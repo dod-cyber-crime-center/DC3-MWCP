@@ -1,0 +1,20 @@
+[
+    {
+        "url": [
+            "http://127.0.0.1"
+        ], 
+        "debug": [
+            "operating on inputfile mwcp-test.py"
+        ], 
+        "outputfile": [
+            [
+                "fooconfigtest.txt", 
+                "example output file"
+            ]
+        ], 
+        "inputfilename": "mwcp-test.py", 
+        "address": [
+            "127.0.0.1"
+        ]
+    }
+]
