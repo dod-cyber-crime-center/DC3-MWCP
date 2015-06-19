@@ -55,8 +55,8 @@ def run_parser(parser):
         logger.info("run_parser %s %s %s" % (parser, datafile.filename, hashlib.md5(data).hexdigest()))
         return __run_parser(parser, data = data, modargs = modargs)
     else:
-        return {'errors': ['No input file provided'] }
         logger.error("run_parser %s no input file" % (parser))
+	return {'errors': ['No input file provided'] }
         
 @app.post('/run_parsers/<parsers:path>')    
 def run_parsers(parsers):

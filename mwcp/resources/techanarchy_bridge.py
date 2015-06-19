@@ -13,6 +13,72 @@ import cStringIO
 TECHANARCHY_OUTPUT_RE = r'''Key: (.*?)\t{1,2} Value: (.*)'''
 TECHANARCHY_DIRECTORY = 'RATDecoders'
 
+def map_bozok_domains(data, reporter):
+    domainlist = data['Domain'].split('*')
+    for domain in domainlist:
+        if len(domain) > 0:
+            if 'Port' in data:
+                reporter.add_metadata('c2_socketaddress', [domain, data['Port'], 'tcp'])
+            else:
+                reporter.add_metadata('c2_address', domain)
+
+def map_unrecom_jar_info(data, reporter):
+    jarinfo = ''
+    mwcpkey = ''
+    if 'jarfoldername' in data:
+        jarinfo = data['jarfoldername']
+        mwcpkey = 'directory'
+    if 'jarname' in data:
+        # if a directory is added put in the \\
+        if len(jarinfo) > 0:
+            jarinfo += '\\'
+        if 'extensionname' in data:
+            jarinfo += data['jarname'] + '.' + data['extensionname']
+            if mwcpkey == 'directory':
+                mwcpkey = 'filepath'
+            else:
+                mwcpkey = 'filename'
+        else:
+            if mwcpkey == 'directory':
+                mwcpkey = 'filepath'
+            else:
+                mwcpkey = 'filename'
+            jarinfo += data['jarname']
+    reporter.add_metadata(mwcpkey, jarinfo)
+
+def map_domainX_fields(data, reporter):
+    suffix_list = ['1',  '2',  '3',  '4',  '5',  '6',  '7',  '8',  '9',  '10',
+                   '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
+    special_handling_list = ['Domain1', 'Domain2']
+    for suffix in suffix_list:
+        field = 'Domain' + suffix
+        if field in data:
+            if not(data[field] == ':0'):
+                if ':' in data[field]:
+                    address, port = data[field].split(':')
+                    reporter.add_metadata('c2_socketaddress', [address, port, 'tcp'])
+                else:
+                    if field in special_handling_list:
+                        if field in data:
+                            if "Port" in data:
+                                reporter.add_metadata("c2_socketaddress", [data[field], data['Port'], "tcp"])
+                            elif ("Port" + suffix) in data:
+                                #assume tcp and c2--use per scriptname customization if this doesn't hold
+                                reporter.add_metadata("c2_socketaddress", [data[field], data['Port' + suffix], "tcp"])
+                            else:
+                                reporter.add_metadata("c2_address", data[field])
+                        elif "Port" + suffix in data:
+                            reporter.add_metadata("port", [data['Port' + suffix], "tcp"])
+                    else:
+                        if field in data:
+                            if not(data[field] == ':0'):
+                                if ':' in data[field]:
+                                    address,port = data[field].split(':')
+                                    reporter.add_metadata('c2_socketaddress', [address, port, 'tcp'])
+                                else:
+                                    reporter.add_metadata('c2_address', data[field])
+
+
 def run_decoder(reporter, script, scriptname=""):
     '''
     Run a RATdecoder and report output
@@ -32,9 +98,9 @@ def run_decoder(reporter, script, scriptname=""):
         command = [reporter.interpreter_path(), script, reporter.filename(), outputfile]
     else:
         command = [script, reporter.filename(), outputfile]
-    
+
     reporter.debug("Running %s using %s" % (scriptname, " ".join(command)))
-    
+
     pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
     stdout, stderr = pipe.communicate(None)
 
@@ -84,110 +150,66 @@ def run_decoder(reporter, script, scriptname=""):
     '''
 
     if "Domain" in data:
-
-        if "Port" in data:
-            #assuming these are all TCP. If there are ever decoders for families that UDP, address here
-            #also assuming these are all c2. If that pattern doesn't hold, then put in a conditional for decoders there Domain isn't a c2_domain
-            if scriptname == "CyberGate":
-                reporter.add_metadata("c2_socketaddress", [data['Domain'].rstrip("|"), data['Port'].rstrip("|"), "tcp" ] )
-            else:
-                reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Port'], "tcp" ] )
+        if scriptname == 'Bozok':
+            map_bozok_domains(data, reporter)
         else:
-             print "placeholder"
-             if scriptname == "LuxNet":
-                if '\\' in data['Domain']:
-                    reporter.add_metadata("registrypath", data['Domain'])
+            if scriptname == 'Pandora':
+                data['Domain'] = data['Domain'].strip('*')
+            if "Port" in data:
+                #assuming these are all TCP. If there are ever decoders for families that UDP, address here
+                #also assuming these are all c2. If that pattern doesn't hold, then put in a conditional for decoders there Domain isn't a c2_domain
+                if scriptname == "CyberGate":
+                    reporter.add_metadata("c2_socketaddress", [data['Domain'].rstrip("|"), data['Port'].rstrip("|"), "tcp" ] )
                 else:
-                    reporter.add_metadata("c2_address", data['Domain'])
-             else:
-                 reporter.add_metadata("c2_address", data['Domain'])
+                    reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Port'], "tcp" ] )
+            elif 'Port1' in data or 'Port2' in data:
+                if 'Port1' in data:
+                    reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Port1'], "tcp" ] )
+                if 'Port2' in data:
+                    reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Port2'], "tcp" ] )
+            elif "Client Control Port" in data or "Client Transfer Port" in data:
+                if "Client Control Port" in data:
+                    reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Client Control Port'], "tcp" ] )
+                if "Client Transfer Port" in data:
+                    reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Client Transfer Port'], "tcp" ] )
+            else:
+                 if scriptname == "LuxNet":
+                    if '\\' in data['Domain']:
+                        reporter.add_metadata("registrypath", data['Domain'])
+                    else:
+                        reporter.add_metadata("c2_address", data['Domain'])
+                 else:
+                     reporter.add_metadata("c2_address", data['Domain'])
 
-        if "Client Transfer Port" in data:
-               reporter.add_metadata("port", [data['Client Transfer Port'], "tcp"])
-        if "Client Control Port" in data:
-               reporter.add_metadata("port", [data['Client Control Port'], "tcp"])
+            if "Client Transfer Port" in data:
+                   reporter.add_metadata("port", [data['Client Transfer Port'], "tcp"])
+            if "Client Control Port" in data:
+                   reporter.add_metadata("port", [data['Client Control Port'], "tcp"])
 
-    elif "Port" in data:
-        #assume all ports are tcp, use scriptname to change this to udp when necessary
-        reporter.add_metadata("port", [data['Port'], "tcp"])
-
-    if "Domain1" in data:
-        if "Port1" in data:
-            #assume tcp and c2--use per scriptname customization if this doesn't hold
-            reporter.add_metadata("c2_socketaddress", [data['Domain1'], data['Port1'], "tcp"])
-        else:
-            reporter.add_metadata("c2_address", data['Domain1'])
-    elif "Port1" in data:
-        reporter.add_metadata("port", [data['Port1'], "tcp"])
-    elif "p1" in data:
-        reporter.add_metadata("port", [data['p1'], "tcp"])
-
-    if "Domain2" in data:
-        if "Port2" in data:
-            #assume tcp and c2--use per scriptname customization if this doesn't hold
-            reporter.add_metadata("c2_socketaddress", [data['Domain2'], data['Port2'], "tcp"])
-        else:
-            reporter.add_metadata("c2_address", data['Domain2'])
-    elif "Port2" in data:
-        reporter.add_metadata("port", [data['Port2'], "tcp"])
-    elif "p2" in data:
-        reporter.add_metadata("port", [data['p2'], "tcp"])
-
-    if "puerto" in data:
-        reporter.add_metadata("port", [data['puerto'], "tcp"])
-
-    if "Domain3" in data:
-        reporter.add_metadata("c2_address", data['Domain3'])
-    if "Domain4" in data:
-        reporter.add_metadata("c2_address", data['Domain4'])
-    if "Domain5" in data:
-        reporter.add_metadata("c2_address", data['Domain5'])
-    if "Domain6" in data:
-        reporter.add_metadata("c2_address", data['Domain6'])
-    if "Domain7" in data:
-        reporter.add_metadata("c2_address", data['Domain7'])
-    if "Domain8" in data:
-        reporter.add_metadata("c2_address", data['Domain8'])
-    if "Domain9" in data:
-        reporter.add_metadata("c2_address", data['Domain9'])
-    if "Domain10" in data:
-        reporter.add_metadata("c2_address", data['Domain10'])
-    if "Domain11" in data:
-        reporter.add_metadata("c2_address", data['Domain11'])
-    if "Domain12" in data:
-        reporter.add_metadata("c2_address", data['Domain12'])
-    if "Domain13" in data:
-        reporter.add_metadata("c2_address", data['Domain13'])
-    if "Domain14" in data:
-        reporter.add_metadata("c2_address", data['Domain14'])
-    if "Domain15" in data:
-        reporter.add_metadata("c2_address", data['Domain15'])
-    if "Domain16" in data:
-        reporter.add_metadata("c2_address", data['Domain16'])
-    if "Domain17" in data:
-        reporter.add_metadata("c2_address", data['Domain17'])
-    if "Domain18" in data:
-        reporter.add_metadata("c2_address", data['Domain18'])
-    if "Domain19" in data:
-        reporter.add_metadata("c2_address", data['Domain19'])
-    if "Domain20" in data:
-        reporter.add_metadata("c2_address", data['Domain20'])
+    map_domainX_fields(data, reporter)
 
     if "dns" in data:
-        reporter.add_metadata("c2_address", data['dns'])
+        if scriptname == 'unrecom':
+            if 'p1' in data:
+                reporter.add_metadata("c2_socketaddress", [data['dns'], data['p1'], 'tcp'])
+            if 'p2' in data:
+                reporter.add_metadata("c2_socketaddress", [data['dns'], data['p2'], 'tcp'])
+        else:
+            reporter.add_metadata("c2_address", data['dns'])
 
     if "Domains" in data:
         #example of script specific parsing
-        if scriptname == "DarkComet":
+        if scriptname == "DarkComet" or scriptname == "poisonivy":
             for addrport in data["Domains"].split("|"):
                 if ":" in addrport:
                     addr, port = addrport.split(":")
+                    if scriptname == 'poisonivy':
+                        addr = addr.translate(None,'5')
                     if addr and port:
                         reporter.add_metadata("c2_socketaddress", [addr, port, "tcp"])
 
-    if "Extension" in data:
-        reporter.add_metadata("filename", data["Extension"])
-
+    if "EncryptionKey" in data:
+        reporter.add_metadata("key", data["EncryptionKey"])
 
 
     if "FTP Address" in data:
@@ -223,8 +245,9 @@ def run_decoder(reporter, script, scriptname=""):
     if "version" in data:
         reporter.add_metadata("version", data['version'] )
 
-    if "Mutex" in data:
-        reporter.add_metadata("mutex", data['Mutex'] )
+    if scriptname != 'jRat':
+        if "Mutex" in data:
+            reporter.add_metadata("mutex", data['Mutex'] )
     if "Mutex Main" in data:
         reporter.add_metadata("mutex", data['Mutex Main'] )
     if "Mutex 4" in data:
@@ -235,6 +258,8 @@ def run_decoder(reporter, script, scriptname=""):
         reporter.add_metadata("mutex", data['mutex'] )
     if "Mutex Grabber" in data:
         reporter.add_metadata("mutex", data['Mutex Grabber'] )
+    if "Mutex Per" in data:
+        reporter.add_metadata("mutex", data['Mutex Per'] )
 
 
     if "Password" in data:
@@ -259,6 +284,8 @@ def run_decoder(reporter, script, scriptname=""):
         reporter.add_metadata("injectionprocess", data['Process Injection'])
     if "Injection" in data:
         reporter.add_metadata("injectionprocess", data['Injection'])
+    if "Inject Exe" in data:
+        reporter.add_metadata("injectionprocess", data['Inject Exe'])
 
     if "Install Dir" in data:
         reporter.add_metadata("directory", data['Install Dir'])
@@ -282,8 +309,7 @@ def run_decoder(reporter, script, scriptname=""):
         reporter.add_metadata("directory", data['FolderName'])
     if "pluginfoldername" in data:
         reporter.add_metadata("directory", data['pluginfoldername'])
-    if "jarfoldername" in data:
-        reporter.add_metadata("directory", data['jarfoldername'])
+
 
     if "nombreCarpeta" in data:
         reporter.add_metadata("directory", data['nombreCarpeta'])
@@ -303,15 +329,28 @@ def run_decoder(reporter, script, scriptname=""):
        reporter.add_metadata("filename", data["Install Name"])
     if "Exe Name" in data:
         reporter.add_metadata("filename", data["Exe Name"])
-    if "jarname" in data:
-        reporter.add_metadata("filename", data["jarname"])
+    if scriptname == 'unrecom':
+        map_unrecom_jar_info(data, reporter)
+    else:
+        if "jarname" in data:
+            reporter.add_metadata("filename", data["jarname"])
+    if "JarName" in data:
+        reporter.add_metadata("filename", data["JarName"])
+    if "Jar Name" in data:
+        reporter.add_metadata("filename", data["Jar Name"])
     if "StartUp Name" in data:
-        reporter.add_metadata("filename", data["StartUp Name"])
+        if scriptname == 'VirusRat':
+            reporter.add_metadata("filename", data["StartUp Name"])
 
-
+    if scriptname == 'Bozok':
+        if 'StartupName' in data:
+            reporter.add_metadata("registrypath", data['StartupName'])
 
     if "File Name" in data:
         reporter.add_metadata("filename", data["File Name"])
+
+    if "USB Name" in data:
+        reporter.add_metadata("filename", data["USB Name"])
 
     if "Log File" in data:
         reporter.add_metadata("filename", data["Log File"])
@@ -339,7 +378,8 @@ def run_decoder(reporter, script, scriptname=""):
             reporter.add_metadata("username", data['FTPUSER'])
     elif "FTPPASS" in data:
         reporter.add_metadata("password", data['FTPPASS'])
-
+    if "Active X Key" in data:
+        reporter.add_metadata("registrypath", data['Active X Key'])
     if "ActiveX Key" in data:
         reporter.add_metadata("registrypath", data['ActiveX Key'])
     if "Active X Startup" in data:
@@ -350,10 +390,24 @@ def run_decoder(reporter, script, scriptname=""):
         reporter.add_metadata("registrypath", data['Startup Key'])
     if "REG Key HKLM" in data:
         reporter.add_metadata("registrypath", data['REG Key HKLM'])
+    if "HKLM Value" in data:
+        if len(data["HKLM Value"]) > 0:
+            reporter.add_metadata("registrypath", data['HKLM Value'])
     if "REG Key HKCU" in data:
         reporter.add_metadata("registrypath", data['REG Key HKCU'])
     if "Reg Key" in data:
-        reporter.add_metadata("registrypath", data['Reg Key'])
+        if "Reg Value" in data or 'Reg value' in data:
+            if "Reg Value" in data:
+                reporter.add_metadata("registrypath", (data['Reg Key'] + '\\' + data['Reg Value']))
+            elif 'Reg value' in data:
+                 reporter.add_metadata("registrypath", (data['Reg Key'] + '\\' + data['Reg value']))
+        else:
+            reporter.add_metadata("registrypath", data['Reg Key'])
+    elif "Reg Value" in data or 'Reg value' in data:
+        if "Reg Value" in data:
+            reporter.add_metadata("registrypath", data['Reg Value'])
+        elif 'Reg value' in data:
+            reporter.add_metadata("registrypath", data['Reg value'])
     if "RegistryKey" in data:
         reporter.add_metadata("registrypath", data['RegistryKey'])
     if "RegKey1" in data:
@@ -364,8 +418,6 @@ def run_decoder(reporter, script, scriptname=""):
         reporter.add_metadata("registrypath", data['HKCUKey'])
     if "HKCU Key" in data:
         reporter.add_metadata("registrypath", data['HKCU Key'])
-    if "Reg Value" in data:
-        reporter.add_metadata("registrypath", data['Reg Value'])
     if "Registry Value" in data:
         reporter.add_metadata("registrypath", data['Registry Value'])
     if "keyClase" in data:
@@ -378,6 +430,8 @@ def run_decoder(reporter, script, scriptname=""):
         reporter.add_metadata("registrypath", data['Custom Reg Key'])
     if "Custom Reg Name" in data:
         reporter.add_metadata("registrypath", data['Custom Reg Name'])
+    if "Custom Reg Value" in data:
+        reporter.add_metadata("registrypath", data['Custom Reg Value'])
     if "HKCU" in data:
         reporter.add_metadata("registrypath", data['HKCU'])
     if "HKLM" in data:
@@ -385,6 +439,9 @@ def run_decoder(reporter, script, scriptname=""):
 
     if "FTP Interval" in data:
         reporter.add_metadata("interval", data['FTP Interval'])
+
+    if "RetryInterval" in data:
+        reporter.add_metadata("interval", data['RetryInterval'])
 
     if "Screen Rec Link" in data:
         reporter.add_metadata("url", data['Screen Rec Link'])

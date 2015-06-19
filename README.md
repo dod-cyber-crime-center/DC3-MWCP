@@ -220,9 +220,9 @@ class Foo(malwareconfigparser):
 
 While DC3-MWCP does not include any malware parsers, it does include a bridge to enable use
 of the parsers provided by Kev of techanarchy.net/malwareconfig.com. The purpose
-of this bridge is to execute the techanarchy parsers, capture the output, and normalize
+of this bridge is to execute the Tech Anarchy parsers, capture the output, and normalize
 the fields. This bridge can be used to create simple DC3-MWCP modules which call the underlying
-techanarchy parsers. It is the responsibility of the user to ensure that field mappings are
+Tech Anarchy parsers. It is the responsibility of the user to ensure that field mappings are
 correct, adjusting the bridge as necessary.
 
 See mwcp/resources/techanarchy_bridge.py

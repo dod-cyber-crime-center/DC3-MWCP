@@ -10,7 +10,6 @@ import traceback
 import hashlib
 import datetime
 import tempfile
-import traceback
 import json
 import base64
 from mwcp.malwareconfigreporter import malwareconfigreporter

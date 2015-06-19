@@ -184,7 +184,7 @@ def main():
         removed_files = tester.remove_test_results(args.parser_name, input_files)
         for filename in removed_files:
             print("Removing results for %s in %s" % (filename, results_file_path))
-    elif args.update or (not args.delete and input_files):
+    elif args.parser_name and (args.update or (not args.delete and input_files)):
         if args.update:
             input_files.extend(tester.list_test_files(args.parser_name))
     
