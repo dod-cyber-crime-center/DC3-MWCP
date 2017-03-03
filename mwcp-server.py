@@ -100,7 +100,7 @@ def descriptions():
         logger.error("descriptions %s" % (traceback.format_exc()))
         return output
         
-def __run_parser(name, data = '', modargs = ''):
+def __run_parser(name, data = '', modargs = '', append_output_text = True):
     output = {}
     logger.info("__run_parser %s %s" % (name, hashlib.md5(data).hexdigest()))
     try:
@@ -113,7 +113,9 @@ def __run_parser(name, data = '', modargs = ''):
         if reporter.errors:
             output["errors"] = reporter.errors
             for error in reporter.errors:
-                logger.error("__run_parser %s %s" % (name, error))    
+                logger.error("__run_parser %s %s" % (name, error))
+        if append_output_text:
+            output["output_text"] = reporter.get_output_text()
         return output
     except Exception as e:
         output = {}

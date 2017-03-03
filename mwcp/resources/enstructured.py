@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 '''
 enstructured -- library for extracting data from data stream using struct like specifications but 
 supporting powerful operations including dynamic structure definitions and nested structures.
@@ -86,6 +86,110 @@ COLORPALLETTE = [
         '#ff40ff', '#ffbfff'
     ]
 
+HTML_BEGIN = '''
+<html>
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Generator content="Microsoft Word 14 (filtered)">
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+	{font-family:Courier;
+	panose-1:2 7 4 9 2 2 5 2 4 4;}
+@font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Calibri;
+	panose-1:2 15 5 2 2 2 4 3 2 4;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin:0in;
+	margin-bottom:.0001pt;
+	font-size:11.0pt;
+	font-family:"Times New Roman","serif";}
+h1
+	{mso-style-link:"Heading 1 Char";
+	margin:0in;
+	margin-bottom:.0001pt;
+	page-break-after:avoid;
+	font-size:16.0pt;
+	font-family:"Calibri","sans-serif";
+	color:#943634;}
+h3
+	{mso-style-link:"Heading 3 Char";
+	margin-top:10.0pt;
+	margin-right:0in;
+	margin-bottom:0in;
+	margin-left:0in;
+	margin-bottom:.0001pt;
+	page-break-after:avoid;
+	font-size:11.0pt;
+	font-family:"Times New Roman","serif";}
+p.MsoNoSpacing, li.MsoNoSpacing, div.MsoNoSpacing
+	{mso-style-link:"No Spacing Char";
+	margin:0in;
+	margin-bottom:.0001pt;
+	font-size:11.0pt;
+	font-family:"Calibri","sans-serif";}
+span.Heading1Char
+	{mso-style-name:"Heading 1 Char";
+	mso-style-link:"Heading 1";
+	color:#943634;
+	font-weight:bold;}
+span.Heading3Char
+	{mso-style-name:"Heading 3 Char";
+	mso-style-link:"Heading 3";
+	font-family:"Times New Roman","serif";
+	font-weight:bold;}
+span.NoSpacingChar
+	{mso-style-name:"No Spacing Char";
+	mso-style-link:"No Spacing";
+	font-family:"Calibri","sans-serif";}
+.MsoChpDefault
+	{font-family:"Calibri","sans-serif";}
+.MsoPapDefault
+	{margin-bottom:10.0pt;
+	line-height:115%;}
+@page WordSection1
+	{size:8.5in 11.0in;
+	margin:1.0in 1.0in 1.0in 1.0in;}
+div.WordSection1
+	{page:WordSection1;}
+-->
+</style>
+</head>
+<body lang=EN-US>
+<div class=WordSection1>
+<p class=MsoNormal style='background:#FFFFFF'><span style='font-size:8.0pt;
+font-family:"Courier New"'>&nbsp;offset&nbsp;|&nbsp;&nbsp;0&nbsp;&nbsp;1&nbsp;&nbsp;2&nbsp;&nbsp;3&nbsp;&nbsp;4&nbsp;&nbsp;5&nbsp;&nbsp;6&nbsp;&nbsp;7&nbsp;&nbsp;8&nbsp;&nbsp;9&nbsp;&nbsp;a&nbsp;&nbsp;b&nbsp;&nbsp;c&nbsp;&nbsp;d&nbsp;&nbsp;e&nbsp;&nbsp;f&nbsp;|&nbsp;0123456789abcdef</span></p>
+<p class=MsoNormal style='background:#FFFFFF'><span style='font-size:8.0pt;
+font-family:"Courier New"'>&nbsp;------ |  -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --  |  ----------------</span></p>
+'''
+
+HTML_TABLE_START = '''
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:5.4pt;border-collapse:collapse;border:none'>
+ <tr>
+  <td width=175 valign=top style='width:131.05pt;border:solid windowtext 1.0pt;
+  background:#244061;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoNoSpacing align=center style='text-align:center'><b><span
+  style='font-size:9.0pt;font-family:"Times New Roman","serif";color:white'>Offset</span></b></p>
+  </td>
+  <td width=238 valign=top style='width:178.7pt;border:solid windowtext 1.0pt;
+  border-left:none;background:#244061;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoNoSpacing align=center style='text-align:center'><b><span
+  style='font-size:9.0pt;font-family:"Times New Roman","serif";color:white'>Name</span></b></p>
+  </td>
+  <td width=218 valign=top style='width:163.65pt;border:solid windowtext 1.0pt;
+  border-left:none;background:#244061;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoNoSpacing align=center style='text-align:center'><b><span
+  style='font-size:9.0pt;font-family:"Times New Roman","serif";color:white'>Value</span></b></p>
+  </td>
+ </tr>
+'''
+
 def extract_single_value(data, type, **params):
     '''
     easily extract a single value
@@ -114,65 +218,40 @@ def member_map(members, depth=1):
         for i in range(members[key]['location'], members[key]['location'] + members[key]['length']):
             membermap[i] = key
     return membermap
-    
+
 def html_hex(data, members, depth=1, colors=COLORPALLETTE, title="Enstructured Hex Output"):
     membermap = member_map(members)
     
     html = []
+    html.append(HTML_BEGIN)
     
-    html.append('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">')
-    html.append('<html>\n')
-    html.append('<head>\n')
-    html.append('    <title>%s</title>\n' % (title))
-    html.append('    <style type="text/css">\n')
-    html.append('       body { font-family: "Courier New", "Lucida Console", monospace; font-size: 12pt}\n')
-    html.append('       table { border-spacing: 0px; table-layout: fixed; width: 614px}\n')
-    html.append('       td, th { word-wrap: break-word}\n')
+    format_colors = []
     for i in range(len(colors)):
         bgcolor = colors[i]
-        name = "color%i" % i
+
         brightness = int(bgcolor[1:3],16) * .299 + int(bgcolor[3:5],16) * .587 + int(bgcolor[5:7],16) * .114
         if brightness >= 128:
             textcolor = "#000000"
         else:
             textcolor = "#ffffff"
-        
-        html.append('       .%s { background-color: %s; color: %s}\n' % (name, bgcolor, textcolor))
-    html.append('       .preformatted { white-space: pre}\n')
-    html.append('    </style>\n')
-    html.append('</head>\n')
-    html.append('<body>\n')
-    html.append('<table>\n')
-    html.append('    <tr><th style="width: 60px">Offset</th><th style="width: 5px"> </th><th style="width: 240px">Name</th><th style="width: 5px"> </th><th style="width: 314px">Value</th></tr>\n')
-    for name in ordered_member_names(members):
-        html.append('    <tr>')
-        html.append('<td>%06x</td><td></td>' % (members[name]['location']))
-        html.append('<td class="color%i">%s</td><td></td>' % (members[name]['index'] % len(colors), name))
-        if 'formatted_value' in members[name]:
-            display_value = members[name]['formatted_value']
-        else:
-            display_value = members[name]['value']
-        if isinstance(display_value, basestring) or isinstance(display_value, numbers.Number):
-            #TODO: handle encoding issues here.
-            html.append('<td>%s</td>' % (str(display_value)))
-        else:
-            html.append('<td>%s</td>' % (re.sub("\n","<br />",pformat(filter_formatted_values(display_value)))))
-        html.append('</tr>\n')
-    html.append('</table>\n')
-    html.append('<br />\n')
-    html.append('<table>\n')
-    html.append('    <tr><th style="width: 60px">Offset</th><th style="width: 5px"> </th><th style="width: 22px">0</th><th style="width: 22px">1</th><th style="width: 22px">2</th><th style="width: 22px">3</th><th style="width: 22px">4</th><th style="width: 22px">5</th><th style="width: 22px">6</th><th style="width: 22px">7</th><th style="width: 22px">8</th><th style="width: 22px">9</th><th style="width: 22px">A</th><th style="width: 22px">B</th><th style="width: 22px">C</th><th style="width: 22px">D</th><th style="width: 22px">E</th><th style="width: 22px">F</th><th style="width: 5px"> </th><th style="width: 12px">0</th><th style="width: 12px">1</th><th style="width: 12px">2</th><th style="width: 12px">3</th><th style="width: 12px">4</th><th style="width: 12px">5</th><th style="width: 12px">6</th><th style="width: 12px">7</th><th style="width: 12px">8</th><th style="width: 12px">9</th><th style="width: 12px">A</th><th style="width: 12px">B</th><th style="width: 12px">C</th><th style="width: 12px">D</th><th style="width: 12px">E</th><th style="width: 12px">F</th></tr>\n')
-    for offset in range(0,len(data),16):
-        html.append('    <tr><td>%06x</td><td></td>' % (offset))
+        format_colors.append([bgcolor,textcolor])
+    
+    for offset in range(0,len(data),16):     
+        hextext = []
         for hexoffset in range(16):
             if offset + hexoffset < len(data):
                 if (offset + hexoffset) in membermap:
-                    html.append('<td class="color%i">%02x</td>' % (members[membermap[offset + hexoffset]]['index'] % len(colors),ord(data[offset+hexoffset])))
+                    index = members[membermap[offset + hexoffset]]['index'] % len(colors)
+                    if hexoffset!= 15 and (offset + hexoffset+1) in membermap:
+                        hextext.append('<span style=\'background:%s;color:%s\'>%02x&nbsp;</span>' % (format_colors[index][0],format_colors[index][1],ord(data[offset+hexoffset])))
+                    else:
+                        hextext.append('<span style=\'background:%s;color:%s\'>%02x</span>&nbsp;' % (format_colors[index][0],format_colors[index][1],ord(data[offset+hexoffset])))
                 else:
-                    html.append('<td>%02x</td>' % (ord(data[offset+hexoffset])))
+                    hextext.append('%02x&nbsp;' % (ord(data[offset+hexoffset])))
             else:
-                html.append('<td></td>')
-        html.append('<td></td>')
+                hextext.append('&nbsp;&nbsp;&nbsp;')
+        
+        asciitext = []
         for hexoffset in range(16):
             if offset + hexoffset < len(data):
                 if ord(data[offset+hexoffset]) > 32 and ord(data[offset+hexoffset]) < 127:
@@ -180,13 +259,37 @@ def html_hex(data, members, depth=1, colors=COLORPALLETTE, title="Enstructured H
                 else:
                     ascii = "."
                 if (offset + hexoffset) in membermap:
-                    html.append('<td class="color%i">%s</td>' % (members[membermap[offset + hexoffset]]['index'] % len(colors),ascii))
+                    index = members[membermap[offset + hexoffset]]['index'] % len(colors)
+                    asciitext.append('<span style=\'background:%s;color:%s\'>%s</span>' % (format_colors[index][0],format_colors[index][1],ascii))
                 else:
-                    html.append('<td>%s</td>' % (ascii))
+                    asciitext.append('%s' % ascii)
             else:
-                html.append('<td></td>')
-        html.append('</tr>\n')
+                asciitext.append('&nbsp;')
+        asciitext = map(lambda x: '&#%d' % ord(x) if len(x)==1 else x,asciitext)
+        html.append('    <p class=MsoNormal style=\'background:#FFFFFF\'><span style=\'font-size:8.0pt;font-family:"Courier New"\'>&nbsp;%06x&nbsp;|&nbsp;%s|&nbsp;%s</span></p>\n'% (offset,''.join(hextext),''.join(asciitext)))
+                    
+    html.append('<p class=MsoNormal>&nbsp;</p>\n')
+    
+    html.append(HTML_TABLE_START)
+
+    for name in ordered_member_names(members):
+        index = members[name]['index'] % len(colors)
+        html.append(r" <tr>  <td width=175 valign=top style='width:131.05pt;border:solid windowtext 1.0pt;  border-top:none;padding:0in 5.4pt 0in 5.4pt'>  <p class=MsoNoSpacing><span style='font-size:8.0pt;font-family:""Courier New"";  '>%06x</span></p>  </td>" % members[name]['location'])
+        
+        html.append(r"<td width=238 valign=top style='width:178.7pt;border-top:none;border-left:  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;  padding:0in 5.4pt 0in 5.4pt'>  <p class=MsoNoSpacing><span style='font-size:8.0pt;font-family:""Courier New"";background:%s;color:%s'>%s</span></p>  </td>" % (format_colors[index][0],format_colors[index][1], name))
+        if 'formatted_value' in members[name]:
+            display_value = members[name]['formatted_value']
+        else:
+            display_value = members[name]['value']
+        if isinstance(display_value, basestring) or isinstance(display_value, numbers.Number):
+            #TODO: handle encoding issues here.
+            display_value = str(display_value)
+        else:
+            display_value = re.sub("\n","<br />",pformat(filter_formatted_values(display_value)))
+            
+        html.append(r"<td width=218 valign=top style='width:163.65pt;border-top:none;border-left:  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;  padding:0in 5.4pt 0in 5.4pt'>  <p class=MsoNoSpacing><span style='font-size:8.0pt;font-family:""Courier New""'>%s</span></p>  </td> </tr>" % (display_value))
     html.append('</table>\n')
+    html.append('</div>\n')
     html.append('</body>\n')
     html.append('</html>\n')
     
@@ -385,6 +488,7 @@ class Extractor(object):
                  endian = None,
                  location = 0,
                  parent = None,
+                 ignored = False
                  ):
         self.data = data
         self.specification = specification
@@ -399,6 +503,7 @@ class Extractor(object):
         self.__currentmember = None
         self.__parent = parent
         self.__baselocation = location
+        self.ignored = ignored
         
         if endian:
             if endian == BIG_ENDIAN or endian == LITTLE_ENDIAN or endian == SYSTEM_ENDIAN:
@@ -438,7 +543,8 @@ class Extractor(object):
             params = {}
             
             if len(spec) > 0 and len(spec) <= 3:
-                
+                if len(self.data) < self.__currentlocation:
+                    break
                 #TODO: check for valid type here?
                 type = spec[0]
                                     
@@ -453,13 +559,22 @@ class Extractor(object):
                         params = self.__eval_replace(spec[2])
                 else:
                     name = self.generate_id()
-                
-                self.extract_member(type, name, params)
+                try:
+                    self.extract_member(type, name, params)
+                except:
+                    #TODO: handle this better. Create elements in the json
+                    return None
             
             else:
                 raise TypeError("Member specification %i is invalid" % (self.__currentspecindex))
                 
-        
+        todelete = []
+        for i in self.members:
+            if self.members[i]['ignore']:
+                todelete.append(i)
+        for i in todelete:
+            del self.members[i]
+                
         return self.members
         
             
@@ -473,6 +588,14 @@ class Extractor(object):
             self.__currentlocation = self.__currentlocation + params['skip']
             skip = params['skip']
             params.pop('skip',None)
+        
+        #For a situation in which the buffer for strings in a list may vary causing 
+        #null bytes to be between each string
+        if "skipnull" in params and params['skipnull']:
+            while self.data[self.__currentlocation] == '\0':
+                self.__currentlocation += 1
+            params.pop('skipnull', None)
+            
         if "location" in params:
             self.__currentlocation = params['location']
             params.pop('location',None)
@@ -495,9 +618,10 @@ class Extractor(object):
             if 'description' in params:
                 self.members[name]['description'] = params.pop('description', "")
         
+        self.members[name]['ignore'] = params.pop('ignore',False)
+            
         self.membernames.append(name)
         self.__currentmember = self.members[name]
-        
         
         getattr(self, "extract_%s" % (type))(**params)
         
@@ -636,7 +760,6 @@ class Extractor(object):
                             "float": 4,
                             "double": 8,
                         }
-        
         self.__currentmember['value'] = struct.unpack(self.__endianflag+formatchars[self.__currentmember['type']],self.data[self.__currentlocation:self.__currentlocation+formatlengths[self.__currentmember['type']]])[0]
         self.__currentlocation = self.__currentlocation + formatlengths[self.__currentmember['type']]
         self.__currentmember['length'] = formatlengths[self.__currentmember['type']]
@@ -683,7 +806,6 @@ class Extractor(object):
             self.__currentmember['length'] = 0
     
     def __unpack_subfield(self, spec, count, maxlength):
-        
         if count == 1:
             extractor = self.__class__(data=self.data,specification=spec,location=self.__currentlocation, external_data = self.external_data, endian = self.__endianflag, parent = self)
             self.__currentmember['value'] = extractor.extract_members()
@@ -692,11 +814,13 @@ class Extractor(object):
             subfieldlist = []
             location = self.__currentlocation
             fieldcount = 0
-            while (fieldcount < count):
+            while (fieldcount < count and location < len(self.data)):
                 extractor = self.__class__(data=self.data,specification=spec,location=location, external_data = self.external_data, endian = self.__endianflag, parent = self)
                 if extractor.__currentlocation - self.__currentlocation >= maxlength:
                     break
-                subfieldlist.append(extractor.extract_members())
+                extracted = extractor.extract_members()
+                if extracted:
+                    subfieldlist.append(extracted)
                 location = extractor.__currentlocation
                 fieldcount = fieldcount + 1
             
@@ -727,7 +851,6 @@ class Extractor(object):
         return parents
     
     def __eval_replace(self, params):
-                
         newparams = {}
         for key in params:
             value = params[key]
@@ -751,11 +874,11 @@ class Extractor(object):
     
     def __aligned_find(self, input, needle, wordlength=1, startoffset=0):
         while startoffset < len(input):
-            pos = input.find(needle,startoffset)
-            if (pos % wordlength) == 0 or pos == -1:
+            pos = input.find(needle, startoffset)
+            if ((pos - startoffset) % wordlength) == 0 or pos == -1:
                 return pos
             else:
-                startoffset = pos + wordlength - (pos % wordlength)
+                startoffset = pos + wordlength - ((pos - startoffset) % wordlength)
         return -1
     
 def __bitmask_values(self, mask):
@@ -781,7 +904,7 @@ def format_filetime(value):
     '''
     Format a windows filetime (number) as an isotime.
     '''
-    return datetime.datetime.fromtimestamp((value)/1000000 - 11644473600).isoformat()
+    return datetime.datetime.fromtimestamp((value)/10000000 - 11644473600).isoformat()
     
     
 def format_enum_factory(definition):
@@ -847,3 +970,39 @@ def format_hex_int(value):
     Format an integer as hex
     '''
     return "0x%x" % (value)
+    
+def format_boolean(value):
+    '''
+    Function Description:
+        Formats a value as a boolean string, True or False
+    
+    Return Value:
+        Formatted string
+    '''
+    return str(bool(value))
+    
+def format_ipv4(hex_ip):
+    '''
+    Function Description:
+        Converts specified DWORD value into an IP address. 
+    
+    Arguments:
+        hex_ip: The DWORD hex representation of an IP address
+        
+    Return Value:
+        The formatted IP address
+    '''
+    return '{:d}.{:d}.{:d}.{:d}'.format(*map(lambda x: ord(x), hex_ip))
+    
+def format_mac(mac_address):
+    '''
+    Function Description:
+        Converts MAC address bytes into a formatted MAC address
+    
+    Arguments:
+        mac_address: The 6-bytes of a MAC address
+        
+    Return Value:
+        The formatted MAC address
+    '''
+    return '{:02x}-{:02x}-{:02x}-{:02x}-{:02x}-{:02x}'.format(*map(lambda x: ord(x), mac_address))

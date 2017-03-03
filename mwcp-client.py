@@ -5,126 +5,213 @@ DC3-MWCP client tool--submit files to the mwcp-server
 
 import os
 import sys
-import httplib
-import uuid
-import optparse
-import urllib2
+import argparse
 import json
+import requests
+import hashlib
+import traceback
 import base64
 
-def make_opt_parser():
+def get_descriptions(host):
     '''
-    create a option parser to handle command line inputs
+    Return list containing parser names, authors, and descriptions.
     '''
     
-    usage_str = 'usage:  %s [options] FILE' % (os.path.basename(sys.argv[0]))
-    description = "DC3-MWCP Framework: client utility for REST API"
-    opt_parser = optparse.OptionParser(usage_str, description = description)
+    url = "http://{0}/descriptions".format(host)
+    try:
+        response = requests.get(url)
+        return json.loads(response.text)
+    except:
+        return {"error": traceback.format_exc()}
+    
+def get_descriptions_table(host):
+    '''
+    Return formatted string with parser descriptions in table
+    format.
+    '''
+    
+    string = "-------------------------------------------------\n"
+    string += "{:<20} {:<15} {}\n".format("Name", "Author", "Description")
+    string += "-------------------------------------------------\n"
+    descriptions = get_descriptions(host)
+    for name, author, description in descriptions:
+        string += "{:<20} {:<15} {}\n".format(name, author, description)
+    return string  
+    
+def valid_parser(host, parser):
+    '''
+    Check if parser name matches a parser name on the server.
+    '''
 
-    opt_parser.add_option('-l',
-                          '--list',
-                          action = "store_true",
-                          default = False,
-                          dest = 'list',
-                          help = 'list all malware config parsers')
-    opt_parser.add_option('-p',
-                          '--parser',
-                          action ='store',
-                          type = 'string',
-                          default = None,
-                          dest = 'parser',
-                          help = 'malware config parser to call')
-    opt_parser.add_option('-H',
-                          '--host',
-                          action = 'store',
-                          type = 'string',
-                          metavar = 'HOST',
-                          default = "localhost:8080",
-                          dest = 'host',
-                          help = 'mwcp-server host' + " [default: %default]")
-    opt_parser.add_option('-w',
-                          '--kwargs',
-                          action = 'store',
-                          type = 'string',
-                          metavar = 'JSON',
-                          default = '',
-                          dest = 'kwargs_raw',
-                          help = 'module keyword arguments as json encoded dictionary\
-                          if values in the dictionary use the special paradigm b64file(filename), then \
-                          filename is read, base64 encoded, and used as the value')
+    descriptions = get_descriptions(host)
+    if parser in [x[0] for x in descriptions]:
+        return True
+    return False
+    
+def run_parser(host, file_path, parser, timeout = 300, modargs = {}):
+    '''
+    Run the provided file against the provided parser.
+    '''
+    
+    url = "http://{0}/run_parser/{1}".format(host, parser)
+    files = {"data": open(file_path, "rb")}
+    data = {"modargs": json.dumps(modargs)}
+    
+    try:
+        response = requests.post(url, files = files, timeout = timeout, data = data)
+        return json.loads(response.text)
+    except:
+        return {"error": traceback.format_exc()}
+    
+    
+def output(args, response_json, filename, md5):
+    '''
+    Output the provided json (dictionary) based on the given
+    arguments. Either print to standard output or write to file.
+    '''
 
-    return opt_parser
+    output_path = args.output if args.output else ""
+    
+    # Output results
+    if args.output == None:
+        print(json.dumps(response_json, indent = 4))
+    else:
+        output_file = os.path.join(args.output, "{0}_{1}.json".format(os.path.basename(filename), md5))
+        with open(output_file, "w") as out:
+            out.write(json.dumps(response_json, indent = 4))
+            
+    # Output any files extracted from the config parser
+    if "outputfile" in response_json and not args.disableparseroutputfiles:
+        for entry in response_json["outputfile"]:
+            name = entry[0]
+            description = entry[1]
+            md5 = entry[2]
+            filedata = base64.b64decode(entry[3])
+            with open(os.path.join(output_path, name), "wb") as f:
+                f.write(filedata)
+    
+def md5(file):
+    '''
+    Return MD5 hash of file.
+    '''
+    
+    hash = hashlib.md5()
+    with open(file, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash.update(chunk)
+    return hash.hexdigest()
+    
+def make_arg_parser():
+    '''
+    Create an argument parser to handle command line inputs
+    '''
 
+    usage_str = '%s [options] FILE' % (os.path.basename(sys.argv[0]))
+    description = "DC3-MWCP client tool--submit files to the mwcp-server"
+    arg_parser = argparse.ArgumentParser(description = description,
+                                         usage = usage_str)
+
+    arg_parser.add_argument("file",
+                            nargs="?",
+                            help = "File or directory pointing to file(s) to parse.")
+    arg_parser.add_argument("-l", 
+                            "--list", 
+                            action = "store_true",
+                            default = False,
+                            help = "List all malware config parsers.",
+                            dest = "list")
+    arg_parser.add_argument("-H",
+                            "--host",
+                            default = "localhost:8080",
+                            dest = "host",
+                            help = "Mwcp-server host. (default: localhost:8080)")
+    arg_parser.add_argument("-o",
+                            "--output",
+                            default = None,
+                            dest = "output",
+                            help = "Output directory to place JSON files instead of standard out.\
+                            Output filenames will have the format <filename>_<MD5>.json. The\
+                            MD5 value is appended to ensure filename uniqueness in the output\
+                            directory.")
+    arg_parser.add_argument("-p",
+                            "--parser",
+                            default = None,
+                            dest = "parser",
+                            help = "Malware config parser to call.")
+    arg_parser.add_argument("-t",
+                            "--timeout",
+                            default = 300,
+                            dest = "timeout",
+                            help = "Timeout limit for running one file against one parser.")
+    arg_parser.add_argument("-d", 
+                            "--disableparseroutputfiles", 
+                            action = "store_true",
+                            default = False,
+                            help = "Do not write files parsed out by config parsers.",
+                            dest = "disableparseroutputfiles")                        
+    arg_parser.add_argument('-w',
+                            '--kwargs',
+                            default = '',
+                            dest = 'kwargs_raw',
+                            help = 'module keyword arguments as json encoded dictionary\
+                            if values in the dictionary use the special paradigm "b64file(filename)", then \
+                            filename is read, base64 encoded, and used as the value')
+    return arg_parser
+    
 def main():
+    '''Run tool.'''
     
-    optparser = make_opt_parser()
-    options, args = optparser.parse_args()
+    arg_parser = make_arg_parser()
+    args = arg_parser.parse_args()
     
-    if options.list:
-        url = "http://%s/descriptions" % (options.host)
-        response = urllib2.urlopen(url)
-        print(response.read())
+    # List parser names and descriptions
+    if args.list:
+        print(get_descriptions_table(args.host))
         sys.exit(0)
-    
-    if len(args) < 1 or not options.parser:
-        optparser.print_help()
+        
+    # Make sure a file or directory of files has been specified
+    if args.file == None:
+        arg_parser.print_help()
         sys.exit(1)
-    
-    filename = args[0]
-    
-    modargs = ""
+        
+    # Verify that file/directory exists
+    if not os.path.exists(args.file):
+        print("File {0} not found".format(args.file))
+        sys.exit(1)
+        
+    # Verify that the parser name is valid
+    if not valid_parser(args.host, args.parser):
+        print("Parser name {0} does not exist on the server.".format(args.parser))
+        sys.exit(1)
+     
+    # Get any custom arguments
     kwargs = {}
-    if options.kwargs_raw: 
-        kwargs = dict(json.loads(options.kwargs_raw))
+    if args.kwargs_raw: 
+        kwargs = dict(json.loads(args.kwargs_raw))
         for key, value in kwargs.iteritems():
             if value and len(value) > len("b64file("):
-                if value[:len("b64file(")] == "b64file(" and value[-1] == ")":
+                if value[:len("b64file(")] == "b64file(" and value[-1:] == ")":
                     tmp_filename = value[len("b64file("):-1]
                     with open(tmp_filename, "rb") as f:
                         kwargs[key] = base64.b64encode(f.read())
-        modargs = json.dumps(kwargs)
+     
+    # Run single file
+    if os.path.isfile(args.file):
+        response_json = run_parser(args.host, args.file, args.parser, timeout = args.timeout, modargs = kwargs)
+        output(args, response_json, args.file, md5(args.file))
+        sys.exit(0)
         
-    
-    responsedata = post_file(options.host, "/run_parser/" + options.parser, filename, modargs = modargs)
-    responseobject = json.loads(responsedata)
-    
-    if "outputfile" in responseobject:
-        newoutputfile = []
-        #outputfile is overloaded with base64 encoded file data.
-        #remove file data from metadata and write to filesystem
-        for file_entry in responseobject["outputfile"]:
-            if len(file_entry) == 3:
-                with open(file_entry[0], "wb") as f:
-                    f.write(base64.b64decode(file_entry[2]))
-            newoutputfile.append([file_entry[0], file_entry[1]])
-        responseobject['outputfile'] = newoutputfile
+    # Recursively run directory of files
+    if os.path.isdir(args.file):
+        for root, dirs, files in os.walk(args.file):
+            for file in files:
+                file_path = os.path.join(os.path.abspath(root), file)
+                response_json = run_parser(args.host, file_path, args.parser, timeout = args.timeout, modargs = kwargs)
+                output(args, response_json, file, md5(file_path))
+        sys.exit(0)
         
-    print json.dumps(responseobject)
-   
-def post_file(host, resource, filename, modargs = ""):
-    base_boundary = '--------mwcp-client-----%s---------' % (uuid.uuid4())
-    content_type = 'multipart/form-data; boundary=%s' % (base_boundary)
-    body = encode_multipart(filename, base_boundary, modargs = modargs)
-    headers = { "Content-Type": content_type, "Content-Length": str(len(body)) }
-    conn = httplib.HTTPConnection(host)
-    conn.request('POST', resource, body, headers)
-    response = conn.getresponse()
-    return response.read()
+    # Shouldn't get here
+    sys.exit(1)
     
-def encode_multipart(filename, base_boundary, modargs = ""):
-    with open(filename, 'rb') as f:
-        data = f.read()
-    body = []
-    if modargs:
-        body.extend(['--', base_boundary, '\r\n'])
-        body.extend(['Content-Disposition: form-data; name="modargs"', '\r\n', '\r\n'])
-        body.extend([modargs, '\r\n'])
-    body.extend(['--', base_boundary, '\r\n'])
-    body.extend(['Content-Disposition: form-data; name="data"; filename="%s"' % (filename), '\r\n'])
-    body.extend(['Content-Type: application/octet-stream', '\r\n', '\r\n'])
-    body.extend([data, '\r\n'])
-    body.extend(['--', base_boundary, '--', '\r\n', '\r\n'])
-    return ''.join(body)
-    
-if __name__ == '__main__':
-    main()    
+if __name__ == "__main__":
+    main()

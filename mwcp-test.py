@@ -7,6 +7,7 @@ DC3-MWCP Framework test case tool
 import argparse
 import os
 import sys
+import locale
 
 # DC3-MWCP framework imports
 from mwcp.malwareconfigtester import malwareconfigtester
@@ -16,7 +17,17 @@ from mwcp.malwareconfigtester import DEFAULT_EXCLUDE_FIELDS
 def get_arg_parser(mwcproot):
     ''' Define command line arguments and return argument parser. '''
     
-    description = "DC3-MWCP Framework: testing utility to create test cases and execute them"
+    description = '''DC3-MWCP Framework: testing utility to create test cases and execute them.
+
+Common usages:
+
+$ mwcp-test.py -ta                                 Run all test cases and only show failed cases
+$ mwcp-test.py -p parser -tf                       Run test cases for single parser and show successful tests
+$ mwcp-test.py -p parser -u                        Update existing test cases for a parser
+$ mwcp-test.py -ua                                 Update existing test cases for all parsers
+$ mwcp-test.py -p parser -i file_paths_file        Add new test cases for a parser
+$ mwcp-test.py -p parser -i file_paths_file -d     Delete test cases for a parser
+'''
     parser = argparse.ArgumentParser(description = description,
                                      formatter_class = argparse.RawDescriptionHelpFormatter,
                                      usage='%(prog)s -p parser [options] [input files]')
@@ -49,32 +60,29 @@ def get_arg_parser(mwcproot):
                         dest = "field_names",
                         default = "",
                         help = "Fields (csv) to compare results for. Reference 'fields.json'. " +
-                               "Ex. socketaddress,registrykey")    
-
+                               "Ex. socketaddress,registrykey")
     parser.add_argument("-x",
                         type = str,
                         dest = "exclude_field_names",
                         default = ",".join(DEFAULT_EXCLUDE_FIELDS),
-                        help = "Fields (csv) excluded from test cases/comparisons. default: %(default)s")    
-                               
+                        help = "Fields (csv) excluded from test cases/comparisons. default: %(default)s")
+    parser.add_argument("-a",
+                        default=False,
+                        dest="all_tests",
+                        action="store_true",
+                        help="select all available parsers, used with -t to test all parsers")
+
     # Arguments used to generate and update test cases
     parser.add_argument("-i",
                         dest = "input_file",
                         action="store_true",
                         default=False,
                         help = "single input file provides a list of files to use as input, one per line")
-
     parser.add_argument("-u",
                         default = False,
                         dest = "update",
                         action = "store_true",
                         help = "Update all stored test cases with newly produced results.")
-
-    parser.add_argument("-a",
-                        default = False,
-                        dest = "all_tests",
-                        action = "store_true",
-                        help = "select all available parsers, used with -t to test all parsers")                        
     parser.add_argument("-d",
                         default = False,
                         dest = "delete",
@@ -83,15 +91,10 @@ def get_arg_parser(mwcproot):
     
     # Arguments to configure console output
     parser.add_argument("-f",
-                        default = False,
-                        action = "store_true",
+                        default = True,
+                        action = "store_false",
                         dest = "only_failed_tests",
-                        help = "Display only failed test case details.")
-    parser.add_argument("-v",
-                        default = False,
-                        action = "store_true",
-                        dest = "verbose",
-                        help = "Verbose output.")
+                        help = "Display all test case details. By default, only failed tests are shown.")
     parser.add_argument("-j",
                         default = False,
                         action = "store_true",
@@ -139,81 +142,123 @@ def main():
             parsers = [ args.parser_name ]
         else:
             print "Error: Invalid parser name(s) specified. Parser names are case sensitive."
-            exit(1)
+            sys.exit(1)
     if args.all_tests:
         parsers = valid_parser_names
     
     if not parsers:
-        print "You must specify the parser to run (or run all parsers)"
-        exit(2)
+        print "You must specify a single parser or all parsers to run or update."
+        sys.exit(2)
     
     if args.parser_name:
         results_file_path = tester.get_results_filepath(args.parser_name)
     
-    #gather all our input files
+    # Gather all our input files
     if args.input_file:
         input_files = read_input_list(input_files[0])
 
-    
-    # Default is to run test cases
+    # Run test cases
     if args.run_tests:
         print "Running test cases. May take a while..."
-        all_passed, test_results = tester.run_tests(parsers, filter(None,args.field_names.split(",")), 
-                                                    ignore_field_names = filter(None, args.exclude_field_names.split(",")))
+
+        # Run tests
+        test_results = tester.run_tests(parsers,
+                                        filter(None,args.field_names.split(",")),
+                                        ignore_field_names=filter(None, args.exclude_field_names.split(",")))
+
+        # Determine if any test cases failed
+        all_passed = True
+        if any([not test_result.passed for test_result in test_results]):
+            all_passed = False
         print "All Passed = {0}\n".format(all_passed)
+
         if not args.silent:
             if args.only_failed_tests:
                 tester.print_test_results(test_results,
                                           failed_tests = True,
                                           passed_tests = False,
-                                          verbose = args.verbose,
                                           json_format = args.json)
             else:
                 tester.print_test_results(test_results,
                                           failed_tests = True,
                                           passed_tests = True,
-                                          verbose = args.verbose,
                                           json_format = args.json)
         if all_passed:
-            exit(0)
+            sys.exit(0)
         else:
-            exit(1)
+            sys.exit(1)
     
-    #add files to test cases
+    # Delete files from test cases
     elif args.delete:
         removed_files = tester.remove_test_results(args.parser_name, input_files)
         for filename in removed_files:
-            print("Removing results for %s in %s" % (filename, results_file_path))
-    elif args.parser_name and (args.update or (not args.delete and input_files)):
-        if args.update:
-            input_files.extend(tester.list_test_files(args.parser_name))
-    
-        for input_file in input_files:
-            metadata = tester.gen_results(parser_name = args.parser_name, input_file_path = input_file)
-            if len(metadata) > 1 and len(reporter.errors) == 0:
-                print("Updating results for %s in %s" % (input_file, results_file_path))
-                tester.update_test_results(results_file_path = results_file_path,
-                                               results_data = metadata,
-                                               replace = True)
-            elif len(metadata) > 1 and len(reporter.errors) > 0:
-                print("Error occurred for %s in %s, not updating" % (input_file, results_file_path))
+            print u"Removing results for {} in {}".format(filename, results_file_path).encode(
+                encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
+                errors="replace")
+
+    # Update previously existing test cases
+    elif args.update:
+        print "Updating test cases. May take a while..."
+        for parser in parsers:
+            results_file_path = tester.get_results_filepath(parser)
+            if os.path.isfile(results_file_path):
+                input_files = tester.list_test_files(parser)
             else:
-                print("Empty results for %s in %s, not updating" % (input_file, results_file_path))
+                print "No test case file found for parser '{}'. No update could be made.".format(parser)
+                continue
+
+            for input_file in input_files:
+                metadata = tester.gen_results(parser_name=parser, input_file_path=input_file)
+                if len(metadata) > 1 and len(reporter.errors) == 0:
+                    print u"Updating results for {} in {}".format(input_file, results_file_path).encode(
+                        encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
+                        errors="replace")
+                    tester.update_test_results(results_file_path=results_file_path,
+                                               results_data=metadata,
+                                               replace=True)
+                elif len(metadata) > 1 and len(reporter.errors) > 0:
+                    print u"Error occurred for {} in {}, not updating".format(input_file, results_file_path).encode(
+                        encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
+                        errors="replace")
+                else:
+                    print u"Empty results for {} in {}, not updating".format(input_file, results_file_path).encode(
+                        encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
+                        errors="replace")
+
+    # Add/update test cases for specified input files and specified parser
+    elif args.parser_name and (not args.delete and input_files):
+        for input_file in input_files:
+            metadata = tester.gen_results(parser_name=args.parser_name, input_file_path=input_file)
+            if len(metadata) > 1 and len(reporter.errors) == 0:
+                print u"Updating results for {} in {}".format(input_file, results_file_path).encode(
+                    encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
+                    errors="replace")
+                tester.update_test_results(results_file_path=results_file_path,
+                                           results_data=metadata,
+                                           replace=True)
+            elif len(metadata) > 1 and len(reporter.errors) > 0:
+                print u"Error occurred for {} in {}, not updating".format(input_file, results_file_path).encode(
+                    encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
+                    errors="replace")
+            else:
+                print u"Empty results for {} in {}, not updating".format(input_file, results_file_path).encode(
+                    encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
+                    errors="replace")
     else:
         argparser.print_help()
+
 
 def read_input_list(filename):
     inputfilelist = []
     if filename:
         if filename == "-":
-            inputfilelist = [ line.rstrip() for line in sys.stdin ]
+            inputfilelist = [line.rstrip() for line in sys.stdin]
         else:
             with open(filename,"rb") as f:
-                inputfilelist = [ line.rstrip() for line in f ]
+                inputfilelist = [line.rstrip() for line in f]
 
     return inputfilelist    
 
 
-    
 if __name__ == "__main__":
     main()

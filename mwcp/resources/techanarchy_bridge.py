@@ -3,26 +3,271 @@
 technanarchy_bridge -- library to execute techanarchy ratdecoders and parse output for DC3-MWCP framework
 '''
 
-import os
-import sys
-import subprocess
-import re
 import cStringIO
+import os
+import re
+import subprocess
+import sys
 
 # Allowing for two tabs to accommodate Punisher
 TECHANARCHY_OUTPUT_RE = r'''Key: (.*?)\t{1,2} Value: (.*)'''
 TECHANARCHY_DIRECTORY = 'RATDecoders'
+SCRIPT_CREATION_STRING = '''import os
+from mwcp.malwareconfigparser import malwareconfigparser
+import techanarchy_bridge
 
-def map_bozok_domains(data, reporter):
-    domainlist = data['Domain'].split('*')
-    for domain in domainlist:
-        if len(domain) > 0:
-            if 'Port' in data:
-                reporter.add_metadata('c2_socketaddress', [domain, data['Port'], 'tcp'])
+class TechAnarchy(malwareconfigparser):
+    def __init__(self,reporter=None):
+        malwareconfigparser.__init__(self,
+                description='Techanarchy %s RATdecoder using bridge',
+                author='TA',
+                reporter=reporter
+                )
+
+    def run(self):
+        scriptpath = os.path.join(self.reporter.resourcedir, '%s', '%s' + '.py')
+        techanarchy_bridge.run_decoder(self.reporter, scriptpath)
+
+'''
+'''
+    New key/fields added that are not current MWCP key pairs should be added to one of the lists
+    below. C2 url keys are added to the domain key list.
+'''
+DIRECTORY_FIELD_LIST = ['Install Dir', 'InstallDir', 'InstallPath', 'Install Folder',
+                        'Install Folder1', 'Install Folder2', 'Install Folder3',
+                        'Folder Name', 'FolderName', 'pluginfoldername', 'nombreCarpeta']
+DOMAIN_KEY_LIST = ['Domains', 'Domain', 'dns']
+FILENAME_FIELD_LIST = ['InstallName', 'Install Name', 'Exe Name',
+                       'Jar Name', 'JarName', 'StartUp Name', 'File Name',
+                       'USB Name', 'Log File', 'Install File Name']
+FILEPATH_CONCATENATE_PAIR_LIST = {'Install Path':'Install Name',
+                                  'Install Directory':'Install File Name'}
+FTP_FIELD_PAIRS = {'FTP Server':'FTP Folder', 'FTPHost':'FTPPort', 'FTPHOST':'FTPPORT'}
+INJECTIONPROCESS_FIELD_LIST = ['Process Injection', 'Injection', 'Inject Exe']
+INTERVAL_FIELD_LIST = ['FTP Interval', 'Remote Delay', 'RetryInterval']
+MISSIONID_FIELD_LIST = ['Campaign ID', 'CampaignID', 'Campaign Name',
+                        'Campaign', 'ID', 'prefijo']
+MUTEX_FIELD_LIST = ['Mutex', 'Mutex Main', 'Mutex 4', 'MUTEX',
+                    'mutex', 'Mutex Grabber', 'Mutex Per']
+NONC2_URL_FIELD_LIST = ['Screen Rec Link', 'WebPanel', 'Plugins']
+
+''' The following list is used when only a password is available, that is a password without
+    a corresponding username. See username below if you have a username/password pair.
+'''
+PASSWORD_ONLY_FIELD_LIST = ['Password', 'password']
+
+''' Note: The username/password list are zipped together in pairs from the following
+    two lists. There is a password only list above.
+'''
+USERNAME_FIELD_LIST = ['FTP UserName', 'FTPUserName', 'FTPUSER']
+PASSWORD_FIELD_LIST = ['FTP Password', 'FTPPassword', 'FTPPASS']
+
+REGISTRYPATH_FIELD_LIST = ['Domain', 'Reg Key', 'StartupName', 'Active X Key', 'ActiveX Key',
+                           'Active X Startup', 'Registry Key', 'Startup Key', 'REG Key HKLM',
+                           'REG Key HKCU', 'HKLM Value', 'RegistryKey', 'HKCUKey', 'HKCU Key',
+                           'Registry Value', 'keyClase', 'regname', 'registryname',
+                           'Custom Reg Key', 'Custom Reg Name', 'Custom Reg Value', 'HKCU',
+                           'HKLM', 'RegKey1', 'RegKey2', 'Custom Reg Key', 'Reg Value']
+VERSION_FIELD_LIST = ['Version', 'version']
+
+'''
+    End of key mapping lists
+'''
+
+def map_ta_fields(data, reporter, field_list, mwcp_key):
+    for field in field_list:
+        if data.get(field):
+            reporter.add_metadata(mwcp_key, data[field])
+
+def map_ta_domain_fields(data, reporter):
+    for domain_key in DOMAIN_KEY_LIST:
+        if domain_key in data:
+            ''' Hack here to handle a LuxNet case where a registry path is stored
+                under the Domain key. '''
+            if data[domain_key].count('\\') < 2:
+                domain_list = []
+                if '|' in data[domain_key]:
+                    ''' The '|' is a separator character so strip it if
+                        it is the last character so the split does not produce
+                        an empty string i.e. '' '''
+                    domain_list = data[domain_key].rstrip('|').split('|')
+                elif '*' in data[domain_key]:
+                    ''' The '*' is a separator character so strip it if
+                        it is the last character '''
+                    domain_list = data[domain_key].rstrip('*').split('*')
+                else:
+                    domain_list = [data[domain_key]]
+                for addport in domain_list:
+                    if ":" in addport:
+                        addr, port = addport.split(":")
+                        if addr and port:
+                            reporter.add_metadata("c2_socketaddress", [addr, port, "tcp"])
+                    elif 'p1' in data or 'p2' in data:
+                        if 'p1' in data:
+                            reporter.add_metadata("c2_socketaddress", [data[domain_key], data['p1'], 'tcp'])
+                        if 'p2' in data:
+                            reporter.add_metadata("c2_socketaddress", [data[domain_key], data['p2'], 'tcp'])
+                    elif  'Port' in data or 'Port1' in data or 'Port2' in data:
+                        if 'Port' in data:
+                            # CyberGate has a separator character in the field remove it here
+                            data['Port'] = data['Port'].rstrip('|').strip('|')
+                            for port in data['Port']:
+                                reporter.add_metadata("c2_socketaddress", [addport, data['Port'], 'tcp'])
+                        if 'Port1' in data:
+                            reporter.add_metadata("c2_socketaddress", [addport, data['Port1'], 'tcp'])
+                        if 'Port2' in data:
+                            reporter.add_metadata("c2_socketaddress", [addport, data['Port2'], 'tcp'])
+                    elif domain_key == 'Domain' and ("Client Control Port" in data or "Client Transfer Port" in data):
+                        if "Client Control Port" in data:
+                            reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Client Control Port'], "tcp" ] )
+                        if "Client Transfer Port" in data:
+                            reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Client Transfer Port'], "tcp" ] )
+                    else:
+                        reporter.add_metadata('c2_address', data[domain_key])
+
+
+def map_domainX_fields(data, reporter):
+    SUFFIX_LIST = ['1',  '2',  '3',  '4',  '5',  '6',  '7',  '8',  '9',  '10',
+                   '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
+    SPECIAL_HANDLING_LIST = ['Domain1', 'Domain2']
+    for suffix in SUFFIX_LIST:
+        field = 'Domain' + suffix
+        if field in data:
+            if data[field] != ':0':
+                if ':' in data[field]:
+                    address, port = data[field].split(':')
+                    reporter.add_metadata('c2_socketaddress', [address, port, 'tcp'])
+                else:
+                    if field in SPECIAL_HANDLING_LIST:
+                        if "Port" in data:
+                            reporter.add_metadata("c2_socketaddress", [data[field], data['Port'], "tcp"])
+                        elif "Port" + suffix in data:
+                            #assume tcp and c2--use per scriptname customization if this doesn't hold
+                            reporter.add_metadata("c2_socketaddress", [data[field], data['Port' + suffix], "tcp"])
+                        else:
+                            reporter.add_metadata("c2_address", data[field])
+                    else:
+                        reporter.add_metadata('c2_address', data[field])
+
+def map_networkgroup_nonc2_fields(data, reporter):
+    map_ta_fields(data, reporter, NONC2_URL_FIELD_LIST, 'url')
+
+def map_network_fields(data, reporter):
+    map_networkgroup_nonc2_fields(data, reporter)
+
+def map_ftp_fields(data, reporter):
+    SPECIAL_HANDLING_PAIRS = {'FTP Address':'FTP Port'}
+    for host, port in SPECIAL_HANDLING_PAIRS.iteritems():
+        ftpdirectory = ''
+        if 'FTP Directory' in data:
+            ftpdirectory = data['FTP Directory']
+        mwcpkey = ''
+        if host in data:
+            ftpinfo = "ftp://" + data[host]
+            mwcpkey = 'c2_url'
+        if port in data:
+            if mwcpkey:
+                ftpinfo += ':' + data[port]
             else:
-                reporter.add_metadata('c2_address', domain)
+                ftpinfo = [data[port], 'tcp']
+                mwcpkey = 'port'
+        if ftpdirectory:
+            if mwcpkey == 'c2_url':
+                ftpinfo += '/' + ftpdirectory
+                reporter.add_metadata(mwcpkey, ftpinfo)
+            elif mwcpkey:
+                reporter.add_metadata(mwcpkey, ftpinfo)
+                reporter.add_metadata('directory', ftpdirectory)
+            else:
+                reporter.add_metadata('directory', ftpdirectory)
+        elif mwcpkey:
+            reporter.add_metadata(mwcpkey, ftpinfo)
 
-def map_unrecom_jar_info(data, reporter):
+    for address, port in FTP_FIELD_PAIRS.iteritems():
+        if address in data:
+            if port in data:
+                reporter.add_metadata("c2_url", "ftp://" + data[address] + "/" + data[port] )
+            else:
+                reporter.add_metadata("c2_url", "ftp://" + data[address]  )
+
+def map_version_fields(data, reporter):
+    map_ta_fields(data, reporter, VERSION_FIELD_LIST, 'version')
+
+def map_mutex_fields(data, reporter):
+    SPECIAL_HANDLING = 'Mutex'
+    for mutex_key in MUTEX_FIELD_LIST:
+        if mutex_key in data:
+            if mutex_key != SPECIAL_HANDLING:
+                reporter.add_metadata('mutex', data[mutex_key])
+            else:
+                if data[mutex_key] != 'false' and data[mutex_key] != 'true':
+                    reporter.add_metadata('mutex', data[mutex_key])
+
+def map_missionid_fields(data, reporter):
+    map_ta_fields(data, reporter, MISSIONID_FIELD_LIST, 'missionid')
+
+def map_injectionprocess_fields(data, reporter):
+    map_ta_fields(data, reporter, INJECTIONPROCESS_FIELD_LIST, 'injectionprocess')
+
+def map_filepath_fields(scriptname, data, reporter):
+    IGNORE_SCRIPT_LIST = ['Pandora', 'Punisher']
+    for pname, fname in FILEPATH_CONCATENATE_PAIR_LIST.iteritems():
+        if scriptname not in IGNORE_SCRIPT_LIST:
+            if pname in data:
+                if fname in data:
+                    reporter.add_metadata("filepath", data[pname].rstrip("\\") + "\\" + data[fname])
+                else:
+                    reporter.add_metadata('directory', data[pname])
+            elif fname in data:
+                reporter.add_metadata('filename', data[fname])
+        else:
+            if pname in data:
+                 reporter.add_metadata('directory', data[pname])
+            if fname in data:
+                 reporter.add_metadata('filename', data[fname])
+
+def map_directory_fields(data, reporter):
+    map_ta_fields(data, reporter, DIRECTORY_FIELD_LIST, 'directory')
+
+def map_username_password_fields(data, reporter):
+    for username, password in zip(USERNAME_FIELD_LIST, PASSWORD_FIELD_LIST):
+        if username in data and password in data:
+            reporter.add_metadata('credential', [data[username], data[password]])
+        elif password in data:
+            reporter.add_metadata('password', data[password])
+        elif username in data:
+            reporter.add_metadata('username', data[username])
+
+    map_ta_fields(data, reporter, PASSWORD_ONLY_FIELD_LIST, 'password')
+
+def map_interval_fields(data, reporter):
+    map_ta_fields(data, reporter, INTERVAL_FIELD_LIST, 'interval')
+
+def check_for_backslashes(ta_key, mwcp_key, data, reporter):
+    IGNORE_FIELD_LIST = ['localhost', 'localhost*']
+    if '\\' in data[ta_key]:
+        reporter.add_metadata(mwcp_key, data[ta_key])
+    elif '.' not in data[ta_key] and data[ta_key] not in IGNORE_FIELD_LIST:
+        reporter.add_metadata(mwcp_key, data[ta_key])
+
+def map_registrypath_fields(data, reporter):
+    SPECIAL_HANDLING = 'Domain'
+    for ta_key in REGISTRYPATH_FIELD_LIST:
+        if ta_key in data:
+            if ta_key == SPECIAL_HANDLING:
+                check_for_backslashes(ta_key, 'registrypath', data, reporter)
+            else:
+                reporter.add_metadata('registrypath', data[ta_key])
+
+def map_filename_fields(data, reporter):
+    map_ta_fields(data, reporter, FILENAME_FIELD_LIST, 'filename')
+
+def map_key_fields(data, reporter):
+    if "EncryptionKey" in data:
+        reporter.add_metadata("key", data["EncryptionKey"])
+
+def map_ta_jar_fields(data, reporter):
+    ''' This routine is for the unrecom family '''
     jarinfo = ''
     mwcpkey = ''
     if 'jarfoldername' in data:
@@ -30,62 +275,52 @@ def map_unrecom_jar_info(data, reporter):
         mwcpkey = 'directory'
     if 'jarname' in data:
         # if a directory is added put in the \\
-        if len(jarinfo) > 0:
-            jarinfo += '\\'
-        if 'extensionname' in data:
-            jarinfo += data['jarname'] + '.' + data['extensionname']
-            if mwcpkey == 'directory':
-                mwcpkey = 'filepath'
-            else:
-                mwcpkey = 'filename'
+        if jarinfo:
+            jarinfo += '\\' + data['jarname']
+            mwcpkey = 'filepath'
         else:
-            if mwcpkey == 'directory':
-                mwcpkey = 'filepath'
-            else:
-                mwcpkey = 'filename'
-            jarinfo += data['jarname']
+            mwcpkey = 'filename'
+            jarinfo = data['jarname']
+        if 'extensionname' in data:
+            jarinfo += '.' + data['extensionname']
     reporter.add_metadata(mwcpkey, jarinfo)
 
-def map_domainX_fields(data, reporter):
-    suffix_list = ['1',  '2',  '3',  '4',  '5',  '6',  '7',  '8',  '9',  '10',
-                   '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
-    special_handling_list = ['Domain1', 'Domain2']
-    for suffix in suffix_list:
-        field = 'Domain' + suffix
-        if field in data:
-            if not(data[field] == ':0'):
-                if ':' in data[field]:
-                    address, port = data[field].split(':')
-                    reporter.add_metadata('c2_socketaddress', [address, port, 'tcp'])
-                else:
-                    if field in special_handling_list:
-                        if field in data:
-                            if "Port" in data:
-                                reporter.add_metadata("c2_socketaddress", [data[field], data['Port'], "tcp"])
-                            elif ("Port" + suffix) in data:
-                                #assume tcp and c2--use per scriptname customization if this doesn't hold
-                                reporter.add_metadata("c2_socketaddress", [data[field], data['Port' + suffix], "tcp"])
-                            else:
-                                reporter.add_metadata("c2_address", data[field])
-                        elif "Port" + suffix in data:
-                            reporter.add_metadata("port", [data['Port' + suffix], "tcp"])
-                    else:
-                        if field in data:
-                            if not(data[field] == ':0'):
-                                if ':' in data[field]:
-                                    address,port = data[field].split(':')
-                                    reporter.add_metadata('c2_socketaddress', [address, port, 'tcp'])
-                                else:
-                                    reporter.add_metadata('c2_address', data[field])
+def map_ta_to_mwcp_keys(scriptname, data, reporter):
+    '''
+    Updates to field mapping code belongs below here
 
+    scriptname can be use to make per decoder customizations
+    '''
+    map_ta_domain_fields(data, reporter)
+    map_domainX_fields(data, reporter)
+    map_key_fields(data, reporter)
+    map_ftp_fields(data, reporter)
+    map_network_fields(data, reporter)
+    map_version_fields(data, reporter)
+    map_mutex_fields(data, reporter)
+    map_missionid_fields(data, reporter)
+    map_injectionprocess_fields(data, reporter)
+    map_filepath_fields(scriptname, data, reporter)
+    map_directory_fields(data, reporter)
+    map_username_password_fields(data, reporter)
+    map_registrypath_fields(data, reporter)
+    map_interval_fields(data, reporter)
+    map_filename_fields(data, reporter)
+    map_network_fields(data, reporter)
+    map_directory_fields(data, reporter)
+    '''
+        The following field mappings only apply to the script unrecom
+    '''
+    if scriptname == 'unrecom':
+          map_ta_jar_fields(data, reporter)
 
 def run_decoder(reporter, script, scriptname=""):
     '''
     Run a RATdecoder and report output
 
-    reporter: mwcp reporter object
+    reporter: DC3-MWCP reporter object
     script: path of script to execute
-    scriptname: This is the name of the decoder script, which is used for decoder specific logic. This is defaults to the basename of the script with the .py removed
+    scriptname: This is the name of the decoder script, which is used for decoder specific logic. It defaults to the basename of the script with the .py removed
 
     '''
     if not scriptname:
@@ -101,8 +336,8 @@ def run_decoder(reporter, script, scriptname=""):
 
     reporter.debug("Running %s using %s" % (scriptname, " ".join(command)))
 
-    pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-    stdout, stderr = pipe.communicate(None)
+    popen_object = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = popen_object.communicate(None)
 
     termhandle = cStringIO.StringIO(stdout)
     for line in termhandle:
@@ -112,8 +347,8 @@ def run_decoder(reporter, script, scriptname=""):
     for line in termhandle:
         reporter.debug(line.rstrip())
 
-    if pipe.returncode != 0:
-        reporter.debug("Error running script. Return code: %i" % ( pipe.returncode))
+    if popen_object.returncode != 0:
+        reporter.debug("Error running script. Return code: %i" % ( popen_object.returncode))
 
     configlist = []
     try:
@@ -138,346 +373,22 @@ def run_decoder(reporter, script, scriptname=""):
         else:
             reporter.debug("Could not parse output item: %s" % (item))
 
-
-
     data = output_data
 
-
-    '''
-    Updates to field mapping code belongs below here
-
-    scriptname can be use to make per decoder customizations
-    '''
-
-    if "Domain" in data:
-        if scriptname == 'Bozok':
-            map_bozok_domains(data, reporter)
-        else:
-            if scriptname == 'Pandora':
-                data['Domain'] = data['Domain'].strip('*')
-            if "Port" in data:
-                #assuming these are all TCP. If there are ever decoders for families that UDP, address here
-                #also assuming these are all c2. If that pattern doesn't hold, then put in a conditional for decoders there Domain isn't a c2_domain
-                if scriptname == "CyberGate":
-                    reporter.add_metadata("c2_socketaddress", [data['Domain'].rstrip("|"), data['Port'].rstrip("|"), "tcp" ] )
-                else:
-                    reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Port'], "tcp" ] )
-            elif 'Port1' in data or 'Port2' in data:
-                if 'Port1' in data:
-                    reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Port1'], "tcp" ] )
-                if 'Port2' in data:
-                    reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Port2'], "tcp" ] )
-            elif "Client Control Port" in data or "Client Transfer Port" in data:
-                if "Client Control Port" in data:
-                    reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Client Control Port'], "tcp" ] )
-                if "Client Transfer Port" in data:
-                    reporter.add_metadata("c2_socketaddress", [data['Domain'], data['Client Transfer Port'], "tcp" ] )
-            else:
-                 if scriptname == "LuxNet":
-                    if '\\' in data['Domain']:
-                        reporter.add_metadata("registrypath", data['Domain'])
-                    else:
-                        reporter.add_metadata("c2_address", data['Domain'])
-                 else:
-                     reporter.add_metadata("c2_address", data['Domain'])
-
-            if "Client Transfer Port" in data:
-                   reporter.add_metadata("port", [data['Client Transfer Port'], "tcp"])
-            if "Client Control Port" in data:
-                   reporter.add_metadata("port", [data['Client Control Port'], "tcp"])
-
-    map_domainX_fields(data, reporter)
-
-    if "dns" in data:
-        if scriptname == 'unrecom':
-            if 'p1' in data:
-                reporter.add_metadata("c2_socketaddress", [data['dns'], data['p1'], 'tcp'])
-            if 'p2' in data:
-                reporter.add_metadata("c2_socketaddress", [data['dns'], data['p2'], 'tcp'])
-        else:
-            reporter.add_metadata("c2_address", data['dns'])
-
-    if "Domains" in data:
-        #example of script specific parsing
-        if scriptname == "DarkComet" or scriptname == "poisonivy":
-            for addrport in data["Domains"].split("|"):
-                if ":" in addrport:
-                    addr, port = addrport.split(":")
-                    if scriptname == 'poisonivy':
-                        addr = addr.translate(None,'5')
-                    if addr and port:
-                        reporter.add_metadata("c2_socketaddress", [addr, port, "tcp"])
-
-    if "EncryptionKey" in data:
-        reporter.add_metadata("key", data["EncryptionKey"])
-
-
-    if "FTP Address" in data:
-        if "FTP Directory" in data and "FTP Port" in data :
-            reporter.add_metadata("c2_url", "ftp://" + data['FTP Address'] + ":" + data['FTP Port'] + "/" + data['FTP Directory'] )
-        elif "FTP Directory" in data:
-            reporter.add_metadata("c2_url", "ftp://" + data['FTP Address'] + "/" + data['FTP Directory'] )
-        elif "FTP Port" in data:
-            reporter.add_metadata("c2_url", "ftp://" + data['FTP Address'] + ":" + data['FTP Port'] )
-        else:
-            reporter.add_metadata("c2_url", "ftp://" + data['FTP Address'] )
-
-    if "FTP Server" in data:
-        if "FTP Folder" in data:
-            reporter.add_metadata("c2_url", "ftp://" + data['FTP Server'] + "/" + data['FTP Folder'] )
-        else:
-            reporter.add_metadata("c2_url", "ftp://" + data['FTP Server']  )
-
-    if "FTPHost" in data:
-        if "FTPPort" in data:
-            reporter.add_metadata("c2_url", "ftp://" + data['FTPHost'] + ":" + data['FTPPort'] )
-        else:
-            reporter.add_metadata("c2_url", "ftp://" + data['FTPHost']  )
-
-    if "FTPHOST" in data:
-        if "FTPPORT" in data:
-            reporter.add_metadata("c2_url", "ftp://" + data['FTPHOST'] + ":" + data['FTPPORT'] )
-        else:
-            reporter.add_metadata("c2_url", "ftp://" + data['FTPPORT']  )
-
-    if "Version" in data:
-        reporter.add_metadata("version", data['Version'] )
-    if "version" in data:
-        reporter.add_metadata("version", data['version'] )
-
-    if scriptname != 'jRat':
-        if "Mutex" in data:
-            reporter.add_metadata("mutex", data['Mutex'] )
-    if "Mutex Main" in data:
-        reporter.add_metadata("mutex", data['Mutex Main'] )
-    if "Mutex 4" in data:
-        reporter.add_metadata("mutex", data['Mutex 4'] )
-    if "MUTEX" in data:
-        reporter.add_metadata("mutex", data['MUTEX'] )
-    if "mutex" in data:
-        reporter.add_metadata("mutex", data['mutex'] )
-    if "Mutex Grabber" in data:
-        reporter.add_metadata("mutex", data['Mutex Grabber'] )
-    if "Mutex Per" in data:
-        reporter.add_metadata("mutex", data['Mutex Per'] )
-
-
-    if "Password" in data:
-        reporter.add_metadata("password", data['Password'])
-    if "password" in data:
-        reporter.add_metadata("password", data['password'])
-
-    if "Campaign ID" in data:
-        reporter.add_metadata("missionid", data['Campaign ID'])
-    if "CampaignID" in data:
-        reporter.add_metadata("missionid", data['CampaignID'])
-    if "Campaign Name" in data:
-        reporter.add_metadata("missionid", data['Campaign Name'])
-    if "Campaign" in data:
-        reporter.add_metadata("missionid", data['Campaign'])
-    if "ID" in data:
-        reporter.add_metadata("missionid", data['ID'])
-    if "prefijo" in data:
-        reporter.add_metadata("missionid", data['prefijo'])
-
-    if "Process Injection" in data:
-        reporter.add_metadata("injectionprocess", data['Process Injection'])
-    if "Injection" in data:
-        reporter.add_metadata("injectionprocess", data['Injection'])
-    if "Inject Exe" in data:
-        reporter.add_metadata("injectionprocess", data['Inject Exe'])
-
-    if "Install Dir" in data:
-        reporter.add_metadata("directory", data['Install Dir'])
-    if "InstallDir" in data:
-        reporter.add_metadata("directory", data['InstallDir'])
-    if "Install Path" in data:
-        reporter.add_metadata("directory", data['Install Path'])
-    if "InstallPath" in data:
-        reporter.add_metadata("directory", data['InstallPath'])
-    if "Install Folder" in data:
-        reporter.add_metadata("directory", data['Install Folder'])
-    if "Install Folder1" in data:
-        reporter.add_metadata("directory", data['Install Folder1'])
-    if "Install Folder2" in data:
-        reporter.add_metadata("directory", data['Install Folder2'])
-    if "Install Folder3" in data:
-        reporter.add_metadata("directory", data['Install Folder3'])
-    if "Folder Name" in data:
-        reporter.add_metadata("directory", data['Folder Name'])
-    if "FolderName" in data:
-        reporter.add_metadata("directory", data['FolderName'])
-    if "pluginfoldername" in data:
-        reporter.add_metadata("directory", data['pluginfoldername'])
-
-
-    if "nombreCarpeta" in data:
-        reporter.add_metadata("directory", data['nombreCarpeta'])
-
-    if "Install Directory" in data:
-        if "Install File Name" in data:
-            #assume windows style path separators
-            reporter.add_metadata("filepath", data["Install Directory"].rstrip("\\") + "\\" + data["Install File Name"])
-        else:
-            reporter.add_metadata("directory", data["Install Directory"])
-    elif "Install File Name" in data:
-        reporter.add_metadata("filename", data["Install File Name"])
-
-    if "InstallName" in data:
-       reporter.add_metadata("filename", data["InstallName"])
-    if "Install Name" in data:
-       reporter.add_metadata("filename", data["Install Name"])
-    if "Exe Name" in data:
-        reporter.add_metadata("filename", data["Exe Name"])
-    if scriptname == 'unrecom':
-        map_unrecom_jar_info(data, reporter)
-    else:
-        if "jarname" in data:
-            reporter.add_metadata("filename", data["jarname"])
-    if "JarName" in data:
-        reporter.add_metadata("filename", data["JarName"])
-    if "Jar Name" in data:
-        reporter.add_metadata("filename", data["Jar Name"])
-    if "StartUp Name" in data:
-        if scriptname == 'VirusRat':
-            reporter.add_metadata("filename", data["StartUp Name"])
-
-    if scriptname == 'Bozok':
-        if 'StartupName' in data:
-            reporter.add_metadata("registrypath", data['StartupName'])
-
-    if "File Name" in data:
-        reporter.add_metadata("filename", data["File Name"])
-
-    if "USB Name" in data:
-        reporter.add_metadata("filename", data["USB Name"])
-
-    if "Log File" in data:
-        reporter.add_metadata("filename", data["Log File"])
-
-    if "FTP UserName" in data:
-        if "FTP Password" in data:
-            reporter.add_metadata("credential", [ data['FTP UserName'], data['FTP Password'] ] )
-        else:
-            reporter.add_metadata("username", data['FTP UserName'])
-    elif "FTP Password" in data:
-        reporter.add_metadata("password", data['FTP Password'])
-
-    if "FTPUserName" in data:
-        if "FTPPassword" in data:
-            reporter.add_metadata("credential", [ data['FTPUserName'], data['FTPPassword'] ] )
-        else:
-            reporter.add_metadata("username", data['FTPUserName'])
-    elif "FTPPassword" in data:
-        reporter.add_metadata("password", data['FTPPassword'])
-
-    if "FTPUSER" in data:
-        if "FTPPASS" in data:
-            reporter.add_metadata("credential", [ data['FTPUSER'], data['FTPPASS'] ] )
-        else:
-            reporter.add_metadata("username", data['FTPUSER'])
-    elif "FTPPASS" in data:
-        reporter.add_metadata("password", data['FTPPASS'])
-    if "Active X Key" in data:
-        reporter.add_metadata("registrypath", data['Active X Key'])
-    if "ActiveX Key" in data:
-        reporter.add_metadata("registrypath", data['ActiveX Key'])
-    if "Active X Startup" in data:
-        reporter.add_metadata("registrypath", data['Active X Startup'])
-    if "Registry Key" in data:
-        reporter.add_metadata("registrypath", data['Registry Key'])
-    if "Startup Key" in data:
-        reporter.add_metadata("registrypath", data['Startup Key'])
-    if "REG Key HKLM" in data:
-        reporter.add_metadata("registrypath", data['REG Key HKLM'])
-    if "HKLM Value" in data:
-        if len(data["HKLM Value"]) > 0:
-            reporter.add_metadata("registrypath", data['HKLM Value'])
-    if "REG Key HKCU" in data:
-        reporter.add_metadata("registrypath", data['REG Key HKCU'])
-    if "Reg Key" in data:
-        if "Reg Value" in data or 'Reg value' in data:
-            if "Reg Value" in data:
-                reporter.add_metadata("registrypath", (data['Reg Key'] + '\\' + data['Reg Value']))
-            elif 'Reg value' in data:
-                 reporter.add_metadata("registrypath", (data['Reg Key'] + '\\' + data['Reg value']))
-        else:
-            reporter.add_metadata("registrypath", data['Reg Key'])
-    elif "Reg Value" in data or 'Reg value' in data:
-        if "Reg Value" in data:
-            reporter.add_metadata("registrypath", data['Reg Value'])
-        elif 'Reg value' in data:
-            reporter.add_metadata("registrypath", data['Reg value'])
-    if "RegistryKey" in data:
-        reporter.add_metadata("registrypath", data['RegistryKey'])
-    if "RegKey1" in data:
-        reporter.add_metadata("registrypath", data['RegKey1'])
-    if "RegKey2" in data:
-        reporter.add_metadata("registrypath", data['RegKey2'])
-    if "HKCUKey" in data:
-        reporter.add_metadata("registrypath", data['HKCUKey'])
-    if "HKCU Key" in data:
-        reporter.add_metadata("registrypath", data['HKCU Key'])
-    if "Registry Value" in data:
-        reporter.add_metadata("registrypath", data['Registry Value'])
-    if "keyClase" in data:
-        reporter.add_metadata("registrypath", data['keyClase'])
-    if "regname" in data:
-        reporter.add_metadata("registrypath", data['regname'])
-    if "registryname" in data:
-        reporter.add_metadata("registrypath", data['registryname'])
-    if "Custom Reg Key" in data:
-        reporter.add_metadata("registrypath", data['Custom Reg Key'])
-    if "Custom Reg Name" in data:
-        reporter.add_metadata("registrypath", data['Custom Reg Name'])
-    if "Custom Reg Value" in data:
-        reporter.add_metadata("registrypath", data['Custom Reg Value'])
-    if "HKCU" in data:
-        reporter.add_metadata("registrypath", data['HKCU'])
-    if "HKLM" in data:
-        reporter.add_metadata("registrypath", data['HKLM'])
-
-    if "FTP Interval" in data:
-        reporter.add_metadata("interval", data['FTP Interval'])
-
-    if "RetryInterval" in data:
-        reporter.add_metadata("interval", data['RetryInterval'])
-
-    if "Screen Rec Link" in data:
-        reporter.add_metadata("url", data['Screen Rec Link'])
-    if "WebPanel" in data:
-        reporter.add_metadata("url", data['WebPanel'])
-    if "Plugins" in data:
-        reporter.add_metadata("url", data['Plugins'])
+    map_ta_to_mwcp_keys(scriptname, data, reporter)
 
 
 def main():
 
     if len(sys.argv) < 2:
-        print("usage: %s NAME ")
-        print("NAME should should be decoder basename without .py extension.")
-        print("when run as script, makes an DC3-MWCP parser for the specified malware")
+        print("usage: techanarchy_bridge.py NAME ")
+        print("NAME should be decoder basename without .py extension.")
+        print("when run as a script from the 'parsers' directory, makes an DC3-MWCP parser for the specified malware family")
         exit(1)
 
     scriptname = sys.argv[1]
 
-    output = ""
-    output += "import os\n"
-    output += "from mwcp.malwareconfigparser import malwareconfigparser\n"
-    output += "import techanarchy_bridge\n"
-    output += "\n"
-    output += "class TechAnarchy(malwareconfigparser):\n"
-    output += "    def __init__(self,reporter=None):\n"
-    output += "        malwareconfigparser.__init__(self,\n"
-    output += "                description='Techanarchy %s RATdecoder using bridge',\n" % (scriptname)
-    output += "                author='TA',\n"
-    output += "                reporter=reporter\n"
-    output += "                )\n"
-    output += "\n"
-    output += "    def run(self):\n"
-    output += "        scriptpath = os.path.join(self.reporter.resourcedir, '%s', '%s' + '.py')\n" % (TECHANARCHY_DIRECTORY, scriptname)
-    output += "        techanarchy_bridge.run_decoder(self.reporter, scriptpath)\n"
-    output += "\n"
+    output = SCRIPT_CREATION_STRING % (scriptname, TECHANARCHY_DIRECTORY, scriptname)
 
     with open(scriptname + "_TA_malwareconfigparser.py", "w") as f:
         f.write(output)

@@ -11,6 +11,8 @@ command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 
 DC3-MWCP requires python 2.7 (the core components should operate on python 2.6).
 
+`mwcp-client.py` requires the requests module.
+
 ###Recommended Modules
 The following modules are recommended as they are often used in parsers
 - pefile
@@ -44,6 +46,18 @@ can simply be placed in these directories.
 
 It is recommended that parser modules be shared in their own distribution packages, allowing for either
 a setup.py install or manual installation by users.
+
+###Updates
+
+DC3-MWCP code updates are implemented to be backwards compatible. 
+
+One exception to backwards compatibility is when new attributes are amended to previously existing 
+fields. An example of this is the MD5 entry being amended to the 'outputfile' field. When attribute 
+additions like this are made, it causes a backwards compatibility conflict with test cases. If 
+`mwcp-test.py` is being used to manage regression tests, the amended attributes can cause previously
+passing test cases to fail. To resolve this issue, work in an evironment where parsers are in a known 
+good state and run the command `mwcp-test.py -ua` to update all test cases. The newly generated test
+cases will include the updated field values.
 
 ##Schema
 
