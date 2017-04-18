@@ -1,4 +1,4 @@
-#DC3-MWCP
+# DC3-MWCP
 DC3 Malware Configuration Parser (DC3-MWCP) is a framework for parsing configuration information from malware.
 The information extracted from malware includes items such as addresses, passwords, filenames, and
 mutex names. A parser module is usually created per malware family.
@@ -7,27 +7,27 @@ and facilitate parser sharing. DC3-MWCP supports both analyst directed analysis 
 large-scale automated execution, utilizing either the native python API, a REST API, or a provided
 command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 
-##Dependencies
+## Dependencies
 
 DC3-MWCP requires python 2.7 (the core components should operate on python 2.6).
 
 `mwcp-client.py` requires the requests module.
 
-###Recommended Modules
+### Recommended Modules
 The following modules are recommended as they are often used in parsers
 - pefile
 - yara-python
 - pyCrypto
 - pydasm
 
-##Installation
+## Installation
 
 Use setup.py to perform a setuptools install or build a distributable package. For 
 example, download the source tree and run `setup.py install`.
 
 DC3-MWCP can also be used by merely downloading the source tree and executing the mwcp utilities.
 
-###Parser and Resource installation
+### Parser and Resource installation
 
 Both parsers and external resources (dependencies) are installed separately from DC3-MWCP.
 
@@ -47,7 +47,7 @@ can simply be placed in these directories.
 It is recommended that parser modules be shared in their own distribution packages, allowing for either
 a setup.py install or manual installation by users.
 
-###Updates
+### Updates
 
 DC3-MWCP code updates are implemented to be backwards compatible. 
 
@@ -59,7 +59,7 @@ passing test cases to fail. To resolve this issue, work in an evironment where p
 good state and run the command `mwcp-test.py -ua` to update all test cases. The newly generated test
 cases will include the updated field values.
 
-##Schema
+## Schema
 
 One of the major goals of DC3-MWCP is to standardize output for malware configuration parsers, making the data
 from one parser comparable with that of other parsers. This is achieved by establishing a schema of 
@@ -79,7 +79,7 @@ will be extracted automatically by DC3-MWCP.
 See mwcp/resources/fields.txt for additional explanation.
 
 
-##Use
+## Use
 DC3-MWCP is designed to allow easy development and use of malware config parsers. DC3-MWCP is also designed to ensure
 that these parsers are scalable and that DC3-MWCP can be integrated in other systems.
 
@@ -93,7 +93,7 @@ There are 3 options for integration of DC3-MWCP:
 
 DC3-MWCP also includes a utility for test case generation and execution: mwcp-test.py
 
-###Python API
+### Python API
 
 mwcp_api_example.py demonstrates how to use the python API:
 
@@ -135,7 +135,7 @@ for filename in reporter.outputfiles:
 
 ```
 
-###REST API
+### REST API
 
 The REST API provides two commonly used functions:
 
@@ -151,7 +151,7 @@ curl http://localhost:8080/descriptions
 bottle (bottlepy.org) is required for the server. The bottle provided web server
 or another wsgi can be used.
 
-###CLI tool
+### CLI tool
 
 mwcp-tool.py provides functionality to run parsers on files:
 
@@ -162,7 +162,7 @@ mwcp-tool.py -p foo README.md
 see ```mwcp-tool.py -h``` for full set of options
 
 
-##Parser Development
+## Parser Development
 
 The high level setps for module development are:
 
@@ -216,7 +216,7 @@ class Foo(malwareconfigparser):
 
 ```
 
-###Parser Development Tips
+### Parser Development Tips
 - Standardized field mapping:
   - Let data type dictate field selection
   - Use most complete field possible
@@ -230,7 +230,7 @@ class Foo(malwareconfigparser):
   - Maintain cross platform functionality: *nix and windows
 - Do not use parser arguments unless absolutely necessary
 
-###Tech Anarchy Bridge
+### Tech Anarchy Bridge
 
 While DC3-MWCP does not include any malware parsers, it does include a bridge to enable use
 of the parsers provided by Kev of techanarchy.net/malwareconfig.com. The purpose
