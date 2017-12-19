@@ -18,7 +18,7 @@ TECHANARCHY_OUTPUT_RE = r"""Key: (.*?)\t{1,2} Value: (.*)"""
 TECHANARCHY_DIRECTORY = 'RATDecoders'
 SCRIPT_CREATION_STRING = """import os
 from mwcp.malwareconfigparser import malwareconfigparser
-import techanarchy_bridge
+from mwcp.resources import techanarchy_bridge
 
 class TechAnarchy(malwareconfigparser):
     def __init__(self,reporter=None):
