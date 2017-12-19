@@ -1,4 +1,6 @@
 # DC3-MWCP
+[Changelog](CHANGELOG.md) | [Releases](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/releases)
+
 DC3 Malware Configuration Parser (DC3-MWCP) is a framework for parsing configuration information from malware.
 The information extracted from malware includes items such as addresses, passwords, filenames, and
 mutex names. A parser module is usually created per malware family.
