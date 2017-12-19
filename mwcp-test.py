@@ -165,8 +165,8 @@ def main():
         print("Running test cases. May take a while...")
 
         # Run tests
-        test_results = tester.run_tests(parsers, filter(None, args.field_names.split(",")),
-                                        ignore_field_names=filter(None, args.exclude_field_names.split(",")))
+        test_results = tester.run_tests(parsers, list(filter(None, args.field_names.split(","))),
+                                        ignore_field_names=list(filter(None, args.exclude_field_names.split(","))))
 
         # Determine if any test cases failed
         all_passed = True
