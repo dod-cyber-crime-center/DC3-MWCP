@@ -3,6 +3,7 @@
 """
 DC3-MWCP Framework test case tool
 """
+from __future__ import print_function
 
 # Standard imports
 import argparse
@@ -153,8 +154,7 @@ def main():
         print("You must specify a single parser or all parsers to run or update.")
         sys.exit(2)
 
-    if args.parser_name:
-        results_file_path = tester.get_results_filepath(args.parser_name)
+    results_file_path = tester.get_results_filepath(args.parser_name)
 
     # Gather all our input files
     if args.input_file:
@@ -195,9 +195,7 @@ def main():
         removed_files = tester.remove_test_results(
             args.parser_name, input_files)
         for filename in removed_files:
-            print(u"Removing results for {} in {}".format(filename, results_file_path).encode(
-                encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
-                errors="replace"))
+            print(u"Removing results for {} in {}".format(filename, results_file_path))
 
     # Update previously existing test cases
     elif args.update:
@@ -214,20 +212,14 @@ def main():
                 metadata = tester.gen_results(
                     parser_name=parser, input_file_path=input_file)
                 if len(metadata) > 1 and len(reporter.errors) == 0:
-                    print(u"Updating results for {} in {}".format(input_file, results_file_path).encode(
-                        encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
-                        errors="replace"))
+                    print(u"Updating results for {} in {}".format(input_file, results_file_path))
                     tester.update_test_results(results_file_path=results_file_path,
                                                results_data=metadata,
                                                replace=True)
                 elif len(metadata) > 1 and len(reporter.errors) > 0:
-                    print(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path).encode(
-                        encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
-                        errors="replace"))
+                    print(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path))
                 else:
-                    print(u"Empty results for {} in {}, not updating".format(input_file, results_file_path).encode(
-                        encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
-                        errors="replace"))
+                    print(u"Empty results for {} in {}, not updating".format(input_file, results_file_path))
 
     # Add/update test cases for specified input files and specified parser
     elif args.parser_name and (not args.delete and input_files):
@@ -235,20 +227,14 @@ def main():
             metadata = tester.gen_results(
                 parser_name=args.parser_name, input_file_path=input_file)
             if len(metadata) > 1 and len(reporter.errors) == 0:
-                print(u"Updating results for {} in {}".format(input_file, results_file_path).encode(
-                    encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
-                    errors="replace"))
+                print(u"Updating results for {} in {}".format(input_file, results_file_path))
                 tester.update_test_results(results_file_path=results_file_path,
                                            results_data=metadata,
                                            replace=True)
             elif len(metadata) > 1 and len(reporter.errors) > 0:
-                print(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path).encode(
-                    encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
-                    errors="replace"))
+                print(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path))
             else:
-                print(u"Empty results for {} in {}, not updating".format(input_file, results_file_path).encode(
-                    encoding=sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
-                    errors="replace"))
+                print(u"Empty results for {} in {}, not updating".format(input_file, results_file_path))
     else:
         argparser.print_help()
 

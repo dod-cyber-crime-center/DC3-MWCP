@@ -2,6 +2,9 @@
 """
 technanarchy_bridge -- library to execute techanarchy ratdecoders and parse output for DC3-MWCP framework
 """
+from __future__ import print_function
+from future.builtins import str, zip
+from six import iteritems
 
 import os
 import re
@@ -9,7 +12,6 @@ import subprocess
 import sys
 
 from io import BytesIO
-from six import iteritems
 
 # Allowing for two tabs to accommodate Punisher
 TECHANARCHY_OUTPUT_RE = r"""Key: (.*?)\t{1,2} Value: (.*)"""

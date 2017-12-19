@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-
 """
 DC3-MWCP cli tool--makes available functionality of DC3-MWCP framework
 """
+from __future__ import print_function
 
 import os
 import sys

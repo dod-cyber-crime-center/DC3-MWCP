@@ -1,2 +1,4 @@
+bottle
+future
 requests
 six

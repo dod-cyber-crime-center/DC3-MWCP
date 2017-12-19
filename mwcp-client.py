@@ -2,6 +2,7 @@
 """
 DC3-MWCP client tool--submit files to the mwcp-server
 """
+from __future__ import print_function
 
 import os
 import sys
