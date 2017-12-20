@@ -7,7 +7,13 @@ All notable changes to this project will be documented in this file.
 - Initial support for Python 3 from @mlaferrera
 
 ### Changed
-- Updated setup.py to install scripts using console_script entry_points.
+- Updated setup.py to install scripts using setuptool's entry_points.
+- Renamed malwareconfigreporter to Reporter and malwareconfigparser to Parser
+    - Old names have been aliased for backwards compatibility but are deprecated.
+
+### Deprecated
+- Deprecated use of resourcedir in Reporter.
+    - Parser should modify sys.path themselves or properly install the library if it has a dependency.
 
 
 ## 1.0.0 - 2017-04-18

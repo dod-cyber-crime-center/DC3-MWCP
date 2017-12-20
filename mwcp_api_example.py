@@ -3,19 +3,18 @@
 Simple example to demonstrate use of the API provided by DC3-MWCP framework.
 """
 
-# first, import the malwareconfigreporter class
-from mwcp.malwareconfigreporter import malwareconfigreporter
+# first, import the Reporter class
+from mwcp import Reporter
 
-# create an instance of the malwareconfigreporter class
-reporter = malwareconfigreporter()
+# create an instance of the Reporter class
+reporter = Reporter()
 """
-The malwareconfigreporter object is the primary DC3-MWCP framework object, containing most input and output data
+The Reporter object is the primary DC3-MWCP framework object, containing most input and output data
 and controlling execution of the parser modules.
 
 The most common parameters to provide are parserdir and resourcedir, depending upon your installation.
 """
 # view location of resource and parser directories
-print(reporter.resourcedir)
 print(reporter.parserdir)
 
 # view available parsers
@@ -25,7 +24,7 @@ print(reporter.get_parser_descriptions())
 reporter.run_parser("foo", "README.md")
 
 # alternate, run on provided buffer:
-reporter.run_parser("foo", data="lorem ipsum")
+reporter.run_parser("foo", data=b"lorem ipsum")
 
 print(reporter.pprint(reporter.metadata))
 

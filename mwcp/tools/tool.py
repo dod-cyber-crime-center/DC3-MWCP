@@ -4,21 +4,21 @@ DC3-MWCP cli tool--makes available functionality of DC3-MWCP framework
 """
 from __future__ import print_function
 
+import argparse
+import base64
+import csv
+import datetime
+import hashlib
+import json
 import os
 import sys
-import argparse
-import traceback
-import hashlib
-import datetime
 import tempfile
-import json
-import base64
 import time
-import csv
-
-from mwcp.malwareconfigreporter import malwareconfigreporter
+import traceback
 
 from six import iteritems
+
+from mwcp.reporter import Reporter
 
 
 def get_arg_parser():
@@ -34,7 +34,7 @@ def get_arg_parser():
 
     # Create reporter to get default paths, ignore if this fails
     try:
-        default_reporter = malwareconfigreporter()
+        default_reporter = Reporter()
         default_parserdir = default_reporter.parserdir
     except Exception:
         pass
@@ -147,14 +147,14 @@ def main():
 
     # If we can not create reporter object there is very little we can do. Just die immediately.
     try:
-        reporter = malwareconfigreporter(parserdir=args.parserdir,
-                                         outputdir=args.outputdir,
-                                         outputfile_prefix=args.outputfile_prefix,
-                                         tempdir=args.tempdir,
-                                         disabledebug=args.hidedebug,
-                                         disableoutputfiles=args.disableoutputfiles,
-                                         disabletempcleanup=args.disabletempcleanup,
-                                         base64outputfiles=args.base64outputfiles)
+        reporter = Reporter(parserdir=args.parserdir,
+                            outputdir=args.outputdir,
+                            outputfile_prefix=args.outputfile_prefix,
+                            tempdir=args.tempdir,
+                            disabledebug=args.hidedebug,
+                            disableoutputfiles=args.disableoutputfiles,
+                            disabletempcleanup=args.disabletempcleanup,
+                            base64outputfiles=args.base64outputfiles)
     except Exception:
         error_message = "Error loading DC3-MWCP reporter object, please check installation: {}".format(traceback.format_exc())
         if args.jsonoutput:

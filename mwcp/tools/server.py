@@ -8,18 +8,18 @@ Requires bottle to be installed which can be done by putting bottle.py in the sa
 this file.
 """
 
+import hashlib
+import json
+import logging
 import os
 import sys
 import traceback
-import json
-import logging
-import hashlib
 
 local_path = os.path.dirname(__file__)
 if local_path not in sys.path:
     sys.path.append(local_path)
 
-from mwcp.malwareconfigreporter import malwareconfigreporter
+from mwcp.reporter import Reporter
 from bottle import Bottle, run, request, response
 
 logger = logging.getLogger("mwcp-server")
@@ -106,7 +106,7 @@ def descriptions():
 
     try:
         response.content_type = "application/json"
-        reporter = malwareconfigreporter(
+        reporter = Reporter(
             base64outputfiles=True, disableoutputfiles=True, parserdir=PARSERDIR)
         return reporter.pprint(reporter.get_parser_descriptions())
     except Exception:
@@ -120,7 +120,7 @@ def __run_parser(name, data=b'', modargs=b'', append_output_text=True):
     output = {}
     logger.info("__run_parser %s %s" % (name, hashlib.md5(data).hexdigest()))
     try:
-        reporter = malwareconfigreporter(base64outputfiles=True, parserdir=PARSERDIR)
+        reporter = Reporter(base64outputfiles=True, parserdir=PARSERDIR)
         kwargs = {}
         if modargs:
             kwargs = dict(json.loads(modargs))

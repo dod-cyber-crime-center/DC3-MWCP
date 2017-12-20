@@ -17,19 +17,20 @@ from io import BytesIO
 TECHANARCHY_OUTPUT_RE = r"""Key: (.*?)\t{1,2} Value: (.*)"""
 TECHANARCHY_DIRECTORY = 'RATDecoders'
 SCRIPT_CREATION_STRING = """import os
-from mwcp.malwareconfigparser import malwareconfigparser
+from mwcp import Parser
+from mwcp import resources
 from mwcp.resources import techanarchy_bridge
 
-class TechAnarchy(malwareconfigparser):
+class TechAnarchy(Parser):
     def __init__(self,reporter=None):
-        malwareconfigparser.__init__(self,
+        Parser.__init__(self,
                 description='Techanarchy %s RATdecoder using bridge',
                 author='TA',
                 reporter=reporter
                 )
 
     def run(self):
-        scriptpath = os.path.join(self.reporter.resourcedir, '%s', '%s' + '.py')
+        scriptpath = os.path.join(os.path.dirname(resources.__file__), '%s', '%s' + '.py')
         techanarchy_bridge.run_decoder(self.reporter, scriptpath)
 
 """

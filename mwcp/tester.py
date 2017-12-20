@@ -16,7 +16,7 @@ import traceback
 DEFAULT_EXCLUDE_FIELDS = ["debug"]
 
 
-class malwareconfigtester(object):
+class Tester(object):
     """DC3-MWCP test case class"""
     
     # Constants

@@ -9,12 +9,11 @@ from __future__ import print_function
 import argparse
 import os
 import sys
-import locale
 
+from mwcp.tester import DEFAULT_EXCLUDE_FIELDS
 # DC3-MWCP framework imports
-from mwcp.malwareconfigtester import malwareconfigtester
-from mwcp.malwareconfigreporter import malwareconfigreporter
-from mwcp.malwareconfigtester import DEFAULT_EXCLUDE_FIELDS
+from mwcp.tester import Tester
+from mwcp.reporter import Reporter
 
 
 def get_arg_parser(mwcproot):
@@ -41,11 +40,6 @@ $ mwcp-test -p parser -i file_paths_file -d     Delete test cases for a parser
                         type=str,
                         dest="test_case_dir",
                         help="Directory containing JSON test case files.")
-    parser.add_argument("-r",
-                        default=os.path.join(mwcproot, "mwcp", "resources"),
-                        type=str,
-                        dest="resource_dir",
-                        help="Resource directory utilized by malware config reporter.")
 
     # Arguments used to run test cases
     parser.add_argument("-t",
@@ -127,14 +121,10 @@ def main():
     args, input_files = argparser.parse_known_args()
 
     # Configure reporter based on args
-    if args.resource_dir:
-        reporter = malwareconfigreporter(resourcedir=args.resource_dir,
-                                         disableoutputfiles=True)
-    else:
-        reporter = malwareconfigreporter(disableoutputfiles=True)
+    reporter = Reporter(disableoutputfiles=True)
 
     # Configure test object
-    tester = malwareconfigtester(
+    tester = Tester(
         reporter=reporter, results_dir=args.test_case_dir)
 
     parser_descriptions = reporter.get_parser_descriptions()
