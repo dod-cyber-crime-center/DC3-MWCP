@@ -1,0 +1,2 @@
+include *.md LICENSE.txt
+recursive-include mwcp/resources *.json *.txt

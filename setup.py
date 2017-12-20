@@ -16,21 +16,28 @@ setup(
     name="mwcp",
     version="1.0.0",
     author="DC3",
-    email="dcci@dc3.mil",
+    author_email="dcci@dc3.mil",
     description=__doc__,
     long_description=read("README.md"),
     keywords="malware",
     url="http://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/",
     packages=find_packages(),
-    package_dir={"mwcp": "mwcp"},
     include_package_data=True,
+    license='MIT',
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Developers',
+        'License :: MIT License",'
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3'
+    ],
     entry_points={
-      'console_scripts': [
-          'mwcp-tool = mwcp.tools.tool:main',
-          'mwcp-client = mwcp.tools.client:main',
-          'mwcp-server = mwcp.tools.server:main',
-          'mwcp-test = mwcp.tools.test:main'
-      ]
+        'console_scripts': [
+            'mwcp-tool = mwcp.tools.tool:main',
+            'mwcp-client = mwcp.tools.client:main',
+            'mwcp-server = mwcp.tools.server:main',
+            'mwcp-test = mwcp.tools.test:main'
+        ]
     },
     install_requires=[
         'bottle',
