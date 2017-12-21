@@ -411,7 +411,7 @@ def is_memory_mapped(file_data):
     """
     pe = obtain_pe(file_data)
     if pe:
-        for i in xrange(len(pe.sections) - 1):
+        for i in range(len(pe.sections) - 1):
             if i == len(pe.sections) - 1:
                 section_end = pe.OPTIONAL_HEADER.SizeOfImage
             else:
@@ -540,7 +540,7 @@ def iter_rsrc(pe, dirtype=None):
             if dir_entry.name:
                 extracted_dirtype = str(dir_entry.name)
             else:
-                for key, id in pefile.RESOURCE_TYPE.iteritems():
+                for key, id in pefile.RESOURCE_TYPE.items():
                     if id == dir_entry.id:
                         extracted_dirtype = key
                         break

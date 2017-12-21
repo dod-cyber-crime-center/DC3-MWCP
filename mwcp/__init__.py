@@ -3,4 +3,4 @@
 from mwcp.parser import Parser
 from mwcp.reporter import Reporter
 from mwcp.resources import techanarchy_bridge
-from mwcp.resources.dispatcher import Dispatcher, ParserBase, FileObject, UnableToParse
+from mwcp.resources.dispatcher import Dispatcher, ComponentParser, FileObject, UnableToParse

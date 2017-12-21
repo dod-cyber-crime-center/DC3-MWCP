@@ -165,7 +165,7 @@ class FileObject(object):
                 self._outputted_file = True
 
 
-class ParserBase(object):
+class ComponentParser(object):
     """
     This is a templated base class for all parser objects.  Either use this as a base for all component parsers, or
     inherit this class into a customized base class for all parsers.  This class includes some of the required data
@@ -177,7 +177,7 @@ class ParserBase(object):
     DESCRIPTION = None
 
     def __init__(self, file_object, reporter, dispatcher):
-        super(ParserBase, self).__init__()
+        super(ComponentParser, self).__init__()
         self.file_object = file_object
         self.reporter = reporter
         self.dispatcher = dispatcher
@@ -220,7 +220,7 @@ class ParserBase(object):
         pass
 
 
-class UnidentifiedFile(ParserBase):
+class UnidentifiedFile(ComponentParser):
     """Describes an unidentified file. This parser will hit on any FileObject."""
     DESCRIPTION = 'Unidentified file'
 
