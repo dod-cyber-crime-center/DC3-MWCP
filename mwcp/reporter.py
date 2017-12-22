@@ -2,6 +2,9 @@
     DC3-MWCP framework primary object used for execution of parsers and collection of metadata
 """
 from __future__ import print_function
+
+import contextlib
+
 from future.builtins import str
 
 import base64
@@ -468,7 +471,6 @@ class Reporter(object):
         :param bytes data: use data as file instead of loading data from filename
         """
         self.__reset()
-        self.__redirect_stdout()
 
         if filename:
             self.__filename = filename
@@ -495,16 +497,17 @@ class Reporter(object):
         source_name = name[:-(len(parser_name) + 1)]
 
         try:
-            found = False
-            for name, source, parser_class in mwcp.iter_parsers(name=parser_name, source=source_name):
-                found = True
-                self.debug('[*] Running parser: {}:{}'.format(source, name))
-                self.handle.seek(0)
-                parser = parser_class(reporter=self)
-                parser.run(**kwargs)
+            with self.__redirect_stdout():
+                found = False
+                for name, source, parser_class in mwcp.iter_parsers(name=parser_name, source=source_name):
+                    found = True
+                    self.debug('[*] Running parser: {}:{}'.format(source, name))
+                    self.handle.seek(0)
+                    parser = parser_class(reporter=self)
+                    parser.run(**kwargs)
 
-            if not found:
-                self.error('Could not find parsers with name: {}'.format(name))
+                if not found:
+                    self.error('Could not find parsers with name: {}'.format(name))
 
         except (Exception, SystemExit) as e:
             if filename:
@@ -515,7 +518,6 @@ class Reporter(object):
                        (name, identifier, traceback.format_exc()))
 
         finally:
-            self.__return_stdout()
             self.__cleanup()
 
     def pprint(self, data):
@@ -680,17 +682,19 @@ class Reporter(object):
 
         return output
 
+    @contextlib.contextmanager
     def __redirect_stdout(self):
-        # we redirect stdout during execution of parser to trap the output
-        self.__debug_stdout = BytesIO()
-        sys.stdout = self.__debug_stdout
-
-    def __return_stdout(self):
-        sys.stdout = self.__orig_stdout
-        if not self.__disabledebug:
-            for line in self.__debug_stdout.getvalue().splitlines():
-                self.add_metadata("debug", line)
-        self.__debug_stdout = BytesIO()
+        """Redirects stdout temporarily to self.debug."""
+        debug_stdout = BytesIO()
+        orig_stdout = sys.stdout
+        sys.stdout = debug_stdout
+        try:
+            yield
+        finally:
+            if not self.__disabledebug:
+                for line in debug_stdout.getvalue().splitlines():
+                    self.debug(line)
+            sys.stdout = orig_stdout
 
     def __reset(self):
         """

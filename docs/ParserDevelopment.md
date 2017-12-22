@@ -153,7 +153,7 @@ foo (mwcp)
 foo (mwcp-acme)                                                        ACME      example parser made by ACME
 ```
 
-NOTE: If multiple mwcp packages contain parsers with the same name (case-insensitive), then all parsers with that name will be run back-to-back. (With results merged together.)
+NOTE: If multiple mwcp packages contain parsers with the same name (case-sensitive), then all parsers with that name will be run back-to-back. (With results merged together.)
 ```
 mwcp-tool -p baz   # Will run the "baz" parser from both mwcp-acme and mwcp-intech
 ```
