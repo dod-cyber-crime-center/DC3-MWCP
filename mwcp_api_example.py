@@ -3,11 +3,11 @@
 Simple example to demonstrate use of the API provided by DC3-MWCP framework.
 """
 
-# first, import the Reporter class
-from mwcp import Reporter
+# first, import mwcp
+import mwcp
 
 # create an instance of the Reporter class
-reporter = Reporter()
+reporter = mwcp.Reporter()
 """
 The Reporter object is the primary DC3-MWCP framework object, containing most input and output data
 and controlling execution of the parser modules.
@@ -18,7 +18,7 @@ The most common parameters to provide are parserdir and resourcedir, depending u
 print(reporter.parserdir)
 
 # view available parsers
-print(reporter.get_parser_descriptions())
+print(mwcp.get_parser_descriptions())
 
 # run the dummy config parser, view the output
 reporter.run_parser("foo", "README.md")

@@ -14,7 +14,7 @@ def read(fname):
 
 setup(
     name="mwcp",
-    version="1.0.0",
+    version="1.1.0",
     author="DC3",
     author_email="dcci@dc3.mil",
     description=__doc__,
@@ -37,6 +37,10 @@ setup(
             'mwcp-client = mwcp.tools.client:main',
             'mwcp-server = mwcp.tools.server:main',
             'mwcp-test = mwcp.tools.test:main'
+        ],
+        'mwcp.parsers': [
+            'bar = mwcp.parsers.bar_malwareconfigparser:Bar',
+            'foo = mwcp.parsers.foo_malwareconfigparser:Foo'
         ]
     },
     install_requires=[

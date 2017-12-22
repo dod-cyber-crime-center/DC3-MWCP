@@ -19,8 +19,9 @@ local_path = os.path.dirname(__file__)
 if local_path not in sys.path:
     sys.path.append(local_path)
 
-from mwcp.reporter import Reporter
 from bottle import Bottle, run, request, response
+
+import mwcp
 
 logger = logging.getLogger("mwcp-server")
 logger.setLevel(logging.DEBUG)
@@ -106,9 +107,9 @@ def descriptions():
 
     try:
         response.content_type = "application/json"
-        reporter = Reporter(
+        reporter = mwcp.Reporter(
             base64outputfiles=True, disableoutputfiles=True, parserdir=PARSERDIR)
-        return reporter.pprint(reporter.get_parser_descriptions())
+        return reporter.pprint(mwcp.get_parser_descriptions())
     except Exception:
         output = {}
         output['errors'] = [traceback.format_exc()]
@@ -120,7 +121,7 @@ def __run_parser(name, data=b'', modargs=b'', append_output_text=True):
     output = {}
     logger.info("__run_parser %s %s" % (name, hashlib.md5(data).hexdigest()))
     try:
-        reporter = Reporter(base64outputfiles=True, parserdir=PARSERDIR)
+        reporter = mwcp.Reporter(base64outputfiles=True, parserdir=PARSERDIR)
         kwargs = {}
         if modargs:
             kwargs = dict(json.loads(modargs))

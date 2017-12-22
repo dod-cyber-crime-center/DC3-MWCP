@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 - Initial support for Python 3 from @mlaferrera
 - `pefileutils` helper module in resources.
 - Dispatcher model, which allows you to split up a parser by their components (Dropper, Implant, etc). (See [documentation](docs/DispatcherParserDevelopment.md) for more information.)
+- Support for using setuptool's entry_points to allow for formal python packaging of parsers. See [documentation](docs/ParserDevelopment.md#formal-parser-packaging) for more information.
+- Added ability to merge results from multiple parsers with the same name but different sources.
 
 ### Changed
 - Updated setup.py to install scripts using setuptool's entry_points.

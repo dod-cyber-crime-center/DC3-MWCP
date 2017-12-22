@@ -5,24 +5,19 @@ from __future__ import print_function
 from future.builtins import str
 
 import base64
-import glob
 import hashlib
-import inspect
 import json
 import ntpath
 import os
 import pefile
-import pkgutil
 import re
 import shutil
 import sys
 import tempfile
 import traceback
-
 from io import BytesIO
 
-from mwcp.parser import Parser
-from mwcp import parsers, resources
+import mwcp
 
 
 PY3 = sys.version_info > (3,)
@@ -65,8 +60,7 @@ class Reporter(object):
         disablemodulesearch: disable search of modules for parsers, only look in parsers directory
 
     Attributes:
-        parserdir: Directory where parsers reside. This directory is added to python path. This should not be
-            changed except through constructor and parsers should have no reason to read this value.
+        parserdir: Optional extra directory where parsers reside.
         tempdir: directory where temporary files should be created. Files created in this directory should
             be deleted by parser. See managed_tempdir for mwcp managed directory
         data: buffer containing input file to parsed
@@ -83,10 +77,6 @@ class Reporter(object):
             use debug instead
 
     """
-
-    # changing this is not recommended
-    __parsernamepostfix = "_malwareconfigparser"
-
     def __init__(self,
                  parserdir=None,
                  outputdir=None,
@@ -103,7 +93,6 @@ class Reporter(object):
                  ):
 
         # defaults
-        self.parserdir = parserdir or os.path.dirname(parsers.__file__)
         self.tempdir = tempdir or tempfile.gettempdir()
         self.outputfiles = {}
         self.data = b''
@@ -121,8 +110,15 @@ class Reporter(object):
         self.__outputdir = outputdir or ''
         self.__outputfile_prefix = outputfile_prefix or ''
 
-        if self.parserdir not in sys.path:
-            sys.path.append(self.parserdir)
+        # Register parsers from given directory.
+        # Only register if a custom parserdir was provided or MWCP's entry_points did not get registered because
+        # the project was not installed with setuptools.
+        # NOTE: This is all to keep backwards compatibility. mwcp.register_parser_directory() should be
+        # called outside of this class in the future.
+        default_parserdir = os.path.dirname(mwcp.parsers.__file__)
+        self.parserdir = parserdir or default_parserdir
+        if self.parserdir != default_parserdir or not list(mwcp.iter_parsers(source='mwcp')):
+            mwcp.register_parser_directory(parserdir)
 
         self.__interpreter_path = interpreter_path
         self.__disabledebug = disabledebug
@@ -136,7 +132,7 @@ class Reporter(object):
         self.__orig_stdout = sys.stdout
 
         # TODO: Move fields.json to shared data or config folder.
-        fieldspath = os.path.join(os.path.dirname(resources.__file__), "fields.json")
+        fieldspath = os.path.join(os.path.dirname(mwcp.resources.__file__), "fields.json")
 
         with open(fieldspath, 'rb') as f:
             self.fields = json.load(f)
@@ -222,7 +218,7 @@ class Reporter(object):
             valueu = self.convert_to_unicode(value)
             if keyu not in self.metadata:
                 self.metadata[keyu] = []
-            if valueu not in self.metadata[keyu] or self.__disablevaluededup:
+            if valueu not in self.metadata[keyu] or self.__disablevaluededup or keyu == 'debug':
                 self.metadata[keyu].append(valueu)
 
             if not self.__disableautosubfieldparsing:
@@ -463,128 +459,64 @@ class Reporter(object):
         else:
             return str(input_string, encoding='utf8', errors='replace')
 
-    def list_parsers(self):
-        """
-        Retrieve list of parsers
-        """
-        parsers = []
-
-        if self.__disablemodulesearch:
-            # We only look for .py files--it is much better to use regular
-            # module search
-            parser_file_postfix = self.__parsernamepostfix + '.py'
-            for fullpath in glob.glob(os.path.join(self.parserdir, '*' + parser_file_postfix)):
-                basefile = os.path.basename(fullpath)
-                parsers.append(basefile[:-len(parser_file_postfix)])
-        else:
-            for loader, modulename, ispkg in pkgutil.iter_modules():
-                if not ispkg:
-                    if modulename[-len(self.__parsernamepostfix):] == self.__parsernamepostfix and len(modulename) > len(self.__parsernamepostfix):
-                        parsers.append(
-                            modulename[:-len(self.__parsernamepostfix)])
-
-        return sorted(parsers, key=lambda s: s.lower())
-
-    def load_parser_instance(self, name):
-        """
-        Load parser instance by parser name
-        """
-        try:
-            parserobj = None
-
-            # we use __import__ instead of importlib.import_module because we
-            # want to work on 2.6
-            parser = __import__("%s%s" % (name, self.__parsernamepostfix))
-
-            # find descendants of malwareconfigparser in this module,
-            # instantiate it
-            for c in list(parser.__dict__.values()):
-                if inspect.isclass(c):
-                    if Parser in c.__bases__:
-                        parserobj = c(reporter=self)
-                        return parserobj
-            # not found
-            self.error("Could not locate parser object in module %s" % (name))
-
-        except (Exception, SystemExit):
-            self.error("Error loading parser %s: %s" %
-                       (name, traceback.format_exc()))
-
-    def get_parser_descriptions(self):
-        """
-        Retrieve list of parser descriptions
-
-        Returns list of tuples per parser. Tuple contains parser name, author, and description.
-        """
-        try:
-            self.__redirect_stdout()
-            descriptions = []
-            for parsername in self.list_parsers():
-                parserobj = self.load_parser_instance(parsername)
-                if parserobj:
-                    descriptions.append(
-                        (parsername, parserobj.author, parserobj.description))
-                else:
-                    descriptions.append(
-                        (parsername, "Parser exists but failed to load.", "Parser exists but failed to load."))
-            self.__return_stdout()
-            return descriptions
-        except (Exception, SystemExit):
-            self.__return_stdout()
-            self.error("Error getting parser descriptions: %s" %
-                       (traceback.format_exc()))
-            return []
-
     def run_parser(self, name, filename=None, data=b"", **kwargs):
         """
         Runs specified parser on file
 
-        :param str name: name of parser module to run
+        :param str name: name of parser module to run (use ":" notation to specify source if necessary e.g. "mwcp-acme:Foo")
         :param str filename: file to parse
         :param bytes data: use data as file instead of loading data from filename
         """
+        self.__reset()
         self.__redirect_stdout()
 
+        if filename:
+            self.__filename = filename
+            with open(self.__filename, 'rb') as f:
+                self.data = f.read()
+        else:
+            self.data = data
+
+        self.handle = BytesIO(self.data)
+
+        if self.data[:2] == b"MZ":
+            # We create pefile object from input file if we can
+            # We want to be able to catch import error and log it using
+            # reporter object.
+            try:
+                self.pe = pefile.PE(data=self.data)
+            except Exception as e:
+                self.debug("Error parsing with pefile: %s" % (str(e)))
+
+        # If name is using dot notation, assume it is being organized by "source_name.parser_name"
+        # Otherwise, we assume its "parser_name" and we'll run the parser for each instance of the parser.
+        # (os.path.basename is necessary in-case source is a file path containing ":"'s)
+        _, _, parser_name = os.path.basename(name).rpartition(':')
+        source_name = name[:-(len(parser_name) + 1)]
+
         try:
+            found = False
+            for name, source, parser_class in mwcp.iter_parsers(name=parser_name, source=source_name):
+                found = True
+                self.debug('[*] Running parser: {}:{}'.format(source, name))
+                self.handle.seek(0)
+                parser = parser_class(reporter=self)
+                parser.run(**kwargs)
 
-            self.__reset()
-
-            if filename:
-                self.__filename = filename
-                with open(self.__filename, 'rb') as f:
-                    self.data = f.read()
-            else:
-                self.data = data
-
-            self.handle = BytesIO(self.data)
-
-            if self.data[:2] == b"MZ":
-                # We create pefile object from input file if we can
-                # We want to be able to catch import error and log it using
-                # reporter object.
-                try:
-                    self.pe = pefile.PE(data=self.data)
-                except Exception as e:
-                    self.debug("Error parsing with pefile: %s" % (str(e)))
-
-            parserobj = self.load_parser_instance(name)
-            if parserobj:
-                # now set in constructor
-                # parserobj.reporter = self
-                parserobj.run(**kwargs)
-
-            self.__return_stdout()
-            self.__cleanup()
+            if not found:
+                self.error('Could not find parsers with name: {}'.format(name))
 
         except (Exception, SystemExit) as e:
             if filename:
                 identifier = filename
             else:
                 identifier = hashlib.md5(data).hexdigest()
-            self.__return_stdout()
-            self.__cleanup()
             self.error("Error running parser %s on %s: %s" %
                        (name, identifier, traceback.format_exc()))
+
+        finally:
+            self.__return_stdout()
+            self.__cleanup()
 
     def pprint(self, data):
         """

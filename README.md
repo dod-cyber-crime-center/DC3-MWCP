@@ -9,6 +9,19 @@ and facilitate parser sharing. DC3-MWCP supports both analyst directed analysis 
 large-scale automated execution, utilizing either the native python API, a REST API, or a provided
 command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 
+## TOC
+- [Install](#install)
+- [Usage](#usage)
+    - [CLI Tool](#cli-tool)
+    - [REST API](#rest-api)
+    - [Python API](#python-api)
+- [Updates](#updates)
+- [Schema](#schema)
+
+### Documentation
+- [Parser Development](docs/ParserDevelopment.md)
+- [Dispatch Parser Development](docs/DispatcherParserDevelopment.md)
+
 ## Install
 
 ```
@@ -136,23 +149,20 @@ le-n4mw7uw3\n\n----Output Files----\n\nfooconfigtest.txt    example output file\
 Simple example to demonstrate use of the API provided by DC3-MWCP framework.
 """
 
-# first, import the malwareconfigreporter class
-from mwcp.malwareconfigreporter import malwareconfigreporter
+# first, import mwcp
+import mwcp
 
-# create an instance of the malwareconfigreporter class
-reporter = malwareconfigreporter()
+# create an instance of the Reporter class
+reporter = mwcp.Reporter()
 """
 The malwareconfigreporter object is the primary DC3-MWCP framework object, containing most input and output data
 and controlling execution of the parser modules.
 
 The most common parameters to provide are parserdir and resourcedir, depending upon your installation.
 """
-# view location of resource and parser directories
-print(reporter.resourcedir)
-print(reporter.parserdir)
 
 # view available parsers
-print(reporter.get_parser_descriptions())
+print(mwcp.get_parser_descriptions())
 
 # run the dummy config parser, view the output
 reporter.run_parser("foo", "README.md")
@@ -199,94 +209,3 @@ individual items reported in composite fields to the degree possible. For exampl
 will be extracted automatically by DC3-MWCP.
 
 See mwcp/resources/fields.txt for additional explanation.
-
-<!-- TODO: move this to its own doc file -->
-## Parser Development
-
-The high level steps for module development are:
-
-- Create new *_malwareconfigparser module
-- Subclass malwareconfigparser
-- Implement run()
-- Use reporter object
-  - Access malware sample
-  - Report metadata
-  - etc.
-
-`foo_malwareconfigparser.py` is provided as an example and may be used as a template:
-
-
-```python
-import os
-from mwcp.malwareconfigparser import malwareconfigparser
-
-class Foo(malwareconfigparser):  
-    def __init__(self, reporter = None):
-        malwareconfigparser.__init__(self,
-            description = 'example parser that works on any file',
-            author = 'DC3',
-            reporter = reporter
-            )
-
-    def run(self):
-            
-        #standardized metadata
-        self.reporter.add_metadata("url", "http://127.0.0.1")
-
-        #demonstrate access to sample
-        self.reporter.debug("size of inputfile is %i bytes" % (len(self.reporter.data)))
-        
-        #other, non-standardized metadata
-        #also demonstrate use of pefile object
-        if self.reporter.pe:
-            self.reporter.add_metadata("other", {"section0": self.reporter.pe.sections[0].Name.rstrip('\x00')})
-
-        #demonstarte file output
-        self.reporter.output_file("hello world", "fooconfigtest.txt", "example output file")
-
-        #demonstrate use of filename()
-        self.reporter.debug("operating on inputfile %s" % self.reporter.filename())
-
-        #demonstrate use of managed tempdir
-        with open(os.path.join(self.reporter.managed_tempdir(), "footmp.txt"), "w") as f:
-            f.write("This is a temp file created in a directory that will be managed by the mwcp framework. \
-                The directory will initially be empty, so there is no worry about name collisions. \
-                The directory is deleted after this module run ends, unless tempcleanup is disabled.")
-
-```
-
-### Parser Installation
-To make a parser available for use, place it in a directory with the name `<name>_malwareconfigparser.py` (Where `<name>` is a unique name you provide. Usually the name of the malware family.)
-Then pass the directory containing your parsers to the mwcp tool being used.
-```
-mwcp-tool --parserdir=C:\my_parsers -p <name> <input_file>
-# OR
-mwcp-server --parserdir=C:\my_parsers
-```
-
-If no parser directory is specified it will default to the parser directory that comes with this python package.
-Usually located in site-package. (e.g. C:\Python27\Lib\site-packages\mwcp\parsers)
-
-### Parser Development Tips
-- Standardized field mapping:
-  - Let data type dictate field selection
-  - Use most complete field possible
-- Include additional context using other fields
-- Output files/artifacts if they are relevant
-- Let DC3-MWCP manage your temp files: see reporter.managed_tempdir()
-- Stay portable:
-  - Respect interfaces
-  - Use common modules for dependencies
-  - Maintain cross platform functionality: *nix and windows
-- Do not use parser arguments unless absolutely necessary
-
-### Tech Anarchy Bridge
-
-While DC3-MWCP does not include any malware parsers, it does include a bridge to enable use
-of the parsers provided by Kev of techanarchy.net/malwareconfig.com. The purpose
-of this bridge is to execute the Tech Anarchy parsers, capture the output, and normalize
-the fields. This bridge can be used to create simple DC3-MWCP modules which call the underlying
-Tech Anarchy parsers. It is the responsibility of the user to ensure that field mappings are
-correct, adjusting the bridge as necessary.
-
-See mwcp/resources/techanarchy_bridge.py

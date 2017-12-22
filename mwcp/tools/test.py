@@ -10,10 +10,11 @@ import argparse
 import os
 import sys
 
+import mwcp
+
 from mwcp.tester import DEFAULT_EXCLUDE_FIELDS
 # DC3-MWCP framework imports
 from mwcp.tester import Tester
-from mwcp.reporter import Reporter
 
 
 def get_arg_parser(mwcproot):
@@ -51,7 +52,7 @@ $ mwcp-test -p parser -i file_paths_file -d     Delete test cases for a parser
                         type=str,
                         dest="parser_name",
                         default="",
-                        help="parser")
+                        help="parser (use ':' notation to specify source if necessary e.g. 'mwcp-acme:Foo')")
     parser.add_argument("-k",
                         type=str,
                         dest="field_names",
@@ -121,13 +122,13 @@ def main():
     args, input_files = argparser.parse_known_args()
 
     # Configure reporter based on args
-    reporter = Reporter(disableoutputfiles=True)
+    reporter = mwcp.Reporter(disableoutputfiles=True)
 
     # Configure test object
     tester = Tester(
         reporter=reporter, results_dir=args.test_case_dir)
 
-    parser_descriptions = reporter.get_parser_descriptions()
+    parser_descriptions = mwcp.get_parser_descriptions()
     valid_parser_names = [x[0] for x in parser_descriptions]
 
     parsers = []

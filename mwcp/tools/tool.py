@@ -18,7 +18,7 @@ import traceback
 
 from six import iteritems
 
-from mwcp.reporter import Reporter
+import mwcp
 
 
 def get_arg_parser():
@@ -34,7 +34,7 @@ def get_arg_parser():
 
     # Create reporter to get default paths, ignore if this fails
     try:
-        default_reporter = Reporter()
+        default_reporter = mwcp.Reporter()
         default_parserdir = default_reporter.parserdir
     except Exception:
         pass
@@ -43,7 +43,7 @@ def get_arg_parser():
                         default="",
                         type=str,
                         dest="parser",
-                        help="Malware config parser to call.")
+                        help="Malware config parser to call. (use ':' notation to specify source if necessary e.g. 'mwcp-acme:Foo')")
     parser.add_argument("-l",
                         action="store_true",
                         default=False,
@@ -147,7 +147,7 @@ def main():
 
     # If we can not create reporter object there is very little we can do. Just die immediately.
     try:
-        reporter = Reporter(parserdir=args.parserdir,
+        reporter = mwcp.Reporter(parserdir=args.parserdir,
                             outputdir=args.outputdir,
                             outputfile_prefix=args.outputfile_prefix,
                             tempdir=args.tempdir,
@@ -164,7 +164,7 @@ def main():
         sys.exit(1)
 
     if args.list:
-        descriptions = reporter.get_parser_descriptions()
+        descriptions = mwcp.get_parser_descriptions()
 
         if args.jsonoutput:
             if reporter.errors:
@@ -172,7 +172,7 @@ def main():
             print(reporter.pprint(descriptions))
         else:
             for name, author, description in descriptions:
-                print('%-25s %-8s %s' % (name, author, description))
+                print('%-70s %-8s %s' % (name, author, description))
             if reporter.errors:
                 print("")
                 print("Errors:")

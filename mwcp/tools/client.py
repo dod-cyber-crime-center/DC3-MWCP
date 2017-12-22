@@ -147,7 +147,7 @@ def make_arg_parser():
                             "--parser",
                             default=None,
                             dest="parser",
-                            help="Malware config parser to call.")
+                            help="Malware config parser to call. (use dot notation to specify source if necessary e.g. 'mwcp-acme.Foo')")
     arg_parser.add_argument("-t",
                             "--timeout",
                             default=300,
