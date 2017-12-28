@@ -45,7 +45,9 @@ setup(
     },
     install_requires=[
         'bottle',
+        'construct',
         'future',
+        'jinja2',  # For construct.html_hex()
         'pefile',
         'requests',
         'six',

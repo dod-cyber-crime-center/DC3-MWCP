@@ -1,4 +1,7 @@
 bottle
+construct==2.8.12
 future
+jinja2==2.10
+pefile
 requests
 six

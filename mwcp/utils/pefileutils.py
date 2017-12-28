@@ -169,7 +169,7 @@ def obtain_exports_list(pe=None, file_data=None, reporter=None):
     :param file_data: Input file data
     :param reporter: MWCP reporter object for debug statements.
 
-    :return: A list of export names, or None.
+    :return: A list of export names.
     """
     if file_data:
         pe = obtain_pe(file_data, reporter=reporter)
@@ -180,6 +180,21 @@ def obtain_exports_list(pe=None, file_data=None, reporter=None):
             return []
     else:
         return []
+
+
+def check_export(export_name, pe=None, file_data=None, reporter=None):
+    """
+    Check if the provided export name is in the list of exports for the file.
+
+    :param export_name: Target export name
+    :param pe: pefile.PE object
+    :param file_data: Input file data
+    :param reporter: Reporter object for debug statements
+
+    :return bool: Indicating if provided export name is in file exports
+    """
+    exports = obtain_exports_list(pe, file_data, reporter)
+    return export_name in exports
 
 
 def obtain_imported_dlls(pe=None, file_data=None, reporter=None):

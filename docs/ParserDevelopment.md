@@ -15,9 +15,9 @@ The high level steps for parser development are:
 
 ```python
 import os
-from mwcp.malwareconfigparser import malwareconfigparser
+from mwcp import Parser
 
-class Foo(malwareconfigparser):
+class Foo(Parser):
     def __init__(self, reporter = None):
         malwareconfigparser.__init__(self,
             description = 'example parser that works on any file',
@@ -63,7 +63,7 @@ For documentation please read: [Dispatcher Parser Development](DispatcherParserD
 
 
 ## Parser Installation
-To make a parser available for use, place it in a directory with the name `<name>_malwareconfigparser.py` (Where `<name>` is a unique name you provide. Usually the name of the malware family.)
+To make a parser available for use, place it in a directory with the name `<name>.py` Where `<name>` is a unique name you provide. Usually the name of the malware family.
 Then pass the directory containing your parsers to the mwcp tool being used.
 ```
 mwcp-tool --parserdir=C:\my_parsers -p <name> <input_file>
@@ -71,7 +71,7 @@ mwcp-tool --parserdir=C:\my_parsers -p <name> <input_file>
 mwcp-server --parserdir=C:\my_parsers
 ```
 
-You should then find your parser available alonside the default parsers that come with MWCP.
+You should then find your parser available alongside the default parsers that come with MWCP.
 ```
 mwcp-tool --parserdir=C:\my_parsers -l
 ```
@@ -84,19 +84,19 @@ foo (mwcp)                                  DC3      example parser that works o
 ```
 
 ## Formal Parser Packaging
-If you would like to package your parsers in a more formal and sharable way,
-MWCP supports the use setuptool's entry_points to register parsers from within
+If you would like to package your parsers in a more formal and shareable way,
+MWCP supports the use of setuptool's entry_points to register parsers from within
 your own python package.
 
 This allows for a number of benefits:
 - Provides a way to encapsulate your parsers as a proper python package.
-- Gives users and easy way to install MWCP and your parsers at the same time. (pip installable)
+- Gives users an easy way to install MWCP and your parsers at the same time. (pip installable)
 - Allows you to specify what versions of MWCP your parsers support.
 - Allows you to easily specify and install extra dependencies your parsers require.
 - Allows you to maintain versions of your parsers.
-- Allows you to provide extra helper modules declared separate from the parsers.
+- Provides a way to distribute and maintain extra helper/utility modules that are used by your parsers.
 
-To set this up, structure your parsers into a module and include a `setup.py` file to declare it as a python package. It should look something like this:
+To set this up, structure your parsers into a package and include a `setup.py` file to declare it as a python package. It should look something like this:
 ```
 some_root_dir/
 |- README.md
@@ -110,7 +110,7 @@ some_root_dir/
 ```
 
 Then, within your `setup.py` file, declare your parsers as entry_points to "mwcp.parsers" pointing
-to your mwcp.Parser classes.
+to your mwcp.Parser classes. (NOTE: The name set before the "=" will be the name of the parser when using the tool.)
 ```python
 from setuptools import setup, find_packages
 
@@ -177,6 +177,7 @@ mwcp-tool -p mwcp-acme:baz   # Will run the "baz" parser from mwcp-acme only.
   - Use common modules for dependencies
   - Maintain cross platform functionality: *nix and windows
 - Do not use parser arguments unless absolutely necessary
+- Use [mwcp.utils.construct](construct.ipynb) to help organize your config structures.
 
 ## Tech Anarchy Bridge
 

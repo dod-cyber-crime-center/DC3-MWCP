@@ -3,7 +3,7 @@ class Parser(object):
     """
     Base class for malware config parsers
 
-    DC3-MWCP modules should be named ${name}_malwareconfigparser.py where ${name} the name used
+    DC3-MWCP modules should be named ${name}.py where ${name} the name used
     to invoke the parser.
 
     Currently, a new parser object is created by the framework for each run().

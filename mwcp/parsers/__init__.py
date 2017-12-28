@@ -45,9 +45,7 @@ def register_parser_directory(parser_dir):
     """
     Registers parsers found in parser_dir. This function allows you to register one-off parsers
     that are not part of an installed python package.
-
-    WARNING: If you use this function for more than one directory and both have a parser with
-    the same name. Only the last one available to be registered.
+    (Files that start with "_" are ignored.)
 
     :param str parser_dir: An extra directory to look for one-off parsers.
     """
@@ -58,10 +56,14 @@ def register_parser_directory(parser_dir):
     orig_path = list(sys.path)
     sys.path.insert(0, parser_dir)
     try:
-        # Look for parsers in the directory containing "_malwareconfigparser.py" suffix.
-        for fullpath in glob.glob(os.path.join(parser_dir, '*_malwareconfigparser.py')):
+        # Look for .py file parsers in the directory.
+        for fullpath in glob.glob(os.path.join(parser_dir, '[!_]*.py')):
             module_name = os.path.basename(fullpath)[:-3]
-            parser_name = module_name[:-len('_malwareconfigparser')]
+            # Account for old-style parsers that have a "_malwareconfigparser.py" prefix.
+            if module_name.endswith('_malwareconfigparser'):
+                parser_name = module_name[:-len('_malwareconfigparser')]
+            else:
+                parser_name = module_name
             module = __import__(module_name)
 
             # find descendants of mwcp.Parser in this module.
@@ -90,7 +92,7 @@ def iter_parsers(name=None, source=None):
     ]
     >>> list(iter_parsers(name='foo'))
     [
-        ('foo', 'local', <class 'foo_malwareconfigparser.Foo'>),
+        ('foo', 'C:\...\parsers', <class 'foo_malwareconfigparser.Foo'>),
         ('foo', 'mwcp-acme', <class 'mwcp-acme.parsers.foo.Foo'>)
     ]
     >>> list(iter_parsers(source='mwcp-acme'))
@@ -103,7 +105,7 @@ def iter_parsers(name=None, source=None):
         ('foo', 'mwcp-acme', <class 'mwcp_acme.parsers.foo.Foo'>)
     ]
 
-    :yields: parser classes
+    :yields: tuple containing: (parser_name, source_name, parser_class)
     """
     # Automatically register any parsers found with 'mwcp.parsers' entry_points.
     _register_entry_points()

@@ -21,6 +21,7 @@ command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 ### Documentation
 - [Parser Development](docs/ParserDevelopment.md)
 - [Dispatch Parser Development](docs/DispatcherParserDevelopment.md)
+- [Construct Tutorial](docs/construct.ipynb)
 
 ## Install
 
@@ -209,3 +210,13 @@ individual items reported in composite fields to the degree possible. For exampl
 will be extracted automatically by DC3-MWCP.
 
 See mwcp/resources/fields.txt for additional explanation.
+
+
+## Helper Utilities
+MWCP comes with a few helper utilities (located in `mwcp.utils`) that may become useful for parsing malware files.
+
+- `pefileutils` - Provides helper functions for common routines done with the pefile library. (obtaining or checking for exports, imports, resources, sections, etc.)
+- `custombase64` - Provides functions for base64 encoding/decoding data with a custom alphabet.
+- `construct` - Provides extended functionality to the [construct](construct.readthedocs.io) library.
+    - This library has replaced the `enstructured` library originally found in the resources directory.
+    - Please follow [this tutorial](docs/construct.ipynb) for migrating from `enstructured` to `construct`.

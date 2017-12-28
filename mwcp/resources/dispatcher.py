@@ -4,14 +4,14 @@ more robust file identification, reporting, and objectifying
 content to ease maintenance.
 """
 
-from collections import deque
 import hashlib
 import io
 import os
-import pefile
 import traceback
+from collections import deque
 
-from mwcp.resources import pefileutils
+import pefile
+from mwcp.utils import pefileutils
 
 
 class UnableToParse(Exception):

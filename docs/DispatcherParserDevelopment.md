@@ -70,13 +70,13 @@ class FooDropper(ComponentParser):
 ```
 
 ### Identifying
-The parser must at least implement the `identify` function. *(Note: This is a class method not an instance method)* This function must return a boolean indicating if the given `file_object` can be parsed by this parser. Since the MWCP parser should only be run on a file that has already been identified using an external method like YARA, we know that the files being passed to it will either be files that matched the signature or files that were extracted by another parser in the same family. Therefore, this function only needs to be able to distinguish itself from the other parsers. For example, if the dropper is the only dll you could return `file_object.pe and file_object.pe.is_dll()`.
+The parser must at least implement the `identify` function. *(Note: This is a class method not an instance method)* This function should return a boolean indicating if the given `file_object` can be parsed by this parser. Since the MWCP parser should only be run on a file that has already been identified using an external method like YARA, we know that the files being passed to it will either be files that matched the signature or files that were extracted by another parser in the same family. Therefore, this function only needs to be able to distinguish itself from the other parsers. For example, if the dropper is the only dll you could return `file_object.pe and file_object.pe.is_dll()`.
 
 ```python
     @classmethod
     def identify(cls, file_object):
         """
-        Identify a Foo Dropper  .
+        Identify a Foo Dropper
 
         :param file_object: dispatcher.FileObject object
 
@@ -100,7 +100,7 @@ self.dispatcher.add_to_queue(embedded_file)
 
 This will place the file onto the dispatcher to be then picked up by the appropriate Component parser.
 
-By default, anything placed onto the queue will automatically be outputted by the MWCP reporter. *(You can disable this by setting `output_file=False` keyword argument when initializing the `FileObject`)*
+By default, anything placed onto the queue will automatically be output by the MWCP reporter. *(You can disable this by setting `output_file=False` keyword argument when initializing the `FileObject`)*
 Therefore, even if you don't have a parser that can pick this up, but would like to output it, it's still a good idea to put it on the queue instead of outputting the file manually. This will allow the possibility of a future Component parser being made that can handle the file.
 
 
