@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 #     parser_name: {source_name: parser_class}
 # }
 _PARSERS = collections.defaultdict(dict)
+_parsers_registered = False
 
 
 def _register_entry_points():
@@ -79,7 +80,7 @@ def iter_parsers(name=None, source=None):
     """
     Iterates all registered parsers.
 
-    :param str name: Filters parser based on a particular name.
+    :param str name: Filters parser based on a particular name. (":" notation is also supported)
     :param str source: Filters parser based on a particular source.
                        (source is either the name of a python package or path to local directory)
 
@@ -100,7 +101,16 @@ def iter_parsers(name=None, source=None):
         ('foo', 'mwcp-acme', <class 'mwcp_acme.parsers.foo.Foo'>),
         ('bar', 'mwcp-acme', <class 'mwcp_acme.parsers.bar.Bar'>
     ]
+    >>> list(iter_parsers('mwcp-acme:'))
+    [
+        ('foo', 'mwcp-acme', <class 'mwcp_acme.parsers.foo.Foo'>),
+        ('bar', 'mwcp-acme', <class 'mwcp_acme.parsers.bar.Bar'>
+    ]
     >>> list(iter_parsers(name='foo', source='mwcp-acme'))
+    [
+        ('foo', 'mwcp-acme', <class 'mwcp_acme.parsers.foo.Foo'>)
+    ]
+    >>> list(iter_parsers('mwcp-acme:foo'))
     [
         ('foo', 'mwcp-acme', <class 'mwcp_acme.parsers.foo.Foo'>)
     ]
@@ -108,7 +118,17 @@ def iter_parsers(name=None, source=None):
     :yields: tuple containing: (parser_name, source_name, parser_class)
     """
     # Automatically register any parsers found with 'mwcp.parsers' entry_points.
-    _register_entry_points()
+    global _parsers_registered
+    if not _parsers_registered:
+        _register_entry_points()
+        _parsers_registered = True
+
+    if name and not source:
+        # If name is using ":" notation, assume it is being organized by "source_name:parser_name"
+        # (os.path.basename is necessary in-case source is a file path containing ":"'s)
+        orig_name = name
+        _, _, name = os.path.basename(name).rpartition(':')
+        source = orig_name[:-(len(name) + 1)]
 
     # Sources are case-insenstive
     if source:

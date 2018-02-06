@@ -13,6 +13,13 @@ import os
 import sys
 import traceback
 
+import mwcp
+
+try:
+    import pkg_resources
+except ImportError:
+    pkg_resources = None
+
 DEFAULT_EXCLUDE_FIELDS = ["debug"]
 
 
@@ -23,11 +30,18 @@ class Tester(object):
     INPUT_FILE_PATH = "inputfilename"
     FILE_EXTENSION = ".json"
 
+    DEFAULT_RESULTS_DIR = os.path.join(os.path.dirname(mwcp.__file__), 'parsertests')
+
     # Properties
     reporter = None
-    results_dir = None
 
-    def __init__(self, reporter, results_dir):
+    def __init__(self, reporter, results_dir=None):
+        """
+        Initailizes Tester.
+
+        :param mwcp.Reporter reporter: MWCP reporter object
+        :param str results_dir: Results dir, or leave as None to dynamically pull.
+        """
         self.reporter = reporter
         self.results_dir = results_dir
 
@@ -55,16 +69,29 @@ class Tester(object):
             filelist.append(metadata[self.INPUT_FILE_PATH])
         return filelist
 
-    def get_results_filepath(self, parser_name):
+    def get_results_filepath(self, parser_name, source=None):
         """
-        Get a results file path based on the parser name provided and the
+        Yields the results file path based on the parser name provided and the
         previously specified output directory.
         """
-
         file_name = parser_name + self.FILE_EXTENSION
-        file_path = os.path.join(self.results_dir, file_name)
+        # Use hardcoded results dir.
+        if self.results_dir:
+            return os.path.join(self.results_dir, file_name)
 
-        return file_path
+        # If package is not installed, use default.
+        elif not pkg_resources:
+            return os.path.join(self.DEFAULT_RESULTS_DIR, file_name)
+
+        # Otherwise dynamically pull based on parser's class location.
+        else:
+            for parser_name, source, klass in mwcp.iter_parsers(parser_name, source=source):
+                # Pull parsertests folder for given parser class.
+                top_level_module, _, _ = klass.__module__.partition('.')
+                results_dir = pkg_resources.resource_filename(top_level_module, 'parsertests')
+                return os.path.join(results_dir, parser_name + self.FILE_EXTENSION)
+
+        raise ValueError('Invalid parser_name: {}'.format(parser_name))
 
     def parse_results_file(self,
                            results_file_path):
@@ -152,7 +179,7 @@ class Tester(object):
         Run tests and compare produced results to expected results.
 
         Arguments:
-            parser_names (list):
+            parser_name (list):
                 A list of parser names to run tests for. If the list is empty (default),
                 then test cases for all parsers will be run.
             field_names(list):
@@ -160,36 +187,31 @@ class Tester(object):
                 during testing. If the list is empty (default), then all fields, except those in
                 ignore_field_names will be compared.
         """
-
-        results_file_list = glob.glob(os.path.join(
-            self.results_dir, "*{0}".format(self.FILE_EXTENSION)))
-        all_test_results = []
-        if not parser_names:
-            parser_names = []
         if not field_names:
             field_names = []
 
         # Determine files to test (this will be a list of JSON files). If no parser name(s) is specified, run
         # all tests.
-        test_case_file_paths = []
-        if len(parser_names) > 0:
-            for parser_name in parser_names:
-                results_file_path = self.get_results_filepath(parser_name)
+        if not parser_names:
+            parser_names = [None]
 
-                if results_file_path in results_file_list:
-                    test_case_file_paths.append(results_file_path)
+        test_case_file_paths = []
+        for parser_name in parser_names:
+            # We want to iterate parsers incase parser_name represents a set of parsers from different sources.
+            for name, source, _ in mwcp.iter_parsers(parser_name):
+                parser_name = '{}:{}'.format(source, name)
+                results_file_path = self.get_results_filepath(parser_name)
+                if os.path.isfile(results_file_path):
+                    test_case_file_paths.append((parser_name, results_file_path))
                 else:
                     print("Results file not found for {} parser".format(parser_name))
-                    print("File not found = {}".format(results_file_path))
-        else:
-            test_case_file_paths = results_file_list
+                    print("File(s) not found = {}".format(results_file_path))
 
+        all_test_results = []
         # Parse test case/results files, run tests, and compare expected
         # results to produced results
-        for results_file_path in test_case_file_paths:
+        for parser_name, results_file_path in test_case_file_paths:
             results_data = self.parse_results_file(results_file_path)
-            parser_name = os.path.splitext(
-                os.path.basename(results_file_path))[0]
 
             for result_data in results_data:
                 input_file_path = result_data[self.INPUT_FILE_PATH]

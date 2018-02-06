@@ -490,33 +490,26 @@ class Reporter(object):
             except Exception as e:
                 self.debug("Error parsing with pefile: %s" % (str(e)))
 
-        # If name is using dot notation, assume it is being organized by "source_name.parser_name"
-        # Otherwise, we assume its "parser_name" and we'll run the parser for each instance of the parser.
-        # (os.path.basename is necessary in-case source is a file path containing ":"'s)
-        _, _, parser_name = os.path.basename(name).rpartition(':')
-        source_name = name[:-(len(parser_name) + 1)]
-
         try:
             with self.__redirect_stdout():
                 found = False
-                for name, source, parser_class in mwcp.iter_parsers(name=parser_name, source=source_name):
+                for parser_name, source, parser_class in mwcp.iter_parsers(name):
                     found = True
-                    self.debug('[*] Running parser: {}:{}'.format(source, name))
+                    self.debug('[*] Running parser: {}:{}'.format(source, parser_name))
                     self.handle.seek(0)
-                    parser = parser_class(reporter=self)
-                    parser.run(**kwargs)
+                    try:
+                        parser = parser_class(reporter=self)
+                        parser.run(**kwargs)
+                    except (Exception, SystemExit) as e:
+                        if filename:
+                            identifier = filename
+                        else:
+                            identifier = hashlib.md5(data).hexdigest()
+                        self.error("Error running parser {}:{} on {}: {}".format(
+                            source, parser_name, identifier, traceback.format_exc()))
 
                 if not found:
                     self.error('Could not find parsers with name: {}'.format(name))
-
-        except (Exception, SystemExit) as e:
-            if filename:
-                identifier = filename
-            else:
-                identifier = hashlib.md5(data).hexdigest()
-            self.error("Error running parser %s on %s: %s" %
-                       (name, identifier, traceback.format_exc()))
-
         finally:
             self.__cleanup()
 

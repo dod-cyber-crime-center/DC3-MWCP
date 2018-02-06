@@ -10,6 +10,12 @@ import argparse
 import os
 import sys
 
+# pkg_resources is optional, to keep backwards compatibility.
+try:
+    import pkg_resources
+except ImportError:
+    pkg_resources = None
+
 import mwcp
 
 from mwcp.tester import DEFAULT_EXCLUDE_FIELDS
@@ -17,7 +23,7 @@ from mwcp.tester import DEFAULT_EXCLUDE_FIELDS
 from mwcp.tester import Tester
 
 
-def get_arg_parser(mwcproot):
+def get_arg_parser():
     """Define command line arguments and return argument parser."""
 
     description = '''DC3-MWCP Framework: testing utility to create test cases and execute them.
@@ -37,10 +43,12 @@ $ mwcp-test -p parser -i file_paths_file -d     Delete test cases for a parser
 
     # Required arguments
     parser.add_argument("-o",
-                        default=os.path.join(mwcproot, "mwcp", "parsertests"),
+                        default=None,
                         type=str,
                         dest="test_case_dir",
-                        help="Directory containing JSON test case files.")
+                        help="Directory containing JSON test case files. "
+                             "(defaults to a 'parsertests' directory located in the root of the "
+                             "parser's home module)")
 
     # Arguments used to run test cases
     parser.add_argument("-t",
@@ -112,14 +120,15 @@ def main():
 
     print('')
 
-    # Setup
-    mwcproot = ""
-    if os.path.dirname(sys.argv[0]):
-        mwcproot = os.path.dirname(sys.argv[0])
-
     # Get command line arguments
-    argparser = get_arg_parser(mwcproot)
+    argparser = get_arg_parser()
     args, input_files = argparser.parse_known_args()
+    input_files = read_input_list(input_files[0]) if args.input_file else []
+
+    if args.all_tests or not args.parser_name:
+        parsers = [None]
+    else:
+        parsers = [args.parser_name]
 
     # Configure reporter based on args
     reporter = mwcp.Reporter(disableoutputfiles=True)
@@ -127,25 +136,6 @@ def main():
     # Configure test object
     tester = Tester(
         reporter=reporter, results_dir=args.test_case_dir)
-
-    parser_descriptions = mwcp.get_parser_descriptions()
-    valid_parser_names = [x[0] for x in parser_descriptions]
-
-    parsers = []
-    if args.parser_name:
-        if args.parser_name in valid_parser_names:
-            parsers = [args.parser_name]
-        else:
-            print("Error: Invalid parser name(s) specified. Parser names are case sensitive.")
-            sys.exit(1)
-    if args.all_tests:
-        parsers = valid_parser_names
-
-    if not parsers:
-        print("You must specify a single parser or all parsers to run or update.")
-        sys.exit(2)
-
-    results_file_path = tester.get_results_filepath(args.parser_name)
 
     # Gather all our input files
     if args.input_file:
@@ -189,31 +179,30 @@ def main():
             print(u"Removing results for {} in {}".format(filename, results_file_path))
 
     # Update previously existing test cases
-    elif args.update:
+    elif args.update and args.parser_name:
         print("Updating test cases. May take a while...")
-        for parser in parsers:
-            results_file_path = tester.get_results_filepath(parser)
-            if os.path.isfile(results_file_path):
-                input_files = tester.list_test_files(parser)
-            else:
-                print("No test case file found for parser '{}'. No update could be made.".format(parser))
-                continue
+        results_file_path = tester.get_results_filepath(args.parser_name)
+        if os.path.isfile(results_file_path):
+            input_files = tester.list_test_files(args.parser_name)
+        else:
+            print("No test case file found for parser '{}'. No update could be made.".format(args.parser_name))
+            return
 
-            for input_file in input_files:
-                metadata = tester.gen_results(
-                    parser_name=parser, input_file_path=input_file)
-                if len(metadata) > 1 and len(reporter.errors) == 0:
-                    print(u"Updating results for {} in {}".format(input_file, results_file_path))
-                    tester.update_test_results(results_file_path=results_file_path,
-                                               results_data=metadata,
-                                               replace=True)
-                elif len(metadata) > 1 and len(reporter.errors) > 0:
-                    print(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path))
-                else:
-                    print(u"Empty results for {} in {}, not updating".format(input_file, results_file_path))
+        for input_file in input_files:
+            metadata = tester.gen_results(
+                parser_name=args.parser_name, input_file_path=input_file)
+            if len(metadata) > 1 and len(reporter.errors) == 0:
+                print(u"Updating results for {} in {}".format(input_file, results_file_path))
+                tester.update_test_results(results_file_path=results_file_path,
+                                           results_data=metadata,
+                                           replace=True)
+            elif len(metadata) > 1 and len(reporter.errors) > 0:
+                print(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path))
+            else:
+                print(u"Empty results for {} in {}, not updating".format(input_file, results_file_path))
 
     # Add/update test cases for specified input files and specified parser
-    elif args.parser_name and (not args.delete and input_files):
+    elif args.parser_name and task != 'delete' and input_files:
         for input_file in input_files:
             metadata = tester.gen_results(
                 parser_name=args.parser_name, input_file_path=input_file)
