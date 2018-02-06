@@ -44,7 +44,6 @@ class FileObject(object):
         :param str def_stub: def_stub argument to pass to obtain_original_filename()
         :param bool use_arch: use_arch argument to pass to obtain_original_filename()
         """
-        super(FileObject, self).__init__()
         self._file_path = None
         self._md5 = None
         self._stack_strings = None
@@ -117,22 +116,14 @@ class FileObject(object):
         Returns a full file path to the file object.
         This is useful for when you want to use this file on libraries which require
         a file path instead of data or file-like object (e.g. cabinet).
+        Always create a temporary file, this avoids issues where the identify function requires the file_path and
+        the file would be output before a description is set.
         """
         if not self._file_path:
-            # Output the file if we were going to anyway.
-            self.output()
-
-            # Pull file path from reporter.outputfiles if it has been outputted.
-            file_path = self.reporter.outputfiles.get(self.file_name, {}).get('path', None)
-            if file_path:
-                self._file_path = file_path
-
-            # Otherwise we are going to have to make a temporary file.
-            else:
-                file_path = os.path.join(self.reporter.managed_tempdir(), self.file_name)
-                with open(file_path, 'wb') as file_object:
-                    file_object.write(self.file_data)
-                self._file_path = file_path
+            file_path = os.path.join(self.reporter.managed_tempdir(), self.file_name)
+            with open(file_path, 'wb') as file_object:
+                file_object.write(self.file_data)
+            self._file_path = file_path
 
         return self._file_path
 

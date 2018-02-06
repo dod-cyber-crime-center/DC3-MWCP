@@ -392,7 +392,7 @@ class Reporter(object):
         try:
             # check for type of other?
             for thiskey in value:
-                if isinstance(value[thiskey], str):
+                if isinstance(value[thiskey], (bytes, str)):
                     thiskeyu = self.convert_to_unicode(thiskey)
                     thisvalueu = self.convert_to_unicode(value[thiskey])
                     if 'other' not in self.metadata:
@@ -403,18 +403,15 @@ class Reporter(object):
                         existingvalue = self.metadata['other'][thiskeyu]
                         if isinstance(existingvalue, list):
                             if thisvalueu not in self.metadata['other'][thiskeyu]:
-                                self.metadata['other'][
-                                    thiskeyu].append(thisvalueu)
+                                self.metadata['other'][thiskeyu].append(thisvalueu)
                         else:
                             if thisvalueu != existingvalue:
-                                self.metadata['other'][thiskeyu] = [
-                                    existingvalue, thisvalueu]
+                                self.metadata['other'][thiskeyu] = [existingvalue, thisvalueu]
                     else:
                         # normal insert of single value
                         self.metadata['other'][thiskeyu] = thisvalueu
                 else:
-                    # TODO: support inserts of lists (assuming members are
-                    # strings)?
+                    # TODO: support inserts of lists (assuming members are strings)?
                     self.debug("Could not add object of %s to metadata under other using key %s" % (
                         str(type(value[thiskey])), thiskey))
         except Exception:
