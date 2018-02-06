@@ -6,11 +6,10 @@ from __future__ import print_function
 from future.builtins import open
 
 # Standard imports
-import glob
+import itertools
 import json
-import locale
+import multiprocessing as mp
 import os
-import sys
 import traceback
 
 import mwcp
@@ -21,6 +20,11 @@ except ImportError:
     pkg_resources = None
 
 DEFAULT_EXCLUDE_FIELDS = ["debug"]
+
+
+def multiproc_test_wrapper(tester_instance, *args):
+    """Wrapper function for running tests in multiple processes."""
+    return tester_instance.get_test_results(*args)
 
 
 class Tester(object):
@@ -207,40 +211,57 @@ class Tester(object):
                     print("Results file not found for {} parser".format(parser_name))
                     print("File(s) not found = {}".format(results_file_path))
 
-        all_test_results = []
-        # Parse test case/results files, run tests, and compare expected
-        # results to produced results
+        cores = mp.cpu_count()
+
+        # Use at most 3/4 of available logical cores.
+        # Adjust fraction as needed.
+        procs = (3 * cores) // 4
+
+        pool = mp.Pool(processes=procs)
+
+        # Feed each parser's test case(s) into the process pool.
+        multi_res = []
         for parser_name, results_file_path in test_case_file_paths:
-            results_data = self.parse_results_file(results_file_path)
+            multi_res.append(pool.apply_async(
+                multiproc_test_wrapper, (self, parser_name, results_file_path, field_names, ignore_field_names)))
 
-            for result_data in results_data:
-                input_file_path = result_data[self.INPUT_FILE_PATH]
+        # Very generous 1 hour timeout for each job.
+        res_list = [res.get(timeout=3600) for res in multi_res]
 
-                # Rerun the file to get the most up to date parser results
-                new_results = self.gen_results(parser_name, input_file_path)
+        # Flatten the list of lists and return
+        return list(itertools.chain.from_iterable(res_list))
 
-                # Compare the newly generated results to previously saved test
-                # results
-                comparer_results = self.compare_results(
-                    result_data, new_results, field_names, ignore_field_names=ignore_field_names)
+    def get_test_results(self, parser_name, results_file_path, field_names, ignore_field_names):
+        """
+        Parse test case/results files, run tests, and compare expected results to produced results
+        """
+        results_data = self.parse_results_file(results_file_path)
 
-                # Determine if any of field comparisons failed
-                passed = True
-                if any([not comparer.passed for comparer in comparer_results]):
-                    passed = False
+        test_results = []
+        for result_data in results_data:
+            input_file_path = result_data[self.INPUT_FILE_PATH]
 
-                # Track the test results
-                debug = self.reporter.metadata[
-                    "debug"] if "debug" in self.reporter.metadata else None
-                test_result = TestResult(parser=parser_name,
-                                         input_file_path=input_file_path,
-                                         passed=passed,
-                                         errors=self.reporter.errors,
-                                         debug=debug,
-                                         results=comparer_results)
-                all_test_results.append(test_result)
+            # Rerun the file to get the most up to date parser results
+            new_results = self.gen_results(parser_name, input_file_path)
 
-        return all_test_results
+            # Compare the newly generated results to previously saved test results
+            comparer_results = self.compare_results(
+                result_data, new_results, field_names, ignore_field_names=ignore_field_names)
+
+            # Determine if any of field comparisons failed
+            passed = all(comparer.passed for comparer in comparer_results)
+
+            # Track the test results
+            debug = self.reporter.metadata["debug"] if "debug" in self.reporter.metadata else None
+            test_result = TestResult(parser=parser_name,
+                                     input_file_path=input_file_path,
+                                     passed=passed,
+                                     errors=self.reporter.errors,
+                                     debug=debug,
+                                     results=comparer_results)
+            test_results.append(test_result)
+
+        return test_results
 
     def compare_results(self, results_a, results_b, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
         """

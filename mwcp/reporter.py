@@ -105,8 +105,6 @@ class Reporter(object):
         self.errors = []
         self.pe = None
 
-        self.__debug_stdout = None
-        self.__orig_stdout = None
         self.__filename = ''
         self.__tempfilename = ''
         self.__managed_tempdir = ''
@@ -131,8 +129,6 @@ class Reporter(object):
         self.__disablevaluededup = disablevaluededup
         self.__disablemodulesearch = disablemodulesearch
         self.__base64outputfiles = base64outputfiles
-
-        self.__orig_stdout = sys.stdout
 
         # TODO: Move fields.json to shared data or config folder.
         fieldspath = os.path.join(os.path.dirname(mwcp.resources.__file__), "fields.json")
