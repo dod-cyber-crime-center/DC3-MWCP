@@ -119,7 +119,7 @@ class Reporter(object):
         default_parserdir = os.path.dirname(mwcp.parsers.__file__)
         self.parserdir = parserdir or default_parserdir
         if self.parserdir != default_parserdir or not list(mwcp.iter_parsers(source='mwcp')):
-            mwcp.register_parser_directory(parserdir)
+            mwcp.register_parser_directory(self.parserdir)
 
         self.__interpreter_path = interpreter_path
         self.__disabledebug = disabledebug
