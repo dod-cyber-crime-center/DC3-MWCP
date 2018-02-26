@@ -176,7 +176,8 @@ def main():
         removed_files = tester.remove_test_results(
             args.parser_name, input_files)
         for filename in removed_files:
-            print(u"Removing results for {} in {}".format(filename, results_file_path))
+            print(u"Removing results for {} in {}".format(
+                filename, tester.get_results_filepath(args.parser_name)))
 
     # Update previously existing test cases
     elif args.update and args.parser_name:
@@ -202,7 +203,8 @@ def main():
                 print(u"Empty results for {} in {}, not updating".format(input_file, results_file_path))
 
     # Add/update test cases for specified input files and specified parser
-    elif args.parser_name and task != 'delete' and input_files:
+    elif args.parser_name and not args.delete and input_files:
+        results_file_path = tester.get_results_filepath(args.parser_name)
         for input_file in input_files:
             metadata = tester.gen_results(
                 parser_name=args.parser_name, input_file_path=input_file)

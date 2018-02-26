@@ -18,9 +18,11 @@ import shutil
 import sys
 import tempfile
 import traceback
+import warnings
 from io import BytesIO
 
 import mwcp
+from mwcp import resources
 
 
 PY3 = sys.version_info > (3,)
@@ -80,6 +82,9 @@ class Reporter(object):
             use debug instead
 
     """
+
+    DEFAULT_PARSERDIR = os.path.dirname(mwcp.parsers.__file__)
+
     def __init__(self,
                  parserdir=None,
                  outputdir=None,
@@ -105,6 +110,10 @@ class Reporter(object):
         self.errors = []
         self.pe = None
 
+        # Continue to allow use of deprecated resourcedir.
+        # TODO: Remove this in a new release version.
+        self._resourcedir = os.path.dirname(resources.__file__)
+
         self.__filename = ''
         self.__tempfilename = ''
         self.__managed_tempdir = ''
@@ -116,9 +125,8 @@ class Reporter(object):
         # the project was not installed with setuptools.
         # NOTE: This is all to keep backwards compatibility. mwcp.register_parser_directory() should be
         # called outside of this class in the future.
-        default_parserdir = os.path.dirname(mwcp.parsers.__file__)
-        self.parserdir = parserdir or default_parserdir
-        if self.parserdir != default_parserdir or not list(mwcp.iter_parsers(source='mwcp')):
+        self.parserdir = parserdir or self.DEFAULT_PARSERDIR
+        if self.parserdir != self.DEFAULT_PARSERDIR or not list(mwcp.iter_parsers(source='mwcp')):
             mwcp.register_parser_directory(self.parserdir)
 
         self.__interpreter_path = interpreter_path
@@ -135,6 +143,29 @@ class Reporter(object):
 
         with open(fieldspath, 'rb') as f:
             self.fields = json.load(f)
+
+    # Allow user to still use resourcedir feature, but warn about deprecation.
+    @property
+    def resourcedir(self):
+        warnings.warn(
+            'resourcedir feature has been deprecated. Dependencies should be properly installed and managed by the parser developer.', DeprecationWarning, 2)
+        return self._resourcedir
+
+    @resourcedir.setter
+    def resourcedir(self, resourcedir):
+        warnings.warn(
+            'resourcedir feature has been deprecated. Dependencies should be properly installed and managed by the parser developer.', DeprecationWarning, 2)
+        self._resourcedir = resourcedir
+        if resourcedir not in sys.path:
+            sys.path.append(resourcedir)
+
+        # we put resourcedir in PYTHONPATH in case we shell out or children
+        # processes need this
+        if 'PYTHONPATH' in os.environ:
+            if resourcedir not in os.environ['PYTHONPATH']:
+                os.environ['PYTHONPATH'] = os.environ['PYTHONPATH'] + os.pathsep + resourcedir
+        else:
+            os.environ['PYTHONPATH'] = resourcedir
 
     def filename(self):
         """
@@ -433,12 +464,10 @@ class Reporter(object):
                 traceback.format_exc()))
             return
 
-        if keyu in self.fields:
-            fieldtype = self.fields[keyu]['type']
-        else:
-            self.debug(
-                "Error adding metadata because %s is not an allowed key" % (keyu))
-            return
+        if keyu not in self.fields:
+            raise KeyError('Invalid field name: {}'.format(keyu))
+
+        fieldtype = self.fields[keyu]['type']
 
         if fieldtype == "listofstrings":
             self.__add_metatadata_listofstrings(keyu, value)

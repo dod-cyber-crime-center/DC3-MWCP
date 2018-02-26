@@ -34,8 +34,6 @@ class Tester(object):
     INPUT_FILE_PATH = "inputfilename"
     FILE_EXTENSION = ".json"
 
-    DEFAULT_RESULTS_DIR = os.path.join(os.path.dirname(mwcp.__file__), 'parsertests')
-
     # Properties
     reporter = None
 
@@ -73,29 +71,29 @@ class Tester(object):
             filelist.append(metadata[self.INPUT_FILE_PATH])
         return filelist
 
-    def get_results_filepath(self, parser_name, source=None):
+    def get_results_filepath(self, name, source=None):
         """
         Yields the results file path based on the parser name provided and the
         previously specified output directory.
         """
-        file_name = parser_name + self.FILE_EXTENSION
-        # Use hardcoded results dir.
-        if self.results_dir:
-            return os.path.join(self.results_dir, file_name)
+        # TODO: Remove hardcoding "parsertests" folder. Determine better way to handle this.
 
-        # If package is not installed, use default.
-        elif not pkg_resources:
-            return os.path.join(self.DEFAULT_RESULTS_DIR, file_name)
+        for parser_name, source, klass in mwcp.iter_parsers(name, source=source):
+            file_name = parser_name + self.FILE_EXTENSION
+            # Use hardcoded results dir if requested.
+            if self.results_dir:
+                return os.path.join(self.results_dir, file_name)
 
-        # Otherwise dynamically pull based on parser's class location.
-        else:
-            for parser_name, source, klass in mwcp.iter_parsers(parser_name, source=source):
-                # Pull parsertests folder for given parser class.
-                top_level_module, _, _ = klass.__module__.partition('.')
-                results_dir = pkg_resources.resource_filename(top_level_module, 'parsertests')
-                return os.path.join(results_dir, parser_name + self.FILE_EXTENSION)
+            # If source is a directory, assume there is a "parsertests" folder next to it.
+            if os.path.isdir(source):
+                return os.path.join(source, '..', 'parsertests', file_name)
 
-        raise ValueError('Invalid parser_name: {}'.format(parser_name))
+            # Otherwise dynamically pull based on parser's top level module.
+            top_level_module, _, _ = klass.__module__.partition('.')
+            results_dir = pkg_resources.resource_filename(top_level_module, 'parsertests')
+            return os.path.join(results_dir, file_name)
+
+        raise ValueError('Invalid parser: {}'.format(name))
 
     def parse_results_file(self,
                            results_file_path):
@@ -213,20 +211,28 @@ class Tester(object):
 
         cores = mp.cpu_count()
 
-        # Use at most 3/4 of available logical cores.
-        # Adjust fraction as needed.
-        procs = (3 * cores) // 4
+        if len(test_case_file_paths) == 1:
+            parser_name, results_file_path = test_case_file_paths[0]
+            res_list = [self.get_test_results(parser_name, results_file_path, field_names, ignore_field_names)]
+        else:
+            # Use at most 3/4 of available logical cores.
+            # Adjust fraction as needed.
+            procs = (3 * cores) // 4
 
-        pool = mp.Pool(processes=procs)
+            # When creating multiprocessing pool we need to re-register the parser_directory because
+            # global variables don't stick with Windows processes.
+            pool = mp.Pool(processes=procs,
+                           initializer=mwcp.register_parser_directory,
+                           initargs=(self.reporter.parserdir,))
 
-        # Feed each parser's test case(s) into the process pool.
-        multi_res = []
-        for parser_name, results_file_path in test_case_file_paths:
-            multi_res.append(pool.apply_async(
-                multiproc_test_wrapper, (self, parser_name, results_file_path, field_names, ignore_field_names)))
+            # Feed each parser's test case(s) into the process pool.
+            multi_res = []
+            for parser_name, results_file_path in test_case_file_paths:
+                multi_res.append(pool.apply_async(
+                    multiproc_test_wrapper, (self, parser_name, results_file_path, field_names, ignore_field_names)))
 
-        # Very generous 1 hour timeout for each job.
-        res_list = [res.get(timeout=3600) for res in multi_res]
+            # Very generous 1 hour timeout for each job.
+            res_list = [res.get(timeout=3600) for res in multi_res]
 
         # Flatten the list of lists and return
         return list(itertools.chain.from_iterable(res_list))
@@ -456,31 +462,31 @@ class ResultComparer(object):
 
     def get_report(self, json=False, tabs=1):
         """
-        If json parameter is False, get report as a string.
+        If json parameter is False, get report as a unicode string.
         If json parameter is True, get report as a dictionary.
         """
 
         if json:
             return self.__dict__
         else:
-            tab = tabs * "\t"
-            tab_1 = tab + "\t"
-            tab_2 = tab_1 + "\t"
-            report = tab + "{}:\n".format(self.field)
-            report += tab_1 + "Passed: {}\n".format(self.passed)
+            tab = tabs * u"\t"
+            tab_1 = tab + u"\t"
+            tab_2 = tab_1 + u"\t"
+            report = tab + u"{}:\n".format(self.field)
+            report += tab_1 + u"Passed: {}\n".format(self.passed)
             if self.missing:
-                report += tab_1 + "Missing From New Results:\n"
+                report += tab_1 + u"Missing From New Results:\n"
                 for item in self.missing:
-                    report += tab_2 + "{}\n".format(item)
+                    report += tab_2 + u"{}\n".format(item)
             if self.unexpected:
-                report += tab_1 + "Unexpected New Results:\n"
+                report += tab_1 + u"Unexpected New Results:\n"
                 for item in self.unexpected:
-                    report += tab_2 + "{}\n".format(item)
+                    report += tab_2 + u"{}\n".format(item)
 
-            return report.rstrip()
+            return report
 
     def __str__(self):
-        return self.get_report()
+        return self.get_report().encode('utf8')
 
     def __repr__(self):
         return self.__str__()
@@ -541,15 +547,15 @@ class DictOfStringsComparer(ResultComparer):
 
         for key in dict_test:
             if key not in dict_new:
-                self.missing.append("{}: {}".format(key, dict_test[key]))
+                self.missing.append(u"{}: {}".format(key, dict_test[key]))
             elif set(dict_test[key]) != set(dict_new[key]):
-                self.missing.append("{}: {}".format(key, dict_test[key]))
+                self.missing.append(u"{}: {}".format(key, dict_test[key]))
 
         for key in dict_new:
             if key not in dict_test:
-                self.unexpected.append("{}: {}".format(key, dict_new[key]))
+                self.unexpected.append(u"{}: {}".format(key, dict_new[key]))
             elif set(dict_new[key]) != set(dict_test[key]):
-                self.unexpected.append("{}: {}".format(key, dict_new[key]))
+                self.unexpected.append(u"{}: {}".format(key, dict_new[key]))
 
 ####################################################
 # JSON encoders

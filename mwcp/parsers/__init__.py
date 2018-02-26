@@ -35,7 +35,7 @@ def _register_entry_points():
         return
     for entry in pkg_resources.iter_entry_points('mwcp.parsers'):
         parser_name = entry.name
-        source_name = entry.dist.project_name.lower()   # Sources are case-insenstive.
+        source_name = entry.dist.project_name
         klass = entry.load()
         if not issubclass(klass, mwcp.Parser):
             raise ImportError('{!r} is not an subclass of mwcp.Parser'.format(klass))
@@ -69,7 +69,7 @@ def register_parser_directory(parser_dir):
 
             # find descendants of mwcp.Parser in this module.
             for _, klass in inspect.getmembers(module, inspect.isclass):
-                if issubclass(klass, mwcp.Parser):
+                if issubclass(klass, mwcp.Parser) and klass != mwcp.Parser:
                     _PARSERS[parser_name][parser_dir] = klass
                     break  # Only count the first one we see.
     finally:
@@ -130,9 +130,6 @@ def iter_parsers(name=None, source=None):
         _, _, name = os.path.basename(name).rpartition(':')
         source = orig_name[:-(len(name) + 1)]
 
-    # Sources are case-insenstive
-    if source:
-        source = source.lower()
     parser_dict = {name: _PARSERS.get(name, {})} if name else _PARSERS
     for name, source_dict in parser_dict.items():
         if source:
