@@ -387,7 +387,8 @@ class Reporter(object):
                                 "Expected port type to be tcp or udp (or icmp)")
                 elif keyu == "registrypathdata":
                     self.add_metadata("registrypath", values[0])
-                    if len(values) >= 2:
+                    # Don't put empty strings in the registrydata field
+                    if len(values) >= 2 and values[1]:
                         self.add_metadata("registrydata", values[1])
                     if len(values) != 2:
                         self.debug(
