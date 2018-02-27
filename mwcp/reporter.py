@@ -112,7 +112,8 @@ class Reporter(object):
 
         # Continue to allow use of deprecated resourcedir.
         # TODO: Remove this in a new release version.
-        self._resourcedir = os.path.dirname(resources.__file__)
+        self._resourcedir = None
+        self.resourcedir = os.path.dirname(resources.__file__)
 
         self.__filename = ''
         self.__tempfilename = ''
@@ -148,13 +149,13 @@ class Reporter(object):
     @property
     def resourcedir(self):
         warnings.warn(
-            'resourcedir feature has been deprecated. Dependencies should be properly installed and managed by the parser developer.', DeprecationWarning, 2)
+            'resourcedir feature has been deprecated. Dependencies should be properly installed and managed by the parser developer.', DeprecationWarning, 1)
         return self._resourcedir
 
     @resourcedir.setter
     def resourcedir(self, resourcedir):
         warnings.warn(
-            'resourcedir feature has been deprecated. Dependencies should be properly installed and managed by the parser developer.', DeprecationWarning, 2)
+            'resourcedir feature has been deprecated. Dependencies should be properly installed and managed by the parser developer.', DeprecationWarning, 1)
         self._resourcedir = resourcedir
         if resourcedir not in sys.path:
             sys.path.append(resourcedir)
