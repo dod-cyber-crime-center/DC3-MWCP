@@ -1,9 +1,12 @@
 #!/usr/bin/env python
-'''
-DC3-MWCP server--simple REST API using bottle framework. Can be used as a standalone server or in a wsgi server.
 
-Requires bottle to be installed which can be done by putting bottle.py in the same directory as this file.
-'''
+"""
+DC3-MWCP server--simple REST API using bottle framework. Can be used as a standalone server or in
+a wsgi server.
+
+Requires bottle to be installed which can be done by putting bottle.py in the same directory as
+this file.
+"""
 
 import os
 import sys
@@ -38,77 +41,88 @@ DEFAULT_PAGE = '''<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 
 app = Bottle()
 
-@app.post('/run_parser/<parser>')    
+
+@app.post('/run_parser/<parser>')
 def run_parser(parser):
-    '''
+    """
     Execute a parser
-    
+
     parser (url component): mwcp parser to use
     data (form file submission): data on which parser operates
     modargs (form data): arguments passed to parsers (used very infrequently)
-    '''
-    output = {}
+    """
+
     datafile = request.files.get('data')
     modargs = request.forms.get("modargs")
     if datafile:
         data = datafile.file.read()
-        logger.info("run_parser %s %s %s" % (parser, datafile.filename, hashlib.md5(data).hexdigest()))
-        return __run_parser(parser, data = data, modargs = modargs)
+        logger.info("run_parser %s %s %s" %
+                    (parser, datafile.filename, hashlib.md5(data).hexdigest()))
+        return __run_parser(parser, data=data, modargs=modargs)
     else:
         logger.error("run_parser %s no input file" % (parser))
-	return {'errors': ['No input file provided'] }
-        
-@app.post('/run_parsers/<parsers:path>')    
+        return {'errors': ['No input file provided']}
+
+
+@app.post('/run_parsers/<parsers:path>')
 def run_parsers(parsers):
-    '''
+    """
     Execute multiple parsers on the same input file
-    
+
     parsers (url components): mwcp parsers to use
     data (form file submission): data on which parser operates
     modargs (form data): arguments passed to parsers (used very infrequently)
-    '''
+    """
+
     output = {}
     datafile = request.files.get('data')
     modargs = request.forms.get("modargs")
     if datafile:
         data = datafile.file.read()
-        logger.info("run_parsers %s %s %s" % (parsers, datafile.filename, hashlib.md5(data).hexdigest()))
+        logger.info("run_parsers %s %s %s" %
+                    (parsers, datafile.filename, hashlib.md5(data).hexdigest()))
         for parser in parsers.split("/"):
             if parser:
-                output[parser] = __run_parser(parser, data = data, modargs = modargs)
+                output[parser] = __run_parser(
+                    parser, data=data, modargs=modargs)
     else:
         output['errors'] = ['No input file provided']
         logger.error("run_parsers %s no input file" % (parsers))
     return output
 
+
 @app.get('/')
 def default():
     return DEFAULT_PAGE
-    
+
+
 @app.get('/descriptions')
 def descriptions():
-    '''
+    """
     List descriptions of parser modules
-    '''
+    """
+
     try:
         response.content_type = "application/json"
-        reporter = malwareconfigreporter(base64outputfiles = True, disableoutputfiles = True)
+        reporter = malwareconfigreporter(
+            base64outputfiles=True, disableoutputfiles=True)
         return reporter.pprint(reporter.get_parser_descriptions())
-    except Exception as e:
+    except Exception:
         output = {}
         output['errors'] = [traceback.format_exc()]
         logger.error("descriptions %s" % (traceback.format_exc()))
         return output
-        
-def __run_parser(name, data = '', modargs = '', append_output_text = True):
+
+
+def __run_parser(name, data='', modargs='', append_output_text=True):
     output = {}
     logger.info("__run_parser %s %s" % (name, hashlib.md5(data).hexdigest()))
     try:
-        reporter = malwareconfigreporter(base64outputfiles = True)
+        reporter = malwareconfigreporter(base64outputfiles=True)
         kwargs = {}
         if modargs:
             kwargs = dict(json.loads(modargs))
-        reporter.run_parser(name, data = data, **kwargs)
+        reporter.run_parser(name, data=data, **kwargs)
         output = reporter.metadata
         if reporter.errors:
             output["errors"] = reporter.errors
@@ -117,14 +131,13 @@ def __run_parser(name, data = '', modargs = '', append_output_text = True):
         if append_output_text:
             output["output_text"] = reporter.get_output_text()
         return output
-    except Exception as e:
+    except Exception:
         output = {}
         output['errors'] = [traceback.format_exc()]
         logger.error("__run_parser %s %s" % (name, traceback.format_exc()))
         return output
 
-if __name__ == '__main__':      
-    run(app, server = 'auto', host = 'localhost', port = 8080)
+if __name__ == '__main__':
+    run(app, server='auto', host='localhost', port=8080)
 else:
     application = app
-
