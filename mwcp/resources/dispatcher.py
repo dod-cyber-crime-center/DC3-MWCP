@@ -4,6 +4,8 @@ more robust file identification, reporting, and objectifying
 content to ease maintenance.
 """
 
+# Python standard imports
+import pefile
 import hashlib
 import io
 import os
@@ -12,6 +14,9 @@ from collections import deque
 
 import pefile
 from mwcp.utils import pefileutils
+
+# Kordesii framework imports
+from kordesii.kordesiireporter import kordesiireporter
 
 
 class UnableToParse(Exception):
@@ -136,6 +141,16 @@ class FileObject(object):
         self._file_path = value
 
     @property
+    def stack_strings(self):
+        """
+        Returns the stack strings for the file.
+        """
+        if not self._stack_strings:
+            kordesii_reporter = self.run_kordesii_decoder('stack_string')
+            self._stack_strings = kordesii_reporter.get_strings()
+        return self._stack_strings
+
+    @property
     def resources(self):
         """Returns a list of the PE resources for the given file."""
         if self.pe and not self._resources:
@@ -154,6 +169,31 @@ class FileObject(object):
                 self.reporter.output_file(
                     data=self.file_data, filename=self.file_name or '', description=self.description or '')
                 self._outputted_file = True
+
+    def run_kordesii_decoder(self, decoder_name):
+        """
+        Run the specified kordesii decoder against the file data.  The reporter object is returned
+        and can be accessed as necessary to obtain output files, etc.
+
+        :param decoder_name: name of the decoder to run
+        :return: Instance of the kordesii_reporter.
+        """
+        self.reporter.debug('[*] Running {} kordesii decoder on file {}.'.format(decoder_name, self.file_name))
+        kordesii_reporter = kordesiireporter(base64outputfiles=True, enableidalog=True)
+
+        kordesii_reporter.run_decoder(decoder_name, data=self.file_data)
+        for message in kordesii_reporter.get_debug():
+            self.reporter.debug('[kordesii_debug] {}'.format(message))
+
+        for message in kordesii_reporter.get_errors():
+            self.reporter.debug('[kordesii_error] {}'.format(message))
+
+        decrypted_strings = kordesii_reporter.get_strings()
+        if not decrypted_strings:
+            self.reporter.debug(
+                '[*] No decrypted strings were returned by the decoder for file {}.'.format(self.file_name))
+
+        return kordesii_reporter
 
 
 class ComponentParser(object):
@@ -283,21 +323,26 @@ class Dispatcher(object):
 
     """
 
-    def __init__(self, reporter, parsers=None, greedy=False, default=UnidentifiedFile):
+    def __init__(self, reporter, parsers=None, greedy=False, default=UnidentifiedFile,
+                 output_unidentified=True, overwrite_descriptions=False):
         """
         Initializes the Dispatcher with the given reporter and parsers to run.
 
         :param reporter: An MWCP reporter.
-        :param parsers: A list of parser classes to use for detection and running.
+        :param list parsers: A list of parser classes to use for detection and running.
             Order of this list is the order the Dispatcher will perform its identification.
             If not provided, it will default to an empty list. (which is not very useful unless you
             plan to overwrite the _identify_file() function.)
-        :param greedy: By default, the dispatcher will only run on the first parser it detects
+        :param bool greedy: By default, the dispatcher will only run on the first parser it detects
             to be a valid parser. If greedy is set to true, the dispatcher will try all parsers
             even if a previous parser was successful.
-        :param default: The Parser class to default to if no parsers in the parsers list
+        :param ParserBase default: The Parser class to default to if no parsers in the parsers list
             has identified it. If set to None, no parser will be run as default.
             (By default, the dispatcher.UnidentifiedFile will be run.)
+        :param bool output_unidentified: Whether to output files that have not been identified by
+            any parsers.
+        :param bool overwrite_descriptions: Whether to allow dispatcher to overwrite any previous
+            set description with the parser's
         """
         self.reporter = reporter
         self.parsers = parsers or []
@@ -306,6 +351,8 @@ class Dispatcher(object):
         self._fifo_buffer = deque()
         self._current_file_object = None
         self._current_parser_class = None
+        self._output_unidentified = output_unidentified
+        self._overwrite_descriptions = overwrite_descriptions
 
         # Dictionary that can be used by parsers to pass variables across parsers.
         # E.g. an encryption key found in the loader to be used by the implant.
@@ -359,11 +406,14 @@ class Dispatcher(object):
                 yield parser_class
 
         if not identified:
-            # If no parsers match and developer didn't set a description, mark as unidentified file.
+            if not self._output_unidentified:
+                file_object.output_file = False
+            # If no parsers match and developer didn't set a description, mark as unidentified file and run
+            # default.
             if not file_object.description:
                 self.reporter.debug('[*] Supplied file {} was not identified.'.format(file_object.file_name))
-            if self.default:
-                yield self.default
+                if self.default:
+                    yield self.default
 
     def dispatch(self):
         """
@@ -378,7 +428,7 @@ class Dispatcher(object):
                 self._current_parser_class = parser_class
 
                 # If a description wasn't set for the file, use the parser's
-                if not file_object.description:
+                if not file_object.description or self._overwrite_descriptions:
                     file_object.description = parser_class.DESCRIPTION
 
                 # Set parser class used in order to keep a history.

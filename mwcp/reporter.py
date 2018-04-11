@@ -519,7 +519,9 @@ class Reporter(object):
                 found = False
                 for parser_name, source, parser_class in mwcp.iter_parsers(name):
                     found = True
-                    self.debug('[*] Running parser: {}:{}'.format(source, parser_name))
+                    # Don't show source since it could be a file path and we don't want to that to be
+                    # exposed in our test cases.
+                    #self.debug('[*] Running parser: {}:{}'.format(source, parser_name))
                     self.handle.seek(0)
                     try:
                         parser = parser_class(reporter=self)

@@ -171,8 +171,12 @@ def main():
                 descriptions.append({"errors": reporter.errors})
             print(reporter.pprint(descriptions))
         else:
-            for name, author, description in descriptions:
-                print('%-70s %-8s %s' % (name, author, description))
+            # TODO: Use a library like tabulate to print this.
+            format = '%-25s %-50s %-15s %s'
+            print(format % ('NAME', 'SOURCE', 'AUTHOR', 'DESCRIPTION'))
+            print('-' * 150)
+            for name, source, author, description in descriptions:
+                print(format % (name, source, author, description))
             if reporter.errors:
                 print("")
                 print("Errors:")

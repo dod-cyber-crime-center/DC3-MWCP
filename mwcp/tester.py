@@ -9,7 +9,9 @@ from future.builtins import open
 import itertools
 import json
 import multiprocessing as mp
+import locale
 import os
+import sys
 import traceback
 
 import mwcp
@@ -20,6 +22,13 @@ except ImportError:
     pkg_resources = None
 
 DEFAULT_EXCLUDE_FIELDS = ["debug"]
+
+
+# Setting encoding to utf8 is a hotfix for a larger issue
+encode_params = {
+    'encoding': 'utf8' or sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
+    'errors': 'replace'
+}
 
 
 def multiproc_test_wrapper(tester_instance, *args):
@@ -77,7 +86,6 @@ class Tester(object):
         previously specified output directory.
         """
         # TODO: Remove hardcoding "parsertests" folder. Determine better way to handle this.
-
         for parser_name, source, klass in mwcp.iter_parsers(name, source=source):
             file_name = parser_name + self.FILE_EXTENSION
             # Use hardcoded results dir if requested.
@@ -152,7 +160,7 @@ class Tester(object):
 
         # Write updated data to results file
         pretty_data = self.reporter.pprint(results_file_data)
-        with open(results_file_path, "w") as results_file:
+        with open(results_file_path, "wb") as results_file:
             results_file.write(pretty_data)
 
     def remove_test_results(self, parser_name, filenames):
@@ -200,14 +208,19 @@ class Tester(object):
         test_case_file_paths = []
         for parser_name in parser_names:
             # We want to iterate parsers incase parser_name represents a set of parsers from different sources.
+            found = False
             for name, source, _ in mwcp.iter_parsers(parser_name):
+                found = True
                 parser_name = '{}:{}'.format(source, name)
                 results_file_path = self.get_results_filepath(parser_name)
                 if os.path.isfile(results_file_path):
                     test_case_file_paths.append((parser_name, results_file_path))
                 else:
-                    print("Results file not found for {} parser".format(parser_name))
-                    print("File(s) not found = {}".format(results_file_path))
+                    print("Results file not found for {} parser".format(parser_name).encode(**encode_params))
+                    print("File(s) not found = {}".format(results_file_path).encode(**encode_params))
+
+            if not found:
+                print("Parser not found for: {}".format(parser_name))
 
         cores = mp.cpu_count()
 
@@ -412,7 +425,11 @@ class Tester(object):
 
                 if filtered_output != "":
                     filtered_output += "{0}\n".format(separator)
+<<<<<<< HEAD:mwcp/tester.py
                     print(filtered_output)
+=======
+                    print(filtered_output.encode(**encode_params))
+>>>>>>> internal/master:mwcp/tester.py
 
 
 ####################################################

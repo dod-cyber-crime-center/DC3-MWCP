@@ -44,8 +44,9 @@ setup(
         ]
     },
     install_requires=[
+        'kordesii',
         'bottle',
-        'construct',
+        'construct==2.8.12',  # pin version, since we patch this library
         'future',
         'jinja2',  # For construct.html_hex()
         'pefile',

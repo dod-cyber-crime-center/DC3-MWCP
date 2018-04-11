@@ -150,9 +150,9 @@ def get_parser_descriptions():
     # temporarily initialize them in order to extract their info.
     # TODO: In the future, this information should be static attributes on the class itself.
     reporter = mwcp.Reporter()
-    for name, source_name, klass in sorted(iter_parsers()):
+    for name, source, klass in sorted(iter_parsers()):
         parser = klass(reporter)
-        descriptions.append(('{} ({})'.format(name, source_name), parser.author, parser.description))
+        descriptions.append((name, source, parser.author, parser.description))
     return descriptions
 
 

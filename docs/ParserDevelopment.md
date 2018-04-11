@@ -38,7 +38,7 @@ class Foo(Parser):
         if self.reporter.pe:
             self.reporter.add_metadata("other", {"section0": self.reporter.pe.sections[0].Name.rstrip('\x00')})
 
-        #demonstarte file output
+        #demonstrate file output
         self.reporter.output_file("hello world", "fooconfigtest.txt", "example output file")
 
         #demonstrate use of filename()
@@ -54,7 +54,7 @@ class Foo(Parser):
 
 ## Dispatching Component parsers
 The above example works for simple cases. However, when you run into malware containing multiple components
-embedded within each other with multiple variations, it can easily grow your parser to an unmanageble size.
+embedded within each other with multiple variations, it can easily grow your parser to an unmanageable size.
 
 MWCP comes with a Dispatcher model that allows you to organize your code based on their individual components
 and variations.

@@ -114,10 +114,10 @@ def map_ta_domain_fields(data, reporter):
                     elif 'p1' in data or 'p2' in data:
                         if 'p1' in data:
                             reporter.add_metadata("c2_socketaddress", [
-                                                  data[domain_key], data['p1'], 'tcp'])
+                                data[domain_key], data['p1'], 'tcp'])
                         if 'p2' in data:
                             reporter.add_metadata("c2_socketaddress", [
-                                                  data[domain_key], data['p2'], 'tcp'])
+                                data[domain_key], data['p2'], 'tcp'])
                     elif 'Port' in data or 'Port1' in data or 'Port2' in data:
                         if 'Port' in data:
                             # CyberGate has a separator character in the field
@@ -125,20 +125,20 @@ def map_ta_domain_fields(data, reporter):
                             data['Port'] = data['Port'].rstrip('|').strip('|')
                             for port in data['Port']:
                                 reporter.add_metadata("c2_socketaddress", [
-                                                      addport, data['Port'], 'tcp'])
+                                    addport, data['Port'], 'tcp'])
                         if 'Port1' in data:
                             reporter.add_metadata("c2_socketaddress", [
-                                                  addport, data['Port1'], 'tcp'])
+                                addport, data['Port1'], 'tcp'])
                         if 'Port2' in data:
                             reporter.add_metadata("c2_socketaddress", [
-                                                  addport, data['Port2'], 'tcp'])
+                                addport, data['Port2'], 'tcp'])
                     elif domain_key == 'Domain' and ("Client Control Port" in data or "Client Transfer Port" in data):
                         if "Client Control Port" in data:
                             reporter.add_metadata("c2_socketaddress", [
-                                                  data['Domain'], data['Client Control Port'], "tcp"])
+                                data['Domain'], data['Client Control Port'], "tcp"])
                         if "Client Transfer Port" in data:
                             reporter.add_metadata("c2_socketaddress", [data['Domain'], data[
-                                                  'Client Transfer Port'], "tcp"])
+                                'Client Transfer Port'], "tcp"])
                     else:
                         reporter.add_metadata('c2_address', data[domain_key])
 
@@ -154,17 +154,17 @@ def map_domainX_fields(data, reporter):
                 if ':' in data[field]:
                     address, port = data[field].split(':')
                     reporter.add_metadata('c2_socketaddress', [
-                                          address, port, 'tcp'])
+                        address, port, 'tcp'])
                 else:
                     if field in SPECIAL_HANDLING_LIST:
                         if "Port" in data:
                             reporter.add_metadata("c2_socketaddress", [
-                                                  data[field], data['Port'], "tcp"])
+                                data[field], data['Port'], "tcp"])
                         elif "Port" + suffix in data:
                             # assume tcp and c2--use per scriptname
                             # customization if this doesn't hold
                             reporter.add_metadata("c2_socketaddress", [
-                                                  data[field], data['Port' + suffix], "tcp"])
+                                data[field], data['Port' + suffix], "tcp"])
                         else:
                             reporter.add_metadata("c2_address", data[field])
                     else:
@@ -426,11 +426,11 @@ def run_decoder(reporter, script, scriptname=""):
 
 
 def main():
-
     if len(sys.argv) < 2:
         print("usage: techanarchy_bridge.py NAME ")
         print("NAME should be decoder basename without .py extension.")
-        print("when run as a script from the 'parsers' directory, makes an DC3-MWCP parser for the specified malware family")
+        print(
+            "when run as a script from the 'parsers' directory, makes an DC3-MWCP parser for the specified malware family")
         exit(1)
 
     scriptname = sys.argv[1]
@@ -440,6 +440,7 @@ def main():
 
     with open(scriptname + "_TA_malwareconfigparser.py", "w") as f:
         f.write(output)
+
 
 if __name__ == '__main__':
     main()

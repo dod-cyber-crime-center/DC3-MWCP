@@ -123,7 +123,6 @@ def main():
     # Get command line arguments
     argparser = get_arg_parser()
     args, input_files = argparser.parse_known_args()
-    input_files = read_input_list(input_files[0]) if args.input_file else []
 
     if args.all_tests or not args.parser_name:
         parsers = [None]
