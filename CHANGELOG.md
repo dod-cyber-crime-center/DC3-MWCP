@@ -1,9 +1,20 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.1.1] - 2018-04-12
 ### Added
 - Support for multiprocessing in tester.
+- Helper function for running [kordesii](https://github.com/Defense-Cyber-Crime-Center/kordesii) decoders in FileObject class.
+- Enhancements to Dispatcher.
+    - Added option to not output unidentified files.
+    - Added option to force overwriting descriptions.
+
+### Changed
+- bugfixes and code reformatting
+- Pinned construct version to avoid errors that occur with newer versions.
+
+### Removed
+- Removed `enstructured` library.
 
 ## [1.1.0] - 2018-01-09
 ### Added
@@ -33,5 +44,6 @@ All notable changes to this project will be documented in this file.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.1.0..HEAD
-[1.1.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.0.0..1.1.0
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.1.1...HEAD
+[1.1.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.1.0...1.1.1
+[1.1.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.0.0...1.1.0
