@@ -1,11 +1,21 @@
 """
 A central location to store common windows enumerations.
-This module will be imported along with 'from mwcp.utils import construct'
+This module will be imported along with 'from IN_Dev_Repo.utils import construct'
 """
 
+import datetime
+
 import construct
-from construct import *
-from . import helpers
+from construct import this
+from IN_Dev_Repo.utils.construct import helpers
+from IN_Dev_Repo.utils.construct import windows_enums
+
+# Visible interface. Add the classes and functions you would like to be available for users of construct
+# library here.
+__all__ = [
+    'IMAGE_DOS_HEADER', 'IMAGE_FILE_HEADER', 'IMAGE_OPTIONAL_HEADER', 'IMAGE_NT_HEADERS', 'PEFILE_HEADER',
+    'SOCKADDR_IN', 'PUBLICKEYSTRUC', 'PUBLICKEYBLOB', 'PRIVATEKEYBLOB', 'SYSTEMTIME', 'SystemTime'
+]
 
 """PEFILE STRUCTURES"""
 
@@ -94,3 +104,74 @@ SOCKADDR_IN = construct.Struct(
     "sin_addr" / helpers.IP4Address,
     "sin_zero" / construct.Bytes(8)
 )
+
+"""CRYPTO STRUCTURES"""
+
+PUBLICKEYSTRUC = construct.Struct(
+    "type" / construct.Byte,
+    "version" / construct.Byte,
+    "reserved" / construct.Int16ul,
+    "algid" / windows_enums.AlgorithmID(construct.Int32ul),
+)
+
+PUBLICKEYBLOB = construct.Struct(
+    "publickeystruc" / PUBLICKEYSTRUC,
+    construct.Check(this.publickeystruc.algid == "CALG_RSA_KEYX"),
+    construct.Const("RSA1"),
+    "bitlen" / construct.Int32ul,
+    construct.Check((this.bitlen % 8) == 0),
+    "pubexponent" / construct.Int32ul,
+    "modulus" / construct.BytesInteger(this.bitlen / 8, swapped=True)
+)
+
+PRIVATEKEYBLOB = construct.Struct(
+    "publickeystruc" / PUBLICKEYSTRUC,
+    construct.Check(this.publickeystruc.algid == "CALG_RSA_KEYX"),
+    construct.Const("RSA2"),
+    "bitlen" / construct.Int32ul,
+    construct.Check((this.bitlen % 8) == 0),
+    "pubexponent" / construct.Int32ul,
+    "modulus" / construct.BytesInteger(this.bitlen / 8, swapped=True),
+    "P" / construct.BytesInteger(this.bitlen / 16, swapped=True),
+    "Q" / construct.BytesInteger(this.bitlen / 16, swapped=True),
+    # d % (p - 1)
+    "Dp" / construct.BytesInteger(this.bitlen / 16, swapped=True),
+    # d % (q - 1)
+    "Dq" / construct.BytesInteger(this.bitlen / 16, swapped=True),
+    # ~(q % p)
+    "Iq" / construct.BytesInteger(this.bitlen / 16, swapped=True),
+    # Private Exponent
+    "D" / construct.BytesInteger(this.bitlen / 8, swapped=True)
+)
+
+"""TIME STRUCTURES"""
+
+SYSTEMTIME = construct.Struct(
+    "wYear" / construct.Int16ul,
+    "wMonth" / construct.Int16ul,
+    "wDayOfWeek" / construct.Int16ul,
+    "wDay" / construct.Int16ul,
+    "wHour" / construct.Int16ul,
+    "wMinute" / construct.Int16ul,
+    "wSecond" / construct.Int16ul,
+    "wMilliseconds" / construct.Int16ul,
+)
+
+
+# TODO: Implement _encode
+class _SystemTimeAdapter(construct.Adapter):
+    r"""
+    Adapter to convert SYSTEMTIME structured data to datetime.datetime ISO format.
+
+    >>> _SystemTimeAdapter(SYSTEMTIME).parse('\xdd\x07\t\x00\x03\x00\x12\x00\t\x00.\x00\x15\x00\xf2\x02')
+    '2013-09-18T09:46:21.754000'
+    """
+    def _decode(self, obj, context):
+        return datetime.datetime(
+            obj.wYear, obj.wMonth, obj.wDay, obj.wHour, obj.wMinute, obj.wSecond, obj.wMilliseconds * 1000
+        ).isoformat()
+
+# Hide the adapter
+SystemTime = _SystemTimeAdapter(SYSTEMTIME)
+
+

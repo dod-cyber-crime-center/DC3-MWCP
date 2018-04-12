@@ -32,10 +32,10 @@ def _validate_alphabet(alphabet, type):
         - 64 or 65 characters
         - mappings are unique
     """
-    if not len(alphabet) == type and not len(alphabet) == type + 1:
+    if len(alphabet) not in (type, type+1):
         raise ValueError('invalid alphabet provided')
 
-    if not len(alphabet) == len(set(alphabet)):
+    if len(alphabet) != len(set(alphabet)):
         raise ValueError('mapping must be unique')
 
     return
@@ -88,6 +88,7 @@ def b64encode(data, alphabet):
 
 
 def b64decode(data, alphabet):
+    data += alphabet[-1] * ((-len(data)) % 4)           # Pad the data, if necessary
     return _code(data, alphabet, 64, True, base64.b64decode)
 
 

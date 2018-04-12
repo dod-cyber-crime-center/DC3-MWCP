@@ -9,22 +9,27 @@ import re
 import string
 import sys
 import uuid
+import datetime
+import time
+import zlib
 
 import construct
 from construct import *
-from construct.core import globalstringencoding
+from construct.core import globalstringencoding, _write_stream, _read_stream, int2byte, byte2int, singleton
 from construct.lib import py3compat
 
 from mwcp.utils import custombase64, pefileutils
 
 PY3 = sys.version_info.major == 3
 
+
 # Visible interface. Add the classes and functions you would like to be available for users of construct
 # library here.
 __all__ = ['BYTE', 'WORD', 'DWORD', 'QWORD', 'ULONG', 'ULONGLONG', 'TerminatedString',
-           'CString', 'String', 'String16', 'String32', 'IP4Address', 'SkipNull',
-           'HexString', 'Base64', 'UUID', 'PEPhysicalAddress', 'PEPointer', 'PEPointer64',
-           'Regex', 'find_constructs', 'Boolean', 'Delimited', 'Printable']
+           'CString', 'String', 'String16', 'String32', 'MACAddressAdapter', 'MacAddress', 'IP4Address', 'SkipNull',
+           'HexString', 'Base64', 'ZLIB', 'UUID', 'PEPhysicalAddress', 'PEPointer', 'PEPointer64',
+           'Regex', 'find_constructs', 'Boolean', 'Delimited', 'Printable', 'DateTimeDateData', 'ErrorMessage',
+           'Compressed', 'Iter', 'DotNetUInt', 'DotNetNullString', 'DotNetSigToken', 'Backwards']
 
 BYTE = Byte
 WORD = Int16ul
@@ -85,6 +90,98 @@ class Boolean(Adapter):
         return bool(obj)
 
 
+class Compressed(Adapter):
+    r"""
+    Replaces the original Compressed construct to improve functionality:
+        - supports providing a custom encoding module or object.
+            - (provide any object that has a "decompress" and "compress" function in the lib parameter.)
+        - produces a ConstructError if compressed/decompression fails.
+            - (You can turn this off by setting wrap_exception=False)
+        - uses Adapter instead of Tunnel in order to allow it be embedded within other constructs.
+            - (Original one read entire stream, no matter the subcon you provide.)
+
+    e.g.
+    >>> import zlib
+    >>> Compressed(GreedyBytes, zlib).build('hello world')
+    'x\x9c\xcbH\xcd\xc9\xc9W(\xcf/\xcaI\x01\x00\x1a\x0b\x04]'
+    >>> Compressed(GreedyBytes, zlib).parse(_)
+    'hello world'
+
+    Now that this is an Adapter, it can be become part of a larger struct.
+    >>> spec = Struct(
+    ...     'magic' / Const('YUP'),
+    ...     'data' / Compressed(Bytes(19), zlib),
+    ...     'trailer' / Int32ul,
+    ... )
+    >>> spec.parse('YUPx\x9c\xcbH\xcd\xc9\xc9W(\xcf/\xcaI\x01\x00\x1a\x0b\x04]\x03\x00\x00\x00')
+    Container(magic='YUP')(data='hello world')(trailer=3)
+    >>> spec.build(_)
+    'YUPx\x9c\xcbH\xcd\xc9\xc9W(\xcf/\xcaI\x01\x00\x1a\x0b\x04]\x03\x00\x00\x00'
+    """
+    __slots__ = ["lib", "wrap_exception"]
+
+    def __init__(self, subcon, lib, wrap_exception=True):
+        super(Compressed, self).__init__(subcon)
+        self.wrap_exception = wrap_exception
+        if hasattr(lib, "compress") and hasattr(lib, "decompress"):
+            self.lib = lib
+        elif lib == "zlib":
+            import zlib
+            self.lib = zlib
+        elif lib == "gzip":
+            import gzip
+            self.lib = gzip
+        elif lib == "bzip2":
+            import bz2
+            self.lib = bz2
+        else:
+            raise ValueError('Invalid lib parameter: {}'.format(lib))
+
+    def _decode(self, data, context):
+        try:
+            return self.lib.decompress(data)
+        except Exception as e:
+            if self.wrap_exception:
+                raise ConstructError('Decompression failed with error: {}'.format(e))
+            else:
+                raise
+
+    def _encode(self, data, context):
+        try:
+            return self.lib.compress(data)
+        except Exception as e:
+            if self.wrap_exception:
+                raise ConstructError('Compression failed with error: {}'.format(e))
+            else:
+                raise
+
+
+class ErrorMessage(Construct):
+    r"""
+    Raises an exception when triggered by parse or build. Can be used as a sentinel that blows a whistle when a conditional branch goes the wrong way, or to raise an error explicitly the declarative way.
+    This modification allows the ability to supply a custom message.
+
+    Example::
+
+        >>> d = "x"/Int8sb >> IfThenElse(this.x > 0, Int8sb, ErrorMessage('Failed if statement'))
+        >>> d.parse(b"\xff\x05")
+        Traceback (most recent call last):
+            ...
+        ExplicitError: Failed if statement
+    """
+    __slots__ = ['message']
+
+    def __init__(self, message="Error field was activated."):
+        super(self.__class__, self).__init__()
+        self.message = message
+    def _parse(self, stream, context, path):
+        message = self.message(context) if callable(self.message) else self.message
+        raise ExplicitError(message)
+    def _build(self, obj, stream, context, path):
+        message = self.message(context) if callable(self.message) else self.message
+        raise ExplicitError(message)
+
+
 class TerminatedString(construct.StringEncoded):
     r"""Construct adapter that can be used on a string construct to strip away the garbage
     characters after the first instance of the terminator.
@@ -94,17 +191,17 @@ class TerminatedString(construct.StringEncoded):
 
     e.g.
     >>> TerminatedString(String(10)).build(b'hello')
-    b'hello\x00\x00\x00\x00\x00'
+    'hello\x00\x00\x00\x00\x00'
     >>> TerminatedString(PascalString(Byte)).build(b'hello')
-    b'\x05hello'
+    '\x05hello'
     >>> TerminatedString(String(10)).parse(b'hello\x00\x02\x04FA')
-    'hello'
+    u'hello'
     >>> TerminatedString(String(10)).parse(b'helloworld')
-    'helloworld'
+    u'helloworld'
     >>> TerminatedString(GreedyString()).parse(b'this is a valid string\x00\x00 GARBAGE!')
-    b'this is a valid string'
+    'this is a valid string'
     >>> TerminatedString(PascalString(Byte)).parse(b'\x0Ahello\x00\x01\x03\x04F')
-    b'hello'
+    'hello'
     """
     __slots__ = ["encoding", "terminator"]
 
@@ -132,21 +229,21 @@ def CString(terminator=b"\x00", encoding=None):
     working with utf-16 or utf-32 encoded strings (github.com/construct/construct/issues/388)
 
     >>> CString().parse(b'hello\x00')
-    b'hello'
+    'hello'
     >>> CString(encoding='utf-16').parse(b'\xff\xfeh\x00e\x00l\x00l\x00o\x00\x00\x00')  # FFFE is BOM for utf-16-le
-    'hello'
+    u'hello'
     >>> CString(encoding='utf-16').parse(b'h\x00e\x00l\x00l\x00o\x00\x00\x00')
-    'hello'
-    >>> CString(encoding='utf-16').build('hello')
-    b'\xff\xfeh\x00e\x00l\x00l\x00o\x00\x00\x00'
-    >>> CString(encoding='utf-32').build('hello')
-    b'\xff\xfe\x00\x00h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00\x00\x00\x00\x00'
+    u'hello'
+    >>> CString(encoding='utf-16').build(u'hello')
+    '\xff\xfeh\x00e\x00l\x00l\x00o\x00\x00\x00'
+    >>> CString(encoding='utf-32').build(u'hello')
+    '\xff\xfe\x00\x00h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00\x00\x00\x00\x00'
 
     Make sure to specify 'le' or 'be' in the encoding if you don't want BOM markers when building.
-    >>> CString(encoding='utf-32-le').build('hello')
-    b'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00\x00\x00\x00\x00'
-    >>> CString(encoding='utf-32-be').build('hello')
-    b'\x00\x00\x00h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00\x00'
+    >>> CString(encoding='utf-32-le').build(u'hello')
+    'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00\x00\x00\x00\x00'
+    >>> CString(encoding='utf-32-be').build(u'hello')
+    '\x00\x00\x00h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00\x00'
     """
     # Revert to original if not utf-16 or utf-32.
     if not encoding or not ('16' in encoding or '32' in encoding):
@@ -164,7 +261,6 @@ def CString(terminator=b"\x00", encoding=None):
             decoder=lambda obj, ctx: b''.join(obj[:-1])),
         encoding)
 
-
 def String(length, encoding=None, padchar=b"\x00", paddir="right", trimdir="right"):
     r"""
     A configurable, fixed-length or variable-length string field.
@@ -176,9 +272,9 @@ def String(length, encoding=None, padchar=b"\x00", paddir="right", trimdir="righ
     up by BOM markings when specifying the length.
     If you don't want BOM. Make sure to explicitly specify "le" or "be" at the end of your encoding.
     >>> u'hi'.encode('utf-16')
-    b'\xff\xfeh\x00i\x00'
+    '\xff\xfeh\x00i\x00'
     >>> u'hi'.encode('utf-16-le')
-    b'h\x00i\x00'
+    'h\x00i\x00'
 
     :param length: length in bytes (not unicode characters), as int or context function
     :param encoding: encoding (e.g. "utf8") or None for bytes
@@ -188,29 +284,29 @@ def String(length, encoding=None, padchar=b"\x00", paddir="right", trimdir="righ
 
     e.g.
     >>> construct.StringEncoded(Bytes(10), 'utf-16').parse(b'h\x00e\x00l\x00l\x00o\x00')
-    'hello'
+    u'hello'
     >>> String(10, encoding='utf-16').parse(b'h\x00e\x00l\x00l\x00o\x00')
-    'hello'
+    u'hello'
     >>> String(12, encoding='utf-16').build(u'hello')
-    b'\xff\xfeh\x00e\x00l\x00l\x00o\x00'
+    '\xff\xfeh\x00e\x00l\x00l\x00o\x00'
     >>> String(10, encoding='utf-16le').build(u'hello')
-    b'h\x00e\x00l\x00l\x00o\x00'
+    'h\x00e\x00l\x00l\x00o\x00'
     >>> String(16, encoding='utf-16le').build(u'hello')
-    b'h\x00e\x00l\x00l\x00o\x00\x00\x00\x00\x00\x00\x00'
+    'h\x00e\x00l\x00l\x00o\x00\x00\x00\x00\x00\x00\x00'
     >>> String(16, encoding='utf-16').parse(b'h\x00e\x00l\x00l\x00o\x00\x00\x00\x00\x00\x00\x00')
-    'hello'
+    u'hello'
 
     Works with utf-32 in the same way.
     >>> String(20, encoding='utf-32-le').build(u'hello')
-    b'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00'
+    'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00'
     >>> String(20, encoding='utf-32').parse(b'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00')
-    'hello'
+    u'hello'
 
     Also, still works with regular single byte encodings.
-    >>> String(5).build(b'hello')
-    b'hello'
+    >>> String(5).build('hello')
+    'hello'
     >>> String(5).parse(b'hello')
-    b'hello'
+    'hello'
     """
     if not encoding or not ('16' in encoding or '32' in encoding):
         return construct.String(length, encoding=encoding, padchar=padchar, paddir=paddir, trimdir=trimdir)
@@ -233,7 +329,6 @@ def String(length, encoding=None, padchar=b"\x00", paddir="right", trimdir="righ
     # Fake the StringPaddedTrimmed so that it can be used with non-byte padchar.
     class _StringPaddedTrimmed(construct.StringPaddedTrimmed):
         """Overwritten to allow padchar to be a str type."""
-
         def __init__(self, length, subcon, padchar=b"\x00", paddir="right", trimdir="right"):
             # Fake the padchar as a byte the switch it back.
             orig_padchar = padchar
@@ -261,12 +356,12 @@ def String16(length):
     r"""
     Creates UTF-16 (little endian) encoded string.
 
-    >>> String16(10).build('hello')
-    b'h\x00e\x00l\x00l\x00o\x00'
+    >>> String16(10).build(u'hello')
+    'h\x00e\x00l\x00l\x00o\x00'
     >>> String16(10).parse(b'h\x00e\x00l\x00l\x00o\x00')
-    'hello'
+    u'hello'
     >>> String16(16).parse(b'h\x00e\x00l\x00l\x00o\x00\x00\x00\x00\x00\x00\x00')
-    'hello'
+    u'hello'
     """
     return String(length, encoding='utf-16-le')
 
@@ -275,10 +370,10 @@ def String32(length):
     r"""
     Creates UTF-32 (little endian) encoded string.
 
-    >>> String32(20).build('hello')
-    b'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00'
+    >>> String32(20).build(u'hello')
+    'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00'
     >>> String32(20).parse(b'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00')
-    'hello'
+    u'hello'
     """
     return String(length, encoding='utf-32-le')
 
@@ -290,23 +385,42 @@ class Printable(Validator):
     NOTE: A ValidationError is a type of ConstructError and will be cause if catching ConstructError.
 
     >>> Printable(String(5)).parse(b'hello')
-    'hello'
+    u'hello'
     >>> Printable(String(5)).parse(b'he\x11o!')
     Traceback (most recent call last):
         ...
-    construct.core.ValidationError: ('object failed validation', 'he\x11o!')
+    ValidationError: ('object failed validation', u'he\x11o!')
     >>> Printable(Bytes(3)).parse(b'\x01NO')
     Traceback (most recent call last):
         ...
-    construct.core.ValidationError: ('object failed validation', b'\x01NO')
+    ValidationError: ('object failed validation', '\x01NO')
     >>> Printable(Bytes(3)).parse(b'YES')
-    b'YES'
+    'YES'
     """
 
     def _validate(self, obj, context):
         if PY3 and isinstance(obj, bytes):
             return all(chr(byte) in string.printable for byte in obj)
         return isinstance(obj, py3compat.stringtypes) and all(char in string.printable for char in obj)
+
+
+class MACAddressAdapter(Adapter):
+    r"""
+    Adapter used to format a MAC address from a list of 6 bytes
+
+    e.g.
+    >>> MACAddressAdapter(Byte[6]).parse(b'\x00\x0c\x29\xd3\x91\xbc')
+    '00-0c-29-d3-91-bc'
+    """
+    def _encode(self, obj, context):
+        return list(map(chr, obj.split("-")))
+
+    def _decode(self, obj, context):
+        return '{:02x}-{:02x}-{:02x}-{:02x}-{:02x}-{:02x}'.format(*obj)
+
+
+# A MacAddress parsed from single bytes.
+MacAddress = MACAddressAdapter(Byte[6])
 
 
 class IP4AddressAdapter(Adapter):
@@ -340,7 +454,7 @@ class HexString(Adapter):
 
     e.g.
     >>> HexString(Int32ul).build('0x123')
-    b'#\x01\x00\x00'
+    '#\x01\x00\x00'
     >>> HexString(Int32ul).parse(b'\x20\x01\x00\x00')
     '0x120'
     >>> HexString(Int16ub).parse(b'\x12\x34')
@@ -359,6 +473,31 @@ class HexString(Adapter):
         return hex_string
 
 
+# TODO: Implement _encode.
+class DateTimeDateDataAdapter(Adapter):
+    r"""
+    Adapter for a C# DateTime.dateData object to DateTime format. Obtain the DateTime.Ticks and the DateTime.Kind
+    property to format datetime.
+
+
+    >>> DateTimeDateDataAdapter(Int64sl).parse('\x80\xb4N3\xd1\xd4\xd1H')
+    '2014-11-23 01:09:01 UTC'
+    """
+    def _decode(self, obj, context):
+        ticks = obj & 0x3fffffffffffffff
+        kind = (obj >> 62) & 0x03
+        converted_ticks = datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds=ticks / 10)
+        if kind == 0:
+            return converted_ticks.strftime("%Y-%m-%d %H:%M:%S")
+        elif kind == 1:
+            return converted_ticks.strftime("%Y-%m-%d %H:%M:%S UTC")
+        elif kind == 2:
+            return converted_ticks.strftime("%Y-%m-%d %H:%M:%S Local")
+
+
+DateTimeDateData = DateTimeDateDataAdapter(Int64sl)
+
+
 class Base64(Adapter):
     r"""
     Adapter used to Base64 encoded/decode a value.
@@ -368,26 +507,26 @@ class Base64(Adapter):
 
     e.g.
     >>> Base64(GreedyString()).build(b'hello')
-    b'aGVsbG8='
+    'aGVsbG8='
     >>> Base64(GreedyString()).parse(b'aGVsbG8=')
-    b'hello'
+    'hello'
     >>> Base64(GreedyBytes).build(b'\x01\x02\x03\x04')
-    b'AQIDBA=='
+    'AQIDBA=='
     >>> Base64(GreedyBytes).parse(b'AQIDBA==')
-    b'\x01\x02\x03\x04'
+    '\x01\x02\x03\x04'
 
     NOTE: String size is based on the encoded version.
     >>> Base64(String(16)).build(b'hello world')
-    b'aGVsbG8gd29ybGQ='
+    'aGVsbG8gd29ybGQ='
     >>> Base64(String(16)).parse(b'aGVsbG8gd29ybGQ=')
-    b'hello world'
+    'hello world'
 
     Supplying a custom alphabet is also supported.
     >>> spec = Base64(String(16), custom_alpha='EFGHQRSTUVWefghijklmnopIJKLMNOPABCDqrstuvwxyXYZabcdz0123456789+/=')
     >>> spec.build(b'hello world')
-    b'LSoXMS8BO29dMSj='
+    'LSoXMS8BO29dMSj='
     >>> spec.parse(b'LSoXMS8BO29dMSj=')
-    b'hello world'
+    'hello world'
     """
     __slots__ = ['subcon', 'custom_alpha']
 
@@ -402,13 +541,61 @@ class Base64(Adapter):
             return base64.b64encode(obj)
 
     def _decode(self, obj, context):
-        try:
-            if self.custom_alpha:
-                return custombase64.b64decode(obj, self.custom_alpha)
-            else:
-                return base64.b64decode(obj)
-        except TypeError as e:
-            raise ConstructError('[*] Error while Base64 decoding provided data: {}'.format(e))
+        # try:
+        if self.custom_alpha:
+            return custombase64.b64decode(obj, self.custom_alpha)
+        else:
+            return base64.b64decode(obj)
+        # except TypeError as e:
+        #     raise ConstructError('[*] Error while Base64 decoding provided data: {}'.format(e))
+
+
+class ZLIB(Adapter):
+    r"""
+    Adapter used to zlib compress/decompress a data buffer
+
+    :param subcon: The construct to wrap
+    :param int level: The zlib compression level
+    :param int wbits: The zlib decompression window size
+    :param int bufsize: The initial output buffer size
+
+    >>> ZLIB(Bytes(12)).build(b'data')
+    'x\x9cKI,I\x04\x00\x04\x00\x01\x9b'
+    >>> ZLIB(GreedyBytes, level=0).build(b'data')
+    'x\x01\x01\x04\x00\xfb\xffdata\x04\x00\x01\x9b'
+    >>> ZLIB(GreedyBytes).parse(b'x^KI,I\x04\x00\x04\x00\x01\x9b')
+    'data'
+    """
+    __slots__ = ["subcon", "wbits", "bufsize", "level"]
+
+    def __init__(self, subcon, wbits=None, bufsize=None, level=None):
+        super(ZLIB, self).__init__(subcon)
+        self.wbits = wbits
+        self.bufsize = bufsize
+        self.level = level
+
+    def _encode(self, obj, context):
+        level = self.level(context) if callable(self.level) else self.level
+        if level is not None:
+            return zlib.compress(obj, level)
+        return zlib.compress(obj)
+
+    def _decode(self, obj, context):
+        """
+        ZLIB decompress a buffer, cannot use bufsize if wbits is not set
+
+        :param obj:
+        :param context:
+
+        :return:
+        """
+        wbits = self.wbits(context) if callable(self.wbits) else self.wbits
+        bufsize = self.bufsize(context) if callable(self.bufsize) else self.bufsize
+        if wbits is not None and bufsize is not None:
+            return zlib.decompress(obj, wbits, bufsize)
+        elif wbits is not None:
+            return zlib.decompress(obj, wbits)
+        return zlib.decompress(obj)
 
 
 class UUIDAdapter(Adapter):
@@ -418,9 +605,9 @@ class UUIDAdapter(Adapter):
 
     e.g.
     >>> UUIDAdapter(Bytes(16)).build('{12345678-1234-5678-1234-567812345678}')
-    b'xV4\x124\x12xV\x124Vx\x124Vx'
+    'xV4\x124\x12xV\x124Vx\x124Vx'
     >>> UUIDAdapter(Bytes(16), le=False).build('{12345678-1234-5678-1234-567812345678}')
-    b'\x124Vx\x124Vx\x124Vx\x124Vx'
+    '\x124Vx\x124Vx\x124Vx\x124Vx'
     >>> UUIDAdapter(Bytes(16)).parse(b'xV4\x124\x12xV\x124Vx\x124Vx')
     '{12345678-1234-5678-1234-567812345678}'
     """
@@ -452,9 +639,9 @@ def UUID(le=True):
 
     e.g.
     >>> UUID().build('{12345678-1234-5678-1234-567812345678}')
-    b'xV4\x124\x12xV\x124Vx\x124Vx'
+    'xV4\x124\x12xV\x124Vx\x124Vx'
     >>> UUID(le=False).build('{12345678-1234-5678-1234-567812345678}')
-    b'\x124Vx\x124Vx\x124Vx\x124Vx'
+    '\x124Vx\x124Vx\x124Vx\x124Vx'
     >>> UUID().parse(b'xV4\x124\x12xV\x124Vx\x124Vx')
     '{12345678-1234-5678-1234-567812345678}'
     >>> UUID(le=False).parse(b'\x124Vx\x124Vx\x124Vx\x124Vx')
@@ -491,15 +678,14 @@ class PEPhysicalAddress(Adapter):
     ...     file_data = fo.read()
     >>> pe = pefileutils.obtain_pe(file_data)
     >>> PEPhysicalAddress(Int32ul, pe=pe).build(100)
-    b'd\x00@\x00'
+    'd\x00@\x00'
     >>> PEPhysicalAddress(Int32ul, pe=pe).parse(b'd\x00@\x00')
     100
     >>> PEPhysicalAddress(Int32ul).build(100, pe=pe)
-    b'd\x00@\x00'
+    'd\x00@\x00'
     >>> PEPhysicalAddress(Int32ul).parse(b'd\x00@\x00', pe=pe)
     100
     """
-
     def __init__(self, subcon, pe=None):
         """
         :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
@@ -544,7 +730,6 @@ def PEPointer(mem_off, subcon, pe=None):
     :param subcon: the subcon to use at the offset
     :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
     """
-
     def _obtain_physical_offset(ctx):
         _pe = pe or _get_pe(ctx)
         _mem_off = mem_off(ctx) if callable(mem_off) else mem_off
@@ -584,7 +769,6 @@ def PEPointer64(mem_off, inst_end, subcon, pe=None):
     :param subcon: the subcon to use at the offset
     :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
     """
-
     def _obtain_physical_offset(ctx):
         _pe = pe or _get_pe(ctx)
         _mem_off = mem_off(ctx) if callable(mem_off) else mem_off
@@ -611,9 +795,9 @@ class Delimited(Construct):
     ...     'fourth' / Byte
     ... )
     >>> spec.parse(b'Hello\x00\x00|\x01\x00\x00\x00|world!!\x01\x02|\xff')
-    Container(first=b'Hello')(second=1)(third=b'world!!\x01\x02')(fourth=255)
+    Container(first='Hello')(second=1)(third='world!!\x01\x02')(fourth=255)
     >>> spec.build(dict(first=b'Hello', second=1, third=b'world!!\x01\x02', fourth=255))
-    b'Hello\x00|\x01\x00\x00\x00|world!!\x01\x02|\xff'
+    'Hello\x00|\x01\x00\x00\x00|world!!\x01\x02|\xff'
 
     If you don't care about a particular element, you can leave it nameless just like in Structs.
     # NOTE: You can't build unless you have supplied every attribute.
@@ -624,7 +808,7 @@ class Delimited(Construct):
     ...     'fourth' / Byte
     ... )
     >>> spec.parse(b'Hello\x00\x00|\x01\x00\x00\x00|world!!\x01\x02|\xff')
-    Container(first=b'Hello')(second=1)(fourth=255)
+    Container(first='Hello')(second=1)(fourth=255)
 
     It may also be useful to use Pass or Optional for fields that may not exist.
     >>> spec = Delimited(b'|',
@@ -633,9 +817,9 @@ class Delimited(Construct):
     ...     'third' / Optional(Int32ul)
     ... )
     >>> spec.parse(b'Hello\x00\x00|dont care|\x01\x00\x00\x00')
-    Container(first=b'Hello')(second=None)(third=1)
+    Container(first='Hello')(second=None)(third=1)
     >>> spec.parse(b'Hello\x00\x00||')
-    Container(first=b'Hello')(second=None)(third=None)
+    Container(first='Hello')(second=None)(third=None)
     """
 
     __slots__ = ['delimiter', 'subcons']
@@ -746,59 +930,60 @@ class Regex(Construct):
     will be purely relative to that piece of data only. This was done to ensure you are only parsing what has been
     captured. (If you need to use Seek or Tell, you will have to instead make a capture group that collects no data.)
 
+
     NOTE: If you supply a string as the regular expression, the re.DOTALL flag will be automatically specified.
-    If you need to use different flags, you must pass a compiled regex.
+    If you need to use different flags, you must past a compiled regex.
 
     The seek position is left at the end of the successful match (match.end()).
 
-    >>> regex = re.compile(b'\x01\x02(?P<size>.{4})\x03\x04(?P<path>[A-Za-z].*\x00)', re.DOTALL)
-    >>> data = b'GARBAGE!\x01\x02\x0A\x00\x00\x00\x03\x04C:\Windows\x00MORE GARBAGE!'
+    >>> regex = re.compile('\x01\x02(?P<size>.{4})\x03\x04(?P<path>[A-Za-z].*\x00)', re.DOTALL)
+    >>> data = 'GARBAGE!\x01\x02\x0A\x00\x00\x00\x03\x04C:\Windows\x00MORE GARBAGE!'
     >>> Regex(regex, size=Int32ul, path=CString()).parse(data)
-    Container(size=10)(path=b'C:\\Windows')
+    Container(path='C:\\Windows')(size=10)
     >>> Regex(regex).parse(data)
-    Container(size=b'\n\x00\x00\x00')(path=b'C:\\Windows\x00')
+    Container(path='C:\\Windows\x00')(size='\n\x00\x00\x00')
     >>> Struct(
     ...     're' / Regex(regex, size=Int32ul, path=CString()),
     ...     'after_re' / Tell,
     ...     'garbage' / GreedyBytes
     ... ).parse(data)
-    Container(re=Container(size=10)(path=b'C:\\Windows'))(after_re=27)(garbage=b'MORE GARBAGE!')
+    Container(re=Container(path='C:\\Windows')(size=10))(after_re=27L)(garbage='MORE GARBAGE!')
     >>> Struct(
     ...     Embedded(Regex(regex, size=Int32ul, path=CString())),
     ...     'after_re' / Tell,
     ...     'garbage' / GreedyBytes
     ... ).parse(data)
-    Container(size=10)(path=b'C:\\Windows')(after_re=27)(garbage=b'MORE GARBAGE!')
+    Container(path='C:\\Windows')(size=10)(after_re=27L)(garbage='MORE GARBAGE!')
 
     You can use Regex as a trigger to find a particular piece of data before you start parsing.
     >>> Struct(
     ...     Regex('TRIGGER'),
     ...     'greeting' / CString()
-    ... ).parse(b'\x01\x02\x04GARBAGE\x05TRIGGERhello world\x00')
-    Container(greeting=b'hello world')
+    ... ).parse('\x01\x02\x04GARBAGE\x05TRIGGERhello world\x00')
+    Container(greeting='hello world')
 
     If no data is captured, the associated subcon will received a stream with the position set at the location
     of that captured group. Thus, allowing you to use it as an anchor point.
-    >>> Regex('hello (?P<anchor>)world(?P<extra_data>.*)', anchor=Tell).parse(b'hello world!!!!')
-    Container(anchor=6)(extra_data=b'!!!!')
+    >>> Regex('hello (?P<anchor>)world(?P<extra_data>.*)', anchor=Tell).parse('hello world!!!!')
+    Container(extra_data='!!!!')(anchor=6L)
 
     If no named capture groups are used, you can instead parse the entire matched string by supplying
     a subconstruct as a positional argument. (If no subcon is provided, the raw bytes are returned instead.
-    >>> Regex('hello world\x00', CString()).parse(b'GARBAGE\x01\x03hello world\x00\x04')
-    b'hello world'
-    >>> Regex('hello world\x00').parse(b'GARBAGE\x01\x03hello world\x00\x04')
-    b'hello world\x00'
+    >>> Regex('hello world\x00', CString()).parse('GARBAGE\x01\x03hello world\x00\x04')
+    'hello world'
+    >>> Regex('hello world\x00').parse('GARBAGE\x01\x03hello world\x00\x04')
+    'hello world\x00'
 
     You can also set the regular expression to match in-place (instead of searching the data)
     by setting the keyword argument _match to True.
     >>> Regex('hello', _match=True).parse(b'hello world!')
-    b'hello'
+    'hello'
     >>> Regex('hello').parse(b'bogus hello world')
-    b'hello'
+    'hello'
     >>> Regex('hello', _match=True).parse(b'bogus hello world')
     Traceback (most recent call last):
         ...
-    construct.core.ConstructError: regex did not match
+    ConstructError: regex did not match
     """
 
     __slots__ = ['regex', 'subcon', 'group_subcons', 'match']
@@ -893,6 +1078,70 @@ class Regex(Construct):
             stream.seek(start + match.end())
 
 
+class IterError(ConstructError):
+    pass
+
+
+class Iter(Construct):
+    r"""
+    Class that allows iterating over an object and acting on each item.
+
+    e.g.
+    >>> struct = Struct(
+    ...     'types' / Byte[3],
+    ...     'entries' / Iter(this.types, {
+    ...        1: construct.Int32ul,
+    ...        2: construct.Int16ul,
+    ...     },
+    ...     default=construct.Pass
+    ...     )
+    ... )
+    >>> struct.parse('\x01\x02\x09\x03\x03\x03\x03\x06\x06')
+    Container(types=[1, 2, 9])(entries=[50529027, 1542, None])
+    >>> C = _
+    >>> struct.build(C)
+    '\x01\x02\t\x03\x03\x03\x03\x06\x06'
+    >>> struct.sizeof(C)
+    9
+
+    :param iterable: iterable items to act upon
+    :param cases: A dictionary of cases
+    :param default: The default case
+    """
+    __slots__ = ['iterable', 'cases', 'default']
+
+    def __init__(self, iterable, cases, default=Switch.NoDefault):
+        super(Iter, self).__init__()
+        self.iterable = iterable
+        self.cases = cases
+        self.default = default
+        self.flagbuildnone = all(sc.flagbuildnone for sc in cases.values())
+        self.flagembedded = all(sc.flagembedded for sc in cases.values())
+
+    def _parse(self, stream, context, path):
+        iterator = iter(self.iterable(context)) if callable(self.iterable) else iter(self.iterable)
+        try:
+            return ListContainer([self.cases.get(i, self.default)._parse(stream, context, path) for i in iterator])
+        except SwitchError as err:
+            raise IterError(err)
+
+    def _build(self, obj, stream, context, path):
+        iterator = iter(self.iterable(context)) if callable(self.iterable) else iter(self.iterable)
+        try:
+            for sub_obj, key in zip(obj, iterator):
+                self.cases.get(key, self.default)._build(sub_obj, stream, context, path)
+        except SwitchError as err:
+            raise IterError(err)
+
+    def _sizeof(self, context, path):
+        try:
+            iterator = iter(self.iterable(context)) if callable(self.iterable) else iter(self.iterable)
+            return sum(self.cases.get(key, self.default)._sizeof(context, path) for key in iterator)
+        except (KeyError, AttributeError):
+            raise SizeofError("cannot calculate size, key not found in context")
+
+
+
 def find_constructs(struct, data):
     r"""
     Generator that yields the results of successful parsings of the given
@@ -909,7 +1158,7 @@ def find_constructs(struct, data):
     ...     'int' / Int16ul,
     ...     'string' / CString())
     >>> list(find_constructs(struct, b'\x01\x02\x03MZ\x0A\x00hello\x00\x03\x04MZ\x0B\x00world\x00\x00'))
-    [(3, Container(int=10)(string=b'hello')), (15, Container(int=11)(string=b'world'))]
+    [(3L, Container(int=10)(string='hello')), (15L, Container(int=11)(string='world'))]
     >>> list(find_constructs(struct, b'nope'))
     []
 
@@ -924,7 +1173,7 @@ def find_constructs(struct, data):
         offset = data.tell()
         try:
             data_element = struct.parse_stream(data)
-        except construct.ConstructError:
+        except (construct.ConstructError, OverflowError) as e:
             data.seek(offset + 1)
         else:
             yield offset, data_element
@@ -934,3 +1183,140 @@ def find_constructs(struct, data):
             data.seek(-1, os.SEEK_CUR)
         else:
             break
+
+
+@singleton
+class DotNetUInt(Construct):
+    r"""
+    DotNet encoded unsigned 32-bit integer, where first byte indicates the length of the integer.
+
+    Example:
+
+        >>> DotNetUInt.build(16)
+        b'\x10'
+        >>> DotNetUInt.parse(_)
+        16
+        >>> DotNetUInt.build(256)
+        b'\x81\x00'
+        >>> DotNetUInt.parse(_)
+        256
+        >>> DotNetUInt.build(0xffff)
+        b'\xc0\x00\xff\xff'
+        >>> DotNetUInt.parse(_)
+        65535
+    """
+    def _parse(self, stream, context, path):
+        b = byte2int(_read_stream(stream, 1))
+        if b & 0x80 == 0:
+            num = b
+        elif b & 0xc0 == 0x80:
+            num = ((b & 0x3f) << 8) + byte2int(_read_stream(stream, 1))
+        elif b & 0xe0 == 0xc0:
+            num = (b & 0x1f) << 24
+            num += byte2int(_read_stream(stream, 1)) << 16
+            num += byte2int(_read_stream(stream, 1)) << 8
+            num += byte2int(_read_stream(stream, 1))
+        else:
+            raise ConstructError('DotNetUInt encountered an invalid string')
+        return num
+
+    def _build(self, obj, stream, context, path):
+        if obj < 0:
+            raise ConstructError("DotNetUInt cannot build from negative number")
+        if obj > 0x1fffffff:
+            raise ConstructError("DotNetUInt encountered too large a number")
+        if obj < 0x80:
+            _write_stream(stream, 1, int2byte(obj))
+        elif obj < 0x3fff:
+            _write_stream(stream, 1, int2byte((obj >> 8) | 0x80))
+            _write_stream(stream, 1, int2byte(obj & 0xff))
+        else:
+            _write_stream(stream, 1, int2byte((obj >> 24) | 0xc0))
+            _write_stream(stream, 1, int2byte((obj >> 16) & 0xff))
+            _write_stream(stream, 1, int2byte((obj >> 8) & 0xff))
+            _write_stream(stream, 1, int2byte(obj & 0xff))
+
+
+@singleton
+class DotNetNullString(Construct):
+    r"""
+    DotNet null string, different from an empty zero-byte string, encoded as a single 0xff byte.
+
+    Example:
+
+        >>> DotNetNullString.parse('\xff')
+        None
+        >>> DotNetNullString.build()
+        '\xff'
+    """
+    def _parse(self, stream, context, path):
+        if _read_stream(stream, 1) != '\xff':
+            raise ConstructError('DotNetNullString encounted an invalid byte.')
+        return None
+
+    def _build(self, obj, stream, context, path):
+        _write_stream(stream, 1, '\xff')
+
+    def _sizeof(self, context, path):
+        return 1
+
+
+class _DotNetSigToken(Adapter):
+    r"""
+    Adapter used to create or read a compressed token used in signatures. The token must be a typedef,
+    typeref, or typespec token.
+
+    >>> _DotNetSigToken(DotNetUInt).parse('\x81\x42')
+    452984912
+    >>> _DotNetSigToken(DotNetUInt).build(0x01000002)
+    '\t'
+    """
+    TOKEN_ENCODE = {
+        0x02: 0,
+        0x01: 1,
+        0x1b: 2,
+    }
+    def _encode(self, obj, context):
+        encoded = self.TOKEN_ENCODE.get(obj >> 24, 3)
+        if encoded is None:
+            raise ConstructError('DotNetSigToken encountered a token other than typedef, typeref, or typespec')
+        return ((obj & 0x00ffffff) << 2) | encoded
+
+    def _decode(self, obj, context):
+        if obj & 3 == 3 or obj & 0xfc00000000:
+            raise ConstructError('DotNetSigToken encountered an invalid typedef, typeref, or typespec token')
+        return (obj >> 2) | [0x02000000, 0x01000000, 0x1b000000][obj & 3]
+
+DotNetSigToken = _DotNetSigToken(DotNetUInt)
+
+
+def Backwards(subcon):
+    r"""
+    Adapter used to parse a given subconstruct backwards in the stream.
+    This ia a macro for seeking backwards before parsing the construct.
+    (This will not work for subcons that don't have a valid sizeof)
+
+    The stream will be left off at the start of the parsed result by design.
+    Therefore, doing something like Int32ul >> Backwards(Int32ul) >> Int32ul will parse
+    the same data 3 times.
+
+    e.g.
+    >>> (Bytes(14) >> Backwards(Int32ul) >> Tell).parse(b'junk stuff\x01\x02\x00\x00')
+    ['junk stuff\x01\x02\x00\x00', 513, 10L]
+    >>> spec = Struct(Seek(0, os.SEEK_END), 'name' / Backwards(String(9)), 'number' / Backwards(Int32ul))
+    >>> spec.parse(b'A BUNCH OF JUNK DATA\x01\x00\x00\x00joe shmoe')
+    Container(name='joe shmoe')(number=1)
+
+    WARNING: This will break if the subcon doesn't have a valid sizeof.
+    >>> spec = Struct(Seek(0, os.SEEK_END), 'name' / Backwards(CString()), 'number' / Backwards(Int32ul))
+    >>> spec.parse(b'A BUNCH OF JUNK DATA\x01\x00\x00\x00joe shmoe\x00')
+    Traceback (most recent call last):
+      ...
+    SizeofError: cannot calculate size
+        parsing -> name
+    """
+    return construct.FocusedSeq(
+        1,
+        construct.Seek(lambda ctx: subcon.sizeof(ctx) * -1, os.SEEK_CUR),
+        construct.Peek(subcon)
+    )

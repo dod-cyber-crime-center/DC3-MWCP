@@ -7,15 +7,18 @@ import pefile
 import os
 
 
-def obtain_pe(file_data, reporter=None, debug=True):
+def obtain_pe(file_data, reporter=None, debug=False):
     """
     Given file data, create a pefile.PE object from the data.
 
     :param file_data: Input PE file data
     :param reporter: MWCP reporter object
+    :param debug: Indicate if a debug message should be created, False by default
 
     :return: A pefile.PE object or None
     """
+    if not file_data:
+        return None
     try:
         return pefile.PE(data=file_data)
     except pefile.PEFormatError:
@@ -430,7 +433,7 @@ def is_memory_mapped(file_data):
             if i == len(pe.sections) - 1:
                 section_end = pe.OPTIONAL_HEADER.SizeOfImage
             else:
-                section_end = pe.sections[i + 1].VirtualAddress
+                section_end = pe.sections[i+1].VirtualAddress
             section_start = pe.sections[i].VirtualAddress + pe.sections[i].SizeOfRawData
             if file_data[section_start:section_end] != '\x00' * (section_end - section_start):
                 return False
@@ -505,7 +508,6 @@ class Resource(object):
     :param idname: ID or name string for the resource (note: always a string)
     :param rsrc_entry: String of the dirtype\idname
     """
-
     def __init__(self, pe, entry, dirtype):
         self._data = None
         self._pe = pe
