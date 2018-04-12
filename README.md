@@ -19,6 +19,7 @@ command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 - [Schema](#schema)
 
 ### Documentation
+- [Parser Installation](docs/ParserInstallation.md)
 - [Parser Development](docs/ParserDevelopment.md)
 - [Dispatch Parser Development](docs/DispatcherParserDevelopment.md)
 - [Construct Tutorial](docs/construct.ipynb)
@@ -156,11 +157,12 @@ import mwcp
 # create an instance of the Reporter class
 reporter = mwcp.Reporter()
 """
-The malwareconfigreporter object is the primary DC3-MWCP framework object, containing most input and output data
+The mwcp.Reporter object is the primary DC3-MWCP framework object, containing most input and output data
 and controlling execution of the parser modules.
-
-The most common parameters to provide are parserdir and resourcedir, depending upon your installation.
 """
+
+# register a directory containing parsers
+mwcp.register_parser_directory(r'C:\my_parsers')
 
 # view available parsers
 print(mwcp.get_parser_descriptions())

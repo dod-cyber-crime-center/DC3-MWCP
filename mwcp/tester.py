@@ -26,7 +26,7 @@ DEFAULT_EXCLUDE_FIELDS = ["debug"]
 
 # Setting encoding to utf8 is a hotfix for a larger issue
 encode_params = {
-    'encoding': 'utf8' or sys.stdout.encoding if sys.stdout.encoding else locale.getpreferredencoding(),
+    'encoding': 'utf8',
     'errors': 'replace'
 }
 
@@ -425,11 +425,7 @@ class Tester(object):
 
                 if filtered_output != "":
                     filtered_output += "{0}\n".format(separator)
-<<<<<<< HEAD:mwcp/tester.py
-                    print(filtered_output)
-=======
                     print(filtered_output.encode(**encode_params))
->>>>>>> internal/master:mwcp/tester.py
 
 
 ####################################################

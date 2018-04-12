@@ -127,7 +127,7 @@ class Reporter(object):
         # NOTE: This is all to keep backwards compatibility. mwcp.register_parser_directory() should be
         # called outside of this class in the future.
         self.parserdir = parserdir or self.DEFAULT_PARSERDIR
-        if self.parserdir != self.DEFAULT_PARSERDIR or not list(mwcp.iter_parsers(source='mwcp')):
+        if self.parserdir != self.DEFAULT_PARSERDIR or not any(mwcp.iter_parsers(source='mwcp')):
             mwcp.register_parser_directory(self.parserdir)
 
         self.__interpreter_path = interpreter_path
