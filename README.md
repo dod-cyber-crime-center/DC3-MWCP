@@ -190,7 +190,7 @@ One exception to backwards compatibility is when new attributes are amended to p
 fields. An example of this is the MD5 entry being amended to the 'outputfile' field. When attribute
 additions like this are made, it causes a backwards compatibility conflict with test cases. If
 `test.py` is being used to manage regression tests, the amended attributes can cause previously
-passing test cases to fail. To resolve this issue, work in an evironment where parsers are in a known
+passing test cases to fail. To resolve this issue, work in an environment where parsers are in a known
 good state and run the command `test.py -ua` to update all test cases. The newly generated test
 cases will include the updated field values.
 

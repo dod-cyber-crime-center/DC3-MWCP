@@ -55,14 +55,14 @@ def valid_parser(host, parser):
     return False
 
 
-def run_parser(host, file_path, parser, timeout=300, modargs={}):
+def run_parser(host, file_path, parser, timeout=300, modargs=None):
     """
     Run the provided file against the provided parser.
     """
 
     url = "http://{0}/run_parser/{1}".format(host, parser)
     files = {"data": open(file_path, "rb")}
-    data = {"modargs": json.dumps(modargs)}
+    data = {"modargs": json.dumps(modargs or {})}
 
     try:
         response = requests.post(url, files=files, timeout=timeout, data=data)
@@ -147,7 +147,8 @@ def make_arg_parser():
                             "--parser",
                             default=None,
                             dest="parser",
-                            help="Malware config parser to call. (use dot notation to specify source if necessary e.g. 'mwcp-acme.Foo')")
+                            help="Malware config parser to call. "
+                                 "(use dot notation to specify source if necessary e.g. 'mwcp-acme.Foo')")
     arg_parser.add_argument("-t",
                             "--timeout",
                             default=300,
@@ -181,7 +182,7 @@ def main():
         sys.exit(0)
 
     # Make sure a file or directory of files has been specified
-    if args.file == None:
+    if args.file is None:
         arg_parser.print_help()
         sys.exit(1)
 

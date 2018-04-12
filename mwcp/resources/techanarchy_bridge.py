@@ -13,7 +13,7 @@ import sys
 
 from io import BytesIO
 
-# Allowing for two tabs to accommodate Punisher
+# Allowing for two tabs to accommodate Publisher
 TECHANARCHY_OUTPUT_RE = r"""Key: (.*?)\t{1,2} Value: (.*)"""
 TECHANARCHY_DIRECTORY = 'RATDecoders'
 SCRIPT_CREATION_STRING = """import os
@@ -395,7 +395,7 @@ def run_decoder(reporter, script, scriptname=""):
 
     if popen_object.returncode != 0:
         reporter.debug("Error running script. Return code: %i" %
-                       (popen_object.returncode))
+                       popen_object.returncode)
 
     configlist = []
     try:
@@ -418,7 +418,7 @@ def run_decoder(reporter, script, scriptname=""):
                     reporter.debug("collision on output key: %s" % key)
                 output_data[key] = value
         else:
-            reporter.debug("Could not parse output item: %s" % (item))
+            reporter.debug("Could not parse output item: %s" % item)
 
     data = output_data
 
@@ -430,7 +430,8 @@ def main():
         print("usage: techanarchy_bridge.py NAME ")
         print("NAME should be decoder basename without .py extension.")
         print(
-            "when run as a script from the 'parsers' directory, makes an DC3-MWCP parser for the specified malware family")
+            "when run as a script from the 'parsers' directory, makes an "
+            "DC3-MWCP parser for the specified malware family")
         exit(1)
 
     scriptname = sys.argv[1]

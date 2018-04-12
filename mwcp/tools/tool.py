@@ -43,7 +43,8 @@ def get_arg_parser():
                         default="",
                         type=str,
                         dest="parser",
-                        help="Malware config parser to call. (use ':' notation to specify source if necessary e.g. 'mwcp-acme:Foo')")
+                        help="Malware config parser to call. "
+                             "(use ':' notation to specify source if necessary e.g. 'mwcp-acme:Foo')")
     parser.add_argument("-l",
                         action="store_true",
                         default=False,
@@ -148,15 +149,16 @@ def main():
     # If we can not create reporter object there is very little we can do. Just die immediately.
     try:
         reporter = mwcp.Reporter(parserdir=args.parserdir,
-                            outputdir=args.outputdir,
-                            outputfile_prefix=args.outputfile_prefix,
-                            tempdir=args.tempdir,
-                            disabledebug=args.hidedebug,
-                            disableoutputfiles=args.disableoutputfiles,
-                            disabletempcleanup=args.disabletempcleanup,
-                            base64outputfiles=args.base64outputfiles)
+                                 outputdir=args.outputdir,
+                                 outputfile_prefix=args.outputfile_prefix,
+                                 tempdir=args.tempdir,
+                                 disabledebug=args.hidedebug,
+                                 disableoutputfiles=args.disableoutputfiles,
+                                 disabletempcleanup=args.disabletempcleanup,
+                                 base64outputfiles=args.base64outputfiles)
     except Exception:
-        error_message = "Error loading DC3-MWCP reporter object, please check installation: {}".format(traceback.format_exc())
+        error_message = "Error loading DC3-MWCP reporter object, please check installation: {}".format(
+            traceback.format_exc())
         if args.jsonoutput:
             print('{"errors": ["{}"]}'.format(error_message))
         else:
@@ -238,7 +240,8 @@ def main():
                 reporter.metadata['sha256'] = hashlib.sha256(reporter.data).hexdigest()
                 reporter.metadata['parser'] = args.parser
                 if reporter.pe:
-                    reporter.metadata['compiletime'] = datetime.datetime.fromtimestamp(reporter.pe.FILE_HEADER.TimeDateStamp).isoformat()
+                    reporter.metadata['compiletime'] = datetime.datetime.fromtimestamp(
+                        reporter.pe.FILE_HEADER.TimeDateStamp).isoformat()
 
             output = reporter.metadata
             if reporter.errors:
@@ -288,7 +291,8 @@ def main():
                 # Flatten 'outputfile' field into separate columns for easier viewing and analysis.
                 if 'outputfile' in key_list:
                     if args.base64outputfiles:
-                        key_list = ['outputfile.name', 'outputfile.description', 'outputfile.md5', 'outputfile.base64'] + key_list
+                        key_list = ['outputfile.name', 'outputfile.description', 'outputfile.md5',
+                                    'outputfile.base64'] + key_list
                     else:
                         key_list = ['outputfile.name', 'outputfile.description', 'outputfile.md5'] + key_list
 
@@ -320,7 +324,8 @@ def main():
                             metadata[k] = u''
                             for j in v:
                                 if not isinstance(j, basestring):
-                                    metadata[k] += u'{}\n'.format(u', '.join([reporter.convert_to_unicode(item) for item in j]))
+                                    metadata[k] += u'{}\n'.format(
+                                        u', '.join([reporter.convert_to_unicode(item) for item in j]))
                                 else:
                                     metadata[k] += u'{}\n'.format(reporter.convert_to_unicode(j))
                             metadata[k] = metadata[k].rstrip()

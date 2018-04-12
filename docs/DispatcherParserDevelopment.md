@@ -52,7 +52,7 @@ class Foo(Dispatcher, Parser):
 The Component Parsers are created by inheriting from `mwcp.ComponentParser`. These parsers are designed to identify and parse a component of the malware family. (e.g. carrier, loader, dropper, etc.)
 
 The parser should not overwrite the `__init__` function, unless there are extra instance variables you
-need to initialize. (If so, make sure you still call super to inialize `ParserBase`).
+need to initialize. (If so, make sure you still call super to initialize `ComponentParser`).
 
 The parser class should have a `DESCRIPTION` variable set. This is used as the file description for identified files if the description has not been set when the file was added to the dispatch queue.
 

@@ -185,7 +185,7 @@ class Reporter(object):
 
                 if self.__disabletempcleanup:
                     self.debug("Using tempfile as input file: %s" %
-                               (self.__tempfilename))
+                               self.__tempfilename)
 
             return self.__tempfilename
 
@@ -201,7 +201,7 @@ class Reporter(object):
 
             if self.__disabletempcleanup:
                 self.debug("Using managed temp dir: %s" %
-                           (self.__managed_tempdir))
+                           self.__managed_tempdir)
 
         return self.__managed_tempdir
 
@@ -582,7 +582,7 @@ class Reporter(object):
         try:
             with open(fullpath, "wb") as f:
                 f.write(data)
-            self.debug("outputfile: %s" % (fullpath))
+            self.debug("outputfile: %s" % fullpath)
             self.outputfiles[filename]['path'] = fullpath
         except Exception as e:
             self.debug("Failed to write output file: %s, %s" %
@@ -598,7 +598,7 @@ class Reporter(object):
             self.output_file(data, os.path.basename(filename), description)
         else:
             self.debug(
-                "Could not output file because it could not be found: %s" % (filename))
+                "Could not output file because it could not be found: %s" % filename)
 
     def format_list(self, values, key=None):
 

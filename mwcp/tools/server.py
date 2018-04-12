@@ -63,7 +63,7 @@ def run_parser(parser):
                     (parser, datafile.filename, hashlib.md5(data).hexdigest()))
         return __run_parser(parser, data=data, modargs=modargs)
     else:
-        logger.error("run_parser %s no input file" % (parser))
+        logger.error("run_parser %s no input file" % parser)
         return {'errors': ['No input file provided']}
 
 
@@ -90,7 +90,7 @@ def run_parsers(parsers):
                     parser, data=data, modargs=modargs)
     else:
         output['errors'] = ['No input file provided']
-        logger.error("run_parsers %s no input file" % (parsers))
+        logger.error("run_parsers %s no input file" % parsers)
     return output
 
 
@@ -111,8 +111,7 @@ def descriptions():
             base64outputfiles=True, disableoutputfiles=True, parserdir=PARSERDIR)
         return reporter.pprint(mwcp.get_parser_descriptions())
     except Exception:
-        output = {}
-        output['errors'] = [traceback.format_exc()]
+        output = {'errors': [traceback.format_exc()]}
         logger.error("descriptions %s" % (traceback.format_exc()))
         return output
 
@@ -135,8 +134,7 @@ def __run_parser(name, data=b'', modargs=b'', append_output_text=True):
             output["output_text"] = reporter.get_output_text()
         return output
     except Exception:
-        output = {}
-        output['errors'] = [traceback.format_exc()]
+        output = {'errors': [traceback.format_exc()]}
         logger.error("__run_parser %s %s" % (name, traceback.format_exc()))
         return output
 

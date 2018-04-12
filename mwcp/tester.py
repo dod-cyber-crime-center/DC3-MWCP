@@ -207,7 +207,7 @@ class Tester(object):
 
         test_case_file_paths = []
         for parser_name in parser_names:
-            # We want to iterate parsers incase parser_name represents a set of parsers from different sources.
+            # We want to iterate parsers in case parser_name represents a set of parsers from different sources.
             found = False
             for name, source, _ in mwcp.iter_parsers(parser_name):
                 found = True
@@ -285,7 +285,8 @@ class Tester(object):
     def compare_results(self, results_a, results_b, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
         """
         Compare two result sets. If the field names list is not empty,
-        then only the fields (metadata key values) in the list will be compared. ignore_field_names fields are not compared unless included in field_names.
+        then only the fields (metadata key values) in the list will be compared.
+        ignore_field_names fields are not compared unless included in field_names.
         """
 
         results = []

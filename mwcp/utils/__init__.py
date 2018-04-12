@@ -1,1 +1,1 @@
-"""This package is used to store common helper utiltiies for developing parsers."""
+"""This package is used to store common helper utilities for developing parsers."""

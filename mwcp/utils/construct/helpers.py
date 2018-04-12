@@ -17,9 +17,7 @@ from construct.lib import py3compat
 
 from mwcp.utils import custombase64, pefileutils
 
-
 PY3 = sys.version_info.major == 3
-
 
 # Visible interface. Add the classes and functions you would like to be available for users of construct
 # library here.
@@ -166,6 +164,7 @@ def CString(terminator=b"\x00", encoding=None):
             decoder=lambda obj, ctx: b''.join(obj[:-1])),
         encoding)
 
+
 def String(length, encoding=None, padchar=b"\x00", paddir="right", trimdir="right"):
     r"""
     A configurable, fixed-length or variable-length string field.
@@ -234,6 +233,7 @@ def String(length, encoding=None, padchar=b"\x00", paddir="right", trimdir="righ
     # Fake the StringPaddedTrimmed so that it can be used with non-byte padchar.
     class _StringPaddedTrimmed(construct.StringPaddedTrimmed):
         """Overwritten to allow padchar to be a str type."""
+
         def __init__(self, length, subcon, padchar=b"\x00", paddir="right", trimdir="right"):
             # Fake the padchar as a byte the switch it back.
             orig_padchar = padchar
@@ -499,6 +499,7 @@ class PEPhysicalAddress(Adapter):
     >>> PEPhysicalAddress(Int32ul).parse(b'd\x00@\x00', pe=pe)
     100
     """
+
     def __init__(self, subcon, pe=None):
         """
         :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
@@ -543,6 +544,7 @@ def PEPointer(mem_off, subcon, pe=None):
     :param subcon: the subcon to use at the offset
     :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
     """
+
     def _obtain_physical_offset(ctx):
         _pe = pe or _get_pe(ctx)
         _mem_off = mem_off(ctx) if callable(mem_off) else mem_off
@@ -582,6 +584,7 @@ def PEPointer64(mem_off, inst_end, subcon, pe=None):
     :param subcon: the subcon to use at the offset
     :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
     """
+
     def _obtain_physical_offset(ctx):
         _pe = pe or _get_pe(ctx)
         _mem_off = mem_off(ctx) if callable(mem_off) else mem_off
@@ -743,9 +746,8 @@ class Regex(Construct):
     will be purely relative to that piece of data only. This was done to ensure you are only parsing what has been
     captured. (If you need to use Seek or Tell, you will have to instead make a capture group that collects no data.)
 
-
     NOTE: If you supply a string as the regular expression, the re.DOTALL flag will be automatically specified.
-    If you need to use different flags, you must pase a compiled regex.
+    If you need to use different flags, you must pass a compiled regex.
 
     The seek position is left at the end of the successful match (match.end()).
 

@@ -82,7 +82,7 @@ class FileObject(object):
             >>> file_object = FileObject('hello world', None)
             >>> with file_object as fo:
             ...     _ = fo.seek(6)
-            ...     print fo.read()
+            ...     print(fo.read())
             world
         """
         self._open_file = io.BytesIO(self.file_data)
@@ -362,7 +362,7 @@ class Dispatcher(object):
         """
         Entry point into parser, called by MWCP framework.
         If this class is used as a mixin along with the MWCP framework
-        this function can be used as the entry point into the mwcp framwork.
+        this function can be used as the entry point into the mwcp framework.
         """
         # Add and run dispatcher with starting file found in reporter.
         self.reporter.debug('[*] Configuration parsing started.')
@@ -387,7 +387,8 @@ class Dispatcher(object):
         self._fifo_buffer.appendleft(file_object)
         if self._current_file_object:
             self.reporter.debug(
-                '[*] {} dispatched residual file: {}'.format(self._current_file_object.file_name, file_object.file_name))
+                '[*] {} dispatched residual file: {}'.format(
+                    self._current_file_object.file_name, file_object.file_name))
 
     def _identify_file(self, file_object):
         """

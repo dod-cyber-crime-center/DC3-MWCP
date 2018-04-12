@@ -29,7 +29,7 @@ def obtain_pe(file_data, reporter=None, debug=True):
 
 def obtain_section(section_name, pe=None, file_data=None, reporter=None):
     """
-    Obtain the section obtain for a specficied PE section of a file.
+    Obtain the section obtain for a specified PE section of a file.
 
     :param section_name: The name of the section from which to extract data.
     :param pe: pefile.PE object
@@ -337,8 +337,8 @@ def obtain_architecture_string(pe=None, file_data=None, reporter=None, bitterm=T
                 return "64-bit"
             else:
                 return "x64"
-        # Specfically check if the return value is False, because that indicates 32-bit, None indicates undetermined.
-        elif is64 == False:
+        # Specifically check if the return value is False, because that indicates 32-bit, None indicates undetermined.
+        elif is64 is False:
             if bitterm:
                 return "32-bit"
             else:
@@ -361,7 +361,7 @@ def __obtain_exif_fname__(pe):
         for file_info in pe.FileInfo:
             if file_info.Key == 'StringFileInfo':
                 for string_table in file_info.StringTable:
-                    for field_name, name_value in string_table.entries.iteritems():
+                    for field_name, name_value in string_table.entries.items():
                         if field_name == 'OriginalFilename':
                             return name_value
     except AttributeError:
