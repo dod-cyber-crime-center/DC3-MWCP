@@ -1,6 +1,6 @@
 """
 A central location to store common windows enumerations.
-This module will be imported along with 'from IN_Dev_Repo.utils import construct'
+This module will be imported along with 'from mwcp.utils import construct'
 """
 
 from construct import *

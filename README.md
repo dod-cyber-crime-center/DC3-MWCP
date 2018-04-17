@@ -42,10 +42,16 @@ git clone https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP.git
 pip install -e ./DC3-MWCP
 ```
 
-Alternatively, you can use MWCP without installing using the *mwcp-\*.py* scripts.
-However, you will need to manually install the dependencies.
+When installing locally from a cloned repo, you may need to
+install the [kordesii](https://github.com/Defense-Cyber-Crime-Center/kordesii)
+dependency first.
 
-*NOTE: This method is not recommend and is only here for backwards compatibility.*
+## No-install Method
+You can also use MWCP without installing using the *mwcp-\*.py* scripts.
+However, you will need to manually install all the dependencies.
+You can find the dependencies listed in the `setup.py` file.
+
+*This method is not recommended and is only here for backwards compatibility.*
 
 Example:
 ```

@@ -1,14 +1,14 @@
 """
 A central location to store common windows enumerations.
-This module will be imported along with 'from IN_Dev_Repo.utils import construct'
+This module will be imported along with 'from mwcp.utils import construct'
 """
 
 import datetime
 
 import construct
 from construct import this
-from IN_Dev_Repo.utils.construct import helpers
-from IN_Dev_Repo.utils.construct import windows_enums
+from mwcp.utils.construct import helpers
+from mwcp.utils.construct import windows_enums
 
 # Visible interface. Add the classes and functions you would like to be available for users of construct
 # library here.
@@ -173,5 +173,3 @@ class _SystemTimeAdapter(construct.Adapter):
 
 # Hide the adapter
 SystemTime = _SystemTimeAdapter(SYSTEMTIME)
-
-

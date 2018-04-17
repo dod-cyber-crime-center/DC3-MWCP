@@ -336,7 +336,7 @@ class Dispatcher(object):
         :param bool greedy: By default, the dispatcher will only run on the first parser it detects
             to be a valid parser. If greedy is set to true, the dispatcher will try all parsers
             even if a previous parser was successful.
-        :param ParserBase default: The Parser class to default to if no parsers in the parsers list
+        :param ComponentParser default: The Parser class to default to if no parsers in the parsers list
             has identified it. If set to None, no parser will be run as default.
             (By default, the dispatcher.UnidentifiedFile will be run.)
         :param bool output_unidentified: Whether to output files that have not been identified by
@@ -396,7 +396,7 @@ class Dispatcher(object):
         This function can be overwritten if you need to change the detection algorithm.
 
         :param FileObject file_object: file object that needs to be identified
-        :rtype ParserBase: parser class to us to process the identified file
+        :rtype ComponentParser: parser class to us to process the identified file
         """
         identified = False
         for parser_class in self.parsers:
