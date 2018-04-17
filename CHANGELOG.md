@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.1.1] - 2018-04-12
+## [1.2.0] - 2018-04-17
 ### Added
 - Support for multiprocessing in tester.
 - Helper function for running [kordesii](https://github.com/Defense-Cyber-Crime-Center/kordesii) decoders in FileObject class.
@@ -44,6 +44,6 @@ All notable changes to this project will be documented in this file.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.1.1...HEAD
-[1.1.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.1.0...1.1.1
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.2.0...HEAD
+[1.2.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.0.0...1.1.0
