@@ -26,7 +26,8 @@ reporter.run_parser("foo", "README.md")
 # alternate, run on provided buffer:
 reporter.run_parser("foo", data=b"lorem ipsum")
 
-print(reporter.pprint(reporter.metadata))
+# Print results.
+reporter.print_report()
 
 # access output files
 for filename in reporter.outputfiles:

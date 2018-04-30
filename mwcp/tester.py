@@ -2,8 +2,8 @@
 Test case support for DC3-MWCP. Parser output is stored in a json file per parser. To run test cases,
 parser is re-run and compared to previous results.
 """
-from __future__ import print_function
-from future.builtins import open
+from __future__ import print_function, unicode_literals
+from future.builtins import open, str
 
 # Standard imports
 import itertools
@@ -15,6 +15,7 @@ import sys
 import traceback
 
 import mwcp
+from mwcp.utils.stringutils import convert_to_unicode
 
 try:
     import pkg_resources
@@ -62,12 +63,11 @@ class Tester(object):
         """
 
         try:
-            with open(input_file_path, "rb") as input_file:
-                self.reporter.run_parser(parser_name, data=input_file.read())
+            self.reporter.run_parser(parser_name, input_file_path)
         except Exception:
             self.reporter.error(traceback.print_exc())
 
-        self.reporter.metadata[self.INPUT_FILE_PATH] = input_file_path
+        self.reporter.metadata[self.INPUT_FILE_PATH] = convert_to_unicode(input_file_path)
 
         return self.reporter.metadata
 
@@ -131,37 +131,30 @@ class Tester(object):
 
         # The results data is expected to be a dictionary representing results
         # for a single file
-        assert type(results_data) is dict
+        assert isinstance(results_data, dict)
 
-        results_file_data = []
         if os.path.isfile(results_file_path):
             results_file_data = self.parse_results_file(results_file_path)
 
             # Check if there is a duplicate file path already in the results
             # path
-            index = 0
-            found = False
-            while index < len(results_file_data) and not found:
-                metadata = results_file_data[index]
+            for index, metadata in enumerate(results_file_data):
                 if metadata[self.INPUT_FILE_PATH] == results_data[self.INPUT_FILE_PATH]:
                     if replace:
                         results_file_data[index] = results_data
-                    found = True
-                index += 1
-
-            # If no duplicate found, then append the passed in results data to
-            # existing results
-            if not found:
+                    break
+            else:
+                # If no duplicate found, then append the passed in results data to
+                # existing results
                 results_file_data.append(results_data)
-
         else:
             # Results file should be a list of metadata dictionaries
-            results_file_data.append(results_data)
+            results_file_data = [results_data]
 
         # Write updated data to results file
-        pretty_data = self.reporter.pprint(results_file_data)
-        with open(results_file_path, "wb") as results_file:
-            results_file.write(pretty_data)
+        # NOTE: We need to use dumps instead of dump to avoid TypeError.
+        with open(results_file_path, b'w', encoding='utf8') as results_file:
+            results_file.write(str(json.dumps(results_file_data, results_file, indent=4, sort_keys=True)))
 
     def remove_test_results(self, parser_name, filenames):
         """
@@ -177,9 +170,8 @@ class Tester(object):
             else:
                 results_file_data.append(metadata)
 
-        pretty_data = self.reporter.pprint(results_file_data)
-        with open(self.get_results_filepath(parser_name), "w") as results_file:
-            results_file.write(pretty_data)
+        with open(self.get_results_filepath(parser_name), b'w', encoding='utf8') as results_file:
+            results_file.write(str(json.dumps(results_file_data, results_file, indent=4, sort_keys=True)))
 
         return removed_files
 
@@ -220,7 +212,7 @@ class Tester(object):
                     print("File(s) not found = {}".format(results_file_path).encode(**encode_params))
 
             if not found:
-                print("Parser not found for: {}".format(parser_name))
+                print("Parser not found for: {}".format(parser_name).encode(**encode_params))
 
         cores = mp.cpu_count()
 
@@ -339,10 +331,10 @@ class Tester(object):
 
         # Check if provided field_name is a valid key (based on fields.json)
         try:
-            field_name_u = self.reporter.convert_to_unicode(field_name)
+            field_name_u = convert_to_unicode(field_name)
         except:
             raise Exception(
-                "Failed to conver field name '{}' to unicode.".format(field_name))
+                "Failed to convert field name '{}' to unicode.".format(field_name))
 
         try:
             field_type = self.reporter.fields[field_name_u]['type']
@@ -483,19 +475,19 @@ class ResultComparer(object):
         if json:
             return self.__dict__
         else:
-            tab = tabs * u"\t"
-            tab_1 = tab + u"\t"
-            tab_2 = tab_1 + u"\t"
-            report = tab + u"{}:\n".format(self.field)
-            report += tab_1 + u"Passed: {}\n".format(self.passed)
+            tab = tabs * "\t"
+            tab_1 = tab + "\t"
+            tab_2 = tab_1 + "\t"
+            report = tab + "{}:\n".format(self.field)
+            report += tab_1 + "Passed: {}\n".format(self.passed)
             if self.missing:
-                report += tab_1 + u"Missing From New Results:\n"
+                report += tab_1 + "Missing From New Results:\n"
                 for item in self.missing:
-                    report += tab_2 + u"{}\n".format(item)
+                    report += tab_2 + "{}\n".format(item)
             if self.unexpected:
-                report += tab_1 + u"Unexpected New Results:\n"
+                report += tab_1 + "Unexpected New Results:\n"
                 for item in self.unexpected:
-                    report += tab_2 + u"{}\n".format(item)
+                    report += tab_2 + "{}\n".format(item)
 
             return report
 

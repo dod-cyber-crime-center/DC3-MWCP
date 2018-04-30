@@ -2,13 +2,15 @@
 """
 DC3-MWCP cli tool--makes available functionality of DC3-MWCP framework
 """
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
+from future.builtins import str, zip, open
 
 import argparse
 import base64
 import csv
 import datetime
 import hashlib
+import itertools
 import json
 import os
 import sys
@@ -19,6 +21,189 @@ import traceback
 from six import iteritems
 
 import mwcp
+from mwcp.utils.stringutils import convert_to_unicode
+
+
+# Column order for standard fields in csv.
+# (All other fields will be appended in alphabetical order after these)
+_STD_CSV_COLUMNS = [
+    'scan_date', 'inputfilename', 'outputfile.name', 'outputfile.description',
+    'outputfile.md5', 'outputfile.base64'
+]
+
+
+def _format_metadata_value(v):
+    """Formats metadata value to a human readable unicode string."""
+    if isinstance(v, (list, tuple)):
+        result = u''
+        for j in v:
+            if not isinstance(j, (bytes, str)):
+                result += u'{}\n'.format(u', '.join(map(convert_to_unicode, j)))
+            else:
+                result += u'{}\n'.format(convert_to_unicode(j))
+        return result.rstrip()
+    elif isinstance(v, dict):
+        result = u''
+        for field, value in iteritems(v):
+            if isinstance(value, (list, tuple)):
+                value = u'[{}]'.format(u', '.join(value))
+
+            result += u'{}: {}\n'.format(field, value)
+        return result.rstrip()
+    else:
+        return convert_to_unicode(v)
+
+
+def _write_csv(input_files, results, csv_path, base64_outputfiles=False):
+    """
+    Writes out results as a csv.
+
+    :param input_files: List of filenames for each respective metadata.
+    :param results: List of metadata dictionaries.
+    :param csv_path: Path to write out csv file.
+    :param base64_outputfiles: Whether to include base64 outputfiles.
+    :raises IOError: If csv could not be written out.
+    """
+    scan_date = time.ctime()
+
+    # Add/Teak metadata.
+    for inputfilename, metadata in zip(input_files, results):
+        # Add scan date.
+        metadata['scan_date'] = scan_date
+        if 'inputfilename' not in metadata:
+            metadata['inputfilename'] = inputfilename
+
+        # Flatten 'other' entry so nested values get their own columns,
+        # are more readable, and easier to individually analyze.
+        #
+        # Example:
+        #   {'other': {"unique_entry": "value", "unique_key": "value2"}}
+        #   Results in columns: other, other.unique_entry, other.unique_key
+        if 'other' in metadata:
+            for sub_key, sub_value in metadata['other'].items():
+                metadata['other.{}'.format(sub_key)] = sub_value
+            del metadata['other']
+
+        # Split outputfile into multiple fields.
+        if 'outputfile' in metadata:
+            value = list(zip(*metadata['outputfile']))
+            metadata['outputfile.name'] = value[0]
+            metadata['outputfile.description'] = value[1]
+            metadata['outputfile.md5'] = value[2]
+            if len(value) > 3 and base64_outputfiles:
+                metadata['outputfile.base64'] = value[3]
+            del metadata['outputfile']
+
+    # Sort columns, but with PREFIX_COLUMNS showing up first.
+    column_names = set(itertools.chain(*(metadata.keys() for metadata in results)))
+    column_names = sorted(
+        column_names, key=lambda x: str(_STD_CSV_COLUMNS.index(x)) if x in _STD_CSV_COLUMNS else x)
+
+    # Reformat metadata and write to CSV
+    with open(csv_path, b'wb') as csvfile:
+        dw = csv.DictWriter(csvfile, fieldnames=column_names)
+        dw.writeheader()
+        dw.writerows([
+            {k: _format_metadata_value(v).encode('utf8') for k, v in metadata.items()}
+            for metadata in results
+        ])
+
+
+def _print_parsers(json_output=False):
+    """
+    Prints a table of registered parsers to stdout.
+
+    :param json_output: Print json
+    """
+    descriptions = mwcp.get_parser_descriptions()
+    if json_output:
+        print(json.dumps(descriptions, indent=4))
+    else:
+        # TODO: Use a library like tabulate to print this.
+        format = '%-25s %-50s %-15s %s'
+        print(format % ('NAME', 'SOURCE', 'AUTHOR', 'DESCRIPTION'))
+        print('-' * 150)
+        for name, source, author, description in descriptions:
+            print(format % (name, source, author, description))
+
+
+def _print_fields(json_output=False):
+    """
+    Prints a table of available metadata fields to stdout.
+
+    :param json_output: Print json
+    :return:
+    """
+    # TODO: reporter shouldn't be generating the fields.
+    reporter = mwcp.Reporter()
+    fields = reporter.fields
+    if json_output:
+        print(json.dumps(fields, indent=4))
+    else:
+        for name, value in sorted(fields.items()):
+            print('%-20s %s' % (name, value['description']))
+            for example in value['examples']:
+                print("{} {}".format(" " * 24, json.dumps(example)))
+
+
+def _get_file_paths(input_args, is_filelist=True):
+    """
+    Gets valid file paths from the given input args.
+    :param input_args: Input arguments passed through in the cli
+    :param is_filelist: Whether input_args is a file containing a list of file paths.
+    :return: A list of file paths.
+    """
+    if is_filelist:
+        if input_args[0] == "-":
+            return [line.rstrip() for line in sys.stdin]
+        else:
+            with open(input_args[0], b"rb") as f:
+                return [line.rstrip() for line in f]
+    else:
+        file_paths = []
+        for arg in input_args:
+            if os.path.isfile(arg):
+                file_paths.append(arg)
+            elif os.path.isdir(arg):
+                for root, dirs, files in os.walk(arg):
+                    for file in files:
+                        file_paths.append(os.path.join(root, file))
+        return file_paths
+
+
+def _parse_file(reporter, file_path, parser, options=None, include_filename=False):
+    """
+    Parses given file_path with given parser.
+
+    :param reporter: Reporter to use for parsing.
+    :param file_path: File path to parse or "-" for stdin
+    :param parser: Name of parser to run (can use ":" notation)
+    :param options: Extra arguments to pass along to parser.
+    :param include_filename: Whether to include input file metadata in the results.
+    :return: Dictionary of results.
+    """
+    options = options or {}
+    if file_path == "-":
+        reporter.run_parser(parser, data=sys.stdin.read(), **options)
+    else:
+        reporter.run_parser(parser, file_path, **options)
+
+    result = reporter.metadata
+
+    if include_filename:
+        result['inputfilename'] = file_path
+        result['md5'] = hashlib.md5(reporter.data).hexdigest()
+        result['sha1'] = hashlib.sha1(reporter.data).hexdigest()
+        result['sha256'] = hashlib.sha256(reporter.data).hexdigest()
+        result['parser'] = parser
+        if reporter.pe:
+            result['compiletime'] = datetime.datetime.fromtimestamp(
+                reporter.pe.FILE_HEADER.TimeDateStamp).isoformat()
+
+    if reporter.errors:
+        result["errors"] = reporter.errors
+
+    return result
 
 
 def get_arg_parser():
@@ -43,8 +228,7 @@ def get_arg_parser():
                         default="",
                         type=str,
                         dest="parser",
-                        help="Malware config parser to call. "
-                             "(use ':' notation to specify source if necessary e.g. 'mwcp-acme:Foo')")
+                        help="Malware config parser to call. (use ':' notation to specify source if necessary e.g. 'mwcp-acme:Foo')")
     parser.add_argument("-l",
                         action="store_true",
                         default=False,
@@ -146,213 +330,67 @@ def main():
     elif args.filelistindirection or len(input_files) > 1 or any([os.path.isdir(x) for x in input_files]):
         args.outputfile_prefix = 'md5'
 
-    # If we can not create reporter object there is very little we can do. Just die immediately.
+    if args.list:
+        if args.parserdir:
+            mwcp.register_parser_directory(args.parserdir)
+        _print_parsers(json_output=args.jsonoutput)
+        sys.exit(0)
+
+    if args.fields:
+        _print_fields(json_output=args.jsonoutput)
+        sys.exit(0)
+
+    if not input_files or not args.parser:
+        argparser.print_help()
+        sys.exit(0)
+
+    file_paths = _get_file_paths(input_files, is_filelist=args.filelistindirection)
+
+    kwargs = {}
+    if args.kwargs_raw:
+        kwargs = dict(json.loads(args.kwargs_raw))
+        for key, value in list(kwargs.items()):
+            if value and value.startswith('b64file(') and value.endswith(')'):
+                tmp_filename = value[len('b64file('):-1]
+                with open(tmp_filename, b'rb') as f:
+                    kwargs[key] = base64.b64encode(f.read())
+
+    # Run MWCP
     try:
         reporter = mwcp.Reporter(parserdir=args.parserdir,
-                                 outputdir=args.outputdir,
-                                 outputfile_prefix=args.outputfile_prefix,
-                                 tempdir=args.tempdir,
-                                 disabledebug=args.hidedebug,
-                                 disableoutputfiles=args.disableoutputfiles,
-                                 disabletempcleanup=args.disabletempcleanup,
-                                 base64outputfiles=args.base64outputfiles)
-    except Exception:
-        error_message = "Error loading DC3-MWCP reporter object, please check installation: {}".format(
-            traceback.format_exc())
+                            outputdir=args.outputdir,
+                            outputfile_prefix=args.outputfile_prefix,
+                            tempdir=args.tempdir,
+                            disabledebug=args.hidedebug,
+                            disableoutputfiles=args.disableoutputfiles,
+                            disabletempcleanup=args.disabletempcleanup,
+                            base64outputfiles=args.base64outputfiles)
+        results = []
+        for file_path in file_paths:
+            result = _parse_file(
+                reporter, file_path, args.parser, options=kwargs, include_filename=args.includefilename)
+            results.append(result)
+            if not args.jsonoutput:
+                reporter.print_report()
+
+        if args.csvwrite:
+            csv_path = args.csvwrite
+            if not csv_path.endswith('.csv'):
+                csv_path += '.csv'
+            _write_csv(input_files, results, csv_path, args.base64outputfiles)
+            if not args.jsonoutput:
+                print('Wrote csv file: {}'.format(csv_path))
+
         if args.jsonoutput:
-            print('{"errors": ["{}"]}'.format(error_message))
+            print(json.dumps(results, indent=4))
+
+    except Exception as e:
+        error_message = "Error running DC3-MWCP: {}".format(e)
+        if args.jsonoutput:
+            print(json.dumps({'errors': [error_message]}))
         else:
             print(error_message)
         sys.exit(1)
-
-    if args.list:
-        descriptions = mwcp.get_parser_descriptions()
-
-        if args.jsonoutput:
-            if reporter.errors:
-                descriptions.append({"errors": reporter.errors})
-            print(reporter.pprint(descriptions))
-        else:
-            # TODO: Use a library like tabulate to print this.
-            format = '%-25s %-50s %-15s %s'
-            print(format % ('NAME', 'SOURCE', 'AUTHOR', 'DESCRIPTION'))
-            print('-' * 150)
-            for name, source, author, description in descriptions:
-                print(format % (name, source, author, description))
-            if reporter.errors:
-                print("")
-                print("Errors:")
-                for error in reporter.errors:
-                    print("    {}".format(error))
-        return
-
-    if args.fields:
-        if args.jsonoutput:
-            print(reporter.pprint(reporter.fields))
-        else:
-            for key in sorted(reporter.fields):
-                print('%-20s %s' % (key, reporter.fields[key]['description']))
-                for example in reporter.fields[key]['examples']:
-                    print("{} {}".format(" " * 24, json.dumps(example)))
-        return
-
-    if not input_files:
-        argparser.print_help()
-        return
-
-    if args.parser:
-        if args.filelistindirection:
-            if input_files[0] == "-":
-                inputfilelist = [line.rstrip() for line in sys.stdin]
-            else:
-                with open(input_files[0], "rb") as f:
-                    inputfilelist = [line.rstrip() for line in f]
-        else:
-            inputfilelist = []
-            for arg in input_files:
-                if os.path.isfile(arg):
-                    inputfilelist.append(arg)
-                elif os.path.isdir(arg):
-                    for root, dirs, files in os.walk(arg):
-                        for file in files:
-                            inputfilelist.append(os.path.join(root, file))
-
-        kwargs = {}
-        if args.kwargs_raw:
-            kwargs = dict(json.loads(args.kwargs_raw))
-            for key, value in iteritems(kwargs):
-                if value and len(value) > len("b64file("):
-                    if value[:len("b64file(")] == "b64file(" and value[-1:] == ")":
-                        tmp_filename = value[len("b64file("):-1]
-                        with open(tmp_filename, "rb") as f:
-                            kwargs[key] = base64.b64encode(f.read())
-        json_accum = []
-        for inputfilename in inputfilelist:
-            if inputfilename == "-":
-                reporter.run_parser(args.parser, data=sys.stdin.read(), **kwargs)
-            else:
-                reporter.run_parser(args.parser, inputfilename, **kwargs)
-
-            if args.includefilename:
-                reporter.metadata['inputfilename'] = inputfilename
-                reporter.metadata['md5'] = hashlib.md5(reporter.data).hexdigest()
-                reporter.metadata['sha1'] = hashlib.sha1(reporter.data).hexdigest()
-                reporter.metadata['sha256'] = hashlib.sha256(reporter.data).hexdigest()
-                reporter.metadata['parser'] = args.parser
-                if reporter.pe:
-                    reporter.metadata['compiletime'] = datetime.datetime.fromtimestamp(
-                        reporter.pe.FILE_HEADER.TimeDateStamp).isoformat()
-
-            output = reporter.metadata
-            if reporter.errors:
-                output["errors"] = reporter.errors
-            json_accum.append(output)
-
-            if not args.jsonoutput:
-                reporter.output_text()
-
-        if args.jsonoutput:
-            print(reporter.pprint(json_accum if len(json_accum) > 1 else json_accum[0]))
-
-        if args.csvwrite:
-            csv_filename = args.csvwrite
-            if not csv_filename.endswith('.csv'):
-                csv_filename += '.csv'
-
-            if json_accum:
-                key_list = []
-
-                # Begin flushing out CSV column names. A column needs to exist for
-                # for each unique field in all the produced results.
-                # 1 key_list entry = 1 column name
-                for metadata in json_accum:
-                    key_list.extend(list(metadata.keys()))
-                    additional_other_keys = []
-
-                    # Flatten 'other' entries so nested values get their own columns,
-                    # are more readable, and easier to individually analyze.
-                    #
-                    # Example:
-                    #   {'other': {"unique_entry": "value", "unique_key": "value2"}}
-                    #   Results in columns: other, other.unique_entry, other.unique_key
-                    if 'other' in metadata:
-                        other_dict = metadata['other']
-                        additional_other_keys = ['other.' + other_key for other_key in list(other_dict.keys())]
-
-                        # Append the metadata to include these more isolated key value pairs
-                        for i, value in enumerate(other_dict.values()):
-                            metadata[additional_other_keys[i]] = value
-
-                    key_list += additional_other_keys
-
-                # Make sure all column names are unique
-                key_list = list(set(key_list))
-
-                # Flatten 'outputfile' field into separate columns for easier viewing and analysis.
-                if 'outputfile' in key_list:
-                    if args.base64outputfiles:
-                        key_list = ['outputfile.name', 'outputfile.description', 'outputfile.md5',
-                                    'outputfile.base64'] + key_list
-                    else:
-                        key_list = ['outputfile.name', 'outputfile.description', 'outputfile.md5'] + key_list
-
-                # Add timestamp and input filename as first columns for readability. Remaining
-                # columns are sorted to sift through them easier.
-                scan_date = time.ctime()
-                if 'inputfilename' in key_list:
-                    key_list.remove('inputfilename')
-                key_list = ['scan_date', 'inputfilename'] + sorted(key_list)
-
-                # Reformat result metadata to:
-                #   1. Populate the newly added fields to the keylist
-                #   2. Reformat values that are lists and dictionaries to be more readable
-                for i, metadata in enumerate(json_accum):
-
-                    # Populate the newly created outputfile fields
-                    if 'outputfile' in list(metadata.keys()):
-                        metadata['outputfile.name'] = [outp[0] for outp in metadata['outputfile']]
-                        metadata['outputfile.description'] = [outp[1] for outp in metadata['outputfile']]
-                        metadata['outputfile.md5'] = [outp[2] for outp in metadata['outputfile']]
-                        if len(outp) > 3 and args.base64outputfiles is True:
-                            metadata['outputfile.base64'] = [outp[3] for outp in metadata['outputfile']]
-
-                    # Reformat lists and dictionaries as string values
-                    for k, v in iteritems(metadata):
-                        if isinstance(v, basestring):
-                            metadata[k] = reporter.convert_to_unicode(v)
-                        elif isinstance(v, list):
-                            metadata[k] = u''
-                            for j in v:
-                                if not isinstance(j, basestring):
-                                    metadata[k] += u'{}\n'.format(
-                                        u', '.join([reporter.convert_to_unicode(item) for item in j]))
-                                else:
-                                    metadata[k] += u'{}\n'.format(reporter.convert_to_unicode(j))
-                            metadata[k] = metadata[k].rstrip()
-                        elif isinstance(v, dict):
-                            metadata[k] = u''
-                            for field, value in iteritems(v):
-                                if isinstance(value, list):
-                                    value = u'[{}]'.format(u', '.join(value))
-
-                                metadata[k] += u'{}: {}\n'.format(field, value)
-                            metadata[k] = metadata[k].rstrip()
-                        else:
-                            metadata[k] = reporter.convert_to_unicode(v)
-
-                    # Populate the newly added scan_date and inputfilename fields
-                    metadata['scan_date'] = scan_date
-                    if 'inputfilename' not in list(metadata.keys()):
-                        metadata['inputfilename'] = inputfilelist[i]
-
-                # Write reformatted metadata results to CSV
-                try:
-                    with open(csv_filename, 'wb') as csvfile:
-                        dw = csv.DictWriter(csvfile, fieldnames=key_list)
-                        dw.writeheader()
-                        dw.writerows([{k: v.encode('utf8') for k, v in list(entry.items())} for entry in json_accum])
-                except IOError as exc:
-                    print('\nUnable to write %s (%s)' % (csv_filename, exc.args[1]))
 
 
 if __name__ == '__main__':

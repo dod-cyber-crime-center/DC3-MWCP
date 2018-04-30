@@ -198,6 +198,7 @@ def main():
                                            replace=True)
             elif len(metadata) > 1 and len(reporter.errors) > 0:
                 print(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path))
+                print('\n'.join(reporter.errors))
             else:
                 print(u"Empty results for {} in {}, not updating".format(input_file, results_file_path))
 

@@ -185,7 +185,7 @@ reporter.run_parser("foo", "README.md")
 # alternate, run on provided buffer:
 reporter.run_parser("foo", data="lorem ipsum")
 
-print(reporter.pprint(reporter.metadata))
+reporter.print_report(reporter.metadata)
 
 # access output files
 for filename in reporter.outputfiles:
@@ -231,6 +231,6 @@ MWCP comes with a few helper utilities (located in `mwcp.utils`) that may become
 
 - `pefileutils` - Provides helper functions for common routines done with the pefile library. (obtaining or checking for exports, imports, resources, sections, etc.)
 - `custombase64` - Provides functions for base64 encoding/decoding data with a custom alphabet.
-- `construct` - Provides extended functionality to the [construct](construct.readthedocs.io) library.
+- `construct` - Provides extended functionality to the [construct](https://construct.readthedocs.io) library.
     - This library has replaced the `enstructured` library originally found in the resources directory.
     - Please follow [this tutorial](docs/construct.ipynb) for migrating from `enstructured` to `construct`.

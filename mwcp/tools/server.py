@@ -109,7 +109,7 @@ def descriptions():
         response.content_type = "application/json"
         reporter = mwcp.Reporter(
             base64outputfiles=True, disableoutputfiles=True, parserdir=PARSERDIR)
-        return reporter.pprint(mwcp.get_parser_descriptions())
+        return json.dumps(mwcp.get_parser_descriptions(), indent=4)
     except Exception:
         output = {'errors': [traceback.format_exc()]}
         logger.error("descriptions %s" % (traceback.format_exc()))

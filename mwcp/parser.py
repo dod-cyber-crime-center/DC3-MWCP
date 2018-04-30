@@ -7,17 +7,6 @@ class Parser(object):
     to invoke the parser.
 
     Currently, a new parser object is created by the framework for each run().
-
-    Parameters:
-        description: brief description
-        author: Initials of author
-        reporter: reference to current reporter object
-
-    Attributes:
-        description: short description
-        author: initials of author
-        reporter: reference to reporter (malwareconfigreporter) object that executed this parser.
-                  Set when parser is created.
     """
 
     def __init__(self,
@@ -25,6 +14,14 @@ class Parser(object):
                  author='na',
                  reporter=None
                  ):
+        """
+        Initializes the parser.
+
+        :param description: short description
+        :param author: initials of author
+        :param mwcp.Reporter reporter: reference to reporter object that executed this parser.
+                                       Set when parser is created.
+        """
         self.description = description
         self.author = author
         self.reporter = reporter

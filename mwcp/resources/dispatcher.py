@@ -82,7 +82,7 @@ class FileObject(object):
             >>> file_object = FileObject('hello world', None)
             >>> with file_object as fo:
             ...     _ = fo.seek(6)
-            ...     print(fo.read())
+            ...     print fo.read()
             world
         """
         self._open_file = io.BytesIO(self.file_data)
@@ -208,6 +208,13 @@ class ComponentParser(object):
     DESCRIPTION = None
 
     def __init__(self, file_object, reporter, dispatcher):
+        """
+        Initializes the ComponentParser.
+
+        :param FileObject file_object: Object containing data about component file.
+        :param mwcp.Reporter reporter: reference to reporter object that executed this parser.
+        :param Dispatcher dispatcher: reference to the dispatcher object.
+        """
         super(ComponentParser, self).__init__()
         self.file_object = file_object
         self.reporter = reporter
@@ -312,13 +319,8 @@ class Dispatcher(object):
                     reporter=reporter)
 
             def run(self):
-                input_file = FileObject(
-                    file_data=self.reporter.data,
-                    pe=self.reporter.pe,
-                    file_name=os.path.basename(self.reporter.filename()),
-                    use_supplied_fname=True)
-                dispatcher = Dispatcher(reporter, [SuperMalware_Loader, SuperMalware_Implant])
-                dispatcher.add_to_queue(input_file)
+                dispatcher = Dispatcher(self.reporter, [SuperMalware_Loader, SuperMalware_Implant])
+                dispatcher.add_to_queue(self.reporter.input_file)
                 dispatcher.dispatch()
 
     """
@@ -362,18 +364,11 @@ class Dispatcher(object):
         """
         Entry point into parser, called by MWCP framework.
         If this class is used as a mixin along with the MWCP framework
-        this function can be used as the entry point into the mwcp framework.
+        this function can be used as the entry point into the mwcp framwork.
         """
         # Add and run dispatcher with starting file found in reporter.
         self.reporter.debug('[*] Configuration parsing started.')
-        input_file = FileObject(file_data=self.reporter.data,
-                                pe=self.reporter.pe,
-                                reporter=self.reporter,
-                                file_name=os.path.basename(self.reporter.filename()),
-                                output_file=False)
-        # Use the input file path as the file_path attribute.
-        input_file.file_path = self.reporter.filename()
-        self.add_to_queue(input_file)
+        self.add_to_queue(self.reporter.input_file)
         self.dispatch()
 
     def add_to_queue(self, file_object):
@@ -387,8 +382,7 @@ class Dispatcher(object):
         self._fifo_buffer.appendleft(file_object)
         if self._current_file_object:
             self.reporter.debug(
-                '[*] {} dispatched residual file: {}'.format(
-                    self._current_file_object.file_name, file_object.file_name))
+                '[*] {} dispatched residual file: {}'.format(self._current_file_object.file_name, file_object.file_name))
 
     def _identify_file(self, file_object):
         """

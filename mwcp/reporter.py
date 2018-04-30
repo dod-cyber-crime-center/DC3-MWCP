@@ -1,7 +1,7 @@
 """
     DC3-MWCP framework primary object used for execution of parsers and collection of metadata
 """
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import contextlib
 
@@ -23,6 +23,7 @@ from io import BytesIO
 
 import mwcp
 from mwcp import resources
+from mwcp.utils.stringutils import convert_to_unicode
 
 
 PY3 = sys.version_info > (3,)
@@ -31,7 +32,10 @@ PY3 = sys.version_info > (3,)
 # reporter for error reporting
 
 INFO_FIELD_ORDER = ['inputfilename', 'md5', 'sha1', 'sha256', 'compiletime']
-STANDARD_FIELD_ORDER = ["c2_url", "c2_socketaddress", "c2_address", "url", "urlpath",
+STANDARD_FIELD_ORDER = ["c2_url", "c2_socketaddress", "c2_address",
+                        "proxy", "proxy_credential", "proxy_username", "proxy_password",
+                        "proxy_socketaddress", "proxy_address", "proxyport",
+                        "url", "urlpath",
                         "socketaddress", "address", "port", "listenport",
                         "credential", "username", "password",
                         "missionid", "useragent", "interval", "version", "mutex",
@@ -69,9 +73,10 @@ class Reporter(object):
         tempdir: directory where temporary files should be created. Files created in this directory should
             be deleted by parser. See managed_tempdir for mwcp managed directory
         data: buffer containing input file to parsed
-        handle: file handle (BytesIO) of file to parsed
+        _handle: file handle (BytesIO) of file to parsed
         metadata: Dictionary containing the metadata extracted from the malware by the parser
-        pe: a pefile object if pefile successfull parsed the file
+        pe: a pefile object if pefile successfull parsed the file (DEPRECATED)
+        input_file: mwcp.FileObject object containing all attributes of the original parsed file.
         outputfiles: dictionary of entries for each ouput file. The key is the filename specified. Each entry
             is a dictionary with keys of data, description, and md5. If the path key is set, the file was written
             to that path on the filesystem.
@@ -84,6 +89,10 @@ class Reporter(object):
     """
 
     DEFAULT_PARSERDIR = os.path.dirname(mwcp.parsers.__file__)
+
+    URL_RE = re.compile(r"[a-z\.-]{1,40}://(?P<address>\[?[^/]+\]?)(?P<path>/[^?]+)?")
+    PORT_RE = re.compile(r"[0-9]{1,5}")
+    SHA1_RE = re.compile('[0-9a-fA-F]{40}')
 
     def __init__(self,
                  parserdir=None,
@@ -103,20 +112,17 @@ class Reporter(object):
         # defaults
         self.tempdir = tempdir or tempfile.gettempdir()
         self.outputfiles = {}
-        self.data = b''
-        self.handle = None
+        self._handle = None
         self.fields = {"debug": {"description": "debug", "type": "listofstrings"}}
         self.metadata = {}
         self.errors = []
-        self.pe = None
+        self.input_file = None
 
         # Continue to allow use of deprecated resourcedir.
         # TODO: Remove this in a new release version.
         self._resourcedir = None
         self.resourcedir = os.path.dirname(resources.__file__)
 
-        self.__filename = ''
-        self.__tempfilename = ''
         self.__managed_tempdir = ''
         self.__outputdir = outputdir or ''
         self.__outputfile_prefix = outputfile_prefix or ''
@@ -134,15 +140,15 @@ class Reporter(object):
         self.__disabledebug = disabledebug
         self.__disableoutputfiles = disableoutputfiles
         self.__disabletempcleanup = disabletempcleanup
-        self.__disableautosubfieldparsing = disableautosubfieldparsing
-        self.__disablevaluededup = disablevaluededup
+        self._disable_auto_subfield_parsing = disableautosubfieldparsing
+        self._disable_value_dedup = disablevaluededup
         self.__disablemodulesearch = disablemodulesearch
         self.__base64outputfiles = base64outputfiles
 
         # TODO: Move fields.json to shared data or config folder.
         fieldspath = os.path.join(os.path.dirname(mwcp.resources.__file__), "fields.json")
 
-        with open(fieldspath, 'rb') as f:
+        with open(fieldspath, b'rb') as f:
             self.fields = json.load(f)
 
     # Allow user to still use resourcedir feature, but warn about deprecation.
@@ -162,32 +168,48 @@ class Reporter(object):
 
         # we put resourcedir in PYTHONPATH in case we shell out or children
         # processes need this
-        if 'PYTHONPATH' in os.environ:
-            if resourcedir not in os.environ['PYTHONPATH']:
-                os.environ['PYTHONPATH'] = os.environ['PYTHONPATH'] + os.pathsep + resourcedir
+        # Windows environment variables must be byte strings.
+        if b'PYTHONPATH' in os.environ:
+            if resourcedir not in os.environ[b'PYTHONPATH']:
+                os.environ[b'PYTHONPATH'] = os.environ[b'PYTHONPATH'] + os.pathsep + resourcedir
         else:
-            os.environ['PYTHONPATH'] = resourcedir
+            os.environ[b'PYTHONPATH'] = resourcedir
+
+    @property
+    def data(self):
+        warnings.warn(
+            'data attribute has been deprecated, please access the data through input_file.file_data',
+            DeprecationWarning
+        )
+        return self.input_file.file_data
+
+    @property
+    def pe(self):
+        warnings.warn(
+            'pe attribute has been deprecated, please access the pe through input_file.pe',
+            DeprecationWarning
+        )
+        return self.input_file.pe
+
+    @property
+    def handle(self):
+        warnings.warn(
+            'handle attribute has been deprecated, please use input_file in a "with" context instead',
+            DeprecationWarning
+        )
+        return self._handle
 
     def filename(self):
         """
         Returns the filename of the input file. If input was not a filesystem object, we create a
         temp file that is cleaned up after parser is finished (unless tempcleanup is disabled)
         """
-        if self.__filename:
-            # we were given a filename, give it back
-            return self.__filename
-        else:
-            # we were passed data buffer. Lazy initialize a temp file for this
-            if not self.__tempfilename:
-                with tempfile.NamedTemporaryFile(delete=False, dir=self.managed_tempdir(), prefix="mwcp-inputfile-") as tfile:
-                    tfile.write(self.data)
-                    self.__tempfilename = tfile.name
-
-                if self.__disabletempcleanup:
-                    self.debug("Using tempfile as input file: %s" %
-                               self.__tempfilename)
-
-            return self.__tempfilename
+        warnings.warn(
+            'filename() function has been deprecated, please access the filename through input_file.file_path',
+            DeprecationWarning
+        )
+        # NOTE: "filename" is misleading. This function actually returns the full file path.
+        return self.input_file.file_path
 
     def managed_tempdir(self):
         """
@@ -243,209 +265,197 @@ class Reporter(object):
         if not self.__disabledebug:
             self.add_metadata("debug", message)
 
-    def __add_metatadata_listofstrings(self, keyu, value):
+    def _add_metatadata_listofstrings(self, key, value):
+        if not value:
+            self.debug("no values provided for {}, skipping".format(key))
+            return
+        value = convert_to_unicode(value)
+        obj = self.metadata.setdefault(key, [])
+        if self._disable_value_dedup or key == 'debug' or value not in obj:
+            obj.append(value)
 
-        try:
-            valueu = self.convert_to_unicode(value)
-            if keyu not in self.metadata:
-                self.metadata[keyu] = []
-            if valueu not in self.metadata[keyu] or self.__disablevaluededup or keyu == 'debug':
-                self.metadata[keyu].append(valueu)
+        if self._disable_auto_subfield_parsing:
+            return
 
-            if not self.__disableautosubfieldparsing:
-                if keyu == "filepath":
-                    # use ntpath instead of os.path so we are consistant across platforms. ntpath
-                    # should work for both windows and unix paths. os.path works for the platform
-                    # you are running on, not necessarily what the malware was written for.
-                    # Ex. when running mwcp on linux to process windows
-                    # malware, os.path will fail due to not handling
-                    # backslashes correctly.
-                    self.add_metadata("filename", ntpath.basename(valueu))
-                    self.add_metadata("directory", ntpath.dirname(valueu))
-                if keyu == "c2_url":
-                    self.add_metadata("url", valueu)
-                if keyu == "c2_address":
-                    self.add_metadata("address", valueu)
-                if keyu == "serviceimage":
-                    # we use tactic of looking for first .exe in value. This is
-                    # not garunteed to be reliable
-                    if '.exe' in valueu:
-                        self.add_metadata("filepath", valueu[
-                                          0:valueu.find('.exe') + 4])
-                if keyu == "servicedll":
-                    self.add_metadata("filepath", valueu)
-                if keyu == "url" or keyu == "c2_url":
-                    # http://[fe80::20c:1234:5678:9abc]:80/badness
-                    # http://bad.com:80
-                    # ftp://127.0.0.1/really/bad?hostname=pwned
-                    match = re.search(
-                        r"[a-z\.-]{1,40}://(\[?[^/]+\]?)(/[^?]+)?", valueu)
-                    if match:
-                        if match.group(1):
-                            address = match.group(1)
-                            if address[0] == "[":
-                                # ipv6--something like
-                                # [fe80::20c:1234:5678:9abc]:80
-                                parts = address.split("]")
-                                if len(parts) > 1:
-                                    if parts[1]:
-                                        if keyu == "c2_url":
-                                            self.add_metadata("c2_socketaddress", [
-                                                              parts[0][1:], parts[1][1:], "tcp"])
-                                        else:
-                                            self.add_metadata("socketaddress", [
-                                                              parts[0][1:], parts[1][1:], "tcp"])
-                                else:
-                                    if keyu == "c2_url":
-                                        self.add_metadata(
-                                            "c2_address", parts[0][1:])
-                                    else:
-                                        self.add_metadata(
-                                            "address", parts[0][1:])
-                            else:
-                                # regular domain or ipv4--bad.com:80 or
-                                # 127.0.0.1
-                                parts = address.split(":")
-                                if len(parts) > 1:
-                                    if parts[1]:
-                                        if keyu == "c2_url":
-                                            self.add_metadata("c2_socketaddress", [
-                                                              parts[0], parts[1], "tcp"])
-                                        else:
-                                            self.add_metadata("socketaddress", [
-                                                              parts[0], parts[1], "tcp"])
-                                else:
-                                    if keyu == "c2_url":
-                                        self.add_metadata(
-                                            "c2_address", parts[0])
-                                    else:
-                                        self.add_metadata("address", parts[0])
-                        if match.group(2):
-                            self.add_metadata("urlpath", match.group(2))
-                    else:
-                        self.debug("Error parsing as url: %s" % valueu)
+        if key == "filepath":
+            # use ntpath instead of os.path so we are consistant across platforms. ntpath
+            # should work for both windows and unix paths. os.path works for the platform
+            # you are running on, not necessarily what the malware was written for.
+            # Ex. when running mwcp on linux to process windows
+            # malware, os.path will fail due to not handling
+            # backslashes correctly.
+            self.add_metadata("filename", ntpath.basename(value))
+            self.add_metadata("directory", ntpath.dirname(value))
 
-        except Exception:
-            self.debug("Error adding metadata for key: %s\n%s" %
-                       (keyu, traceback.format_exc()))
+        if key == "c2_url":
+            self.add_metadata("url", value)
 
-    def __add_metadata_listofstringtuples(self, keyu, value):
-        try:
-            values = []
-            if not value:
-                self.debug("no values provided for %s, skipping" % keyu)
+        if key in ("c2_address", "proxy_address"):
+            self.add_metadata("address", value)
+
+        if key == "serviceimage":
+            # we use tactic of looking for first .exe in value. This is
+            # not guaranteed to be reliable
+            if '.exe' in value:
+                self.add_metadata("filepath", value[
+                                  0:value.find('.exe') + 4])
+
+        if key == "servicedll":
+            self.add_metadata("filepath", value)
+
+        if key == "ssl_cer_sha1":
+            if not self.SHA1_RE.match(value):
+                self.debug("Invalid SHA1 hash found: {!r}".format(value))
+
+        if key in ("url", "c2_url"):
+            # http://[fe80::20c:1234:5678:9abc]:80/badness
+            # http://bad.com:80
+            # ftp://127.0.0.1/really/bad?hostname=pwned
+            match = self.URL_RE.search(value)
+            if not match:
+                self.debug("Error parsing as url: %s" % value)
                 return
-            for thisvalue in value:
-                values.append(self.convert_to_unicode(thisvalue))
 
-            if keyu not in self.metadata:
-                self.metadata[keyu] = []
-            if self.__disablevaluededup:
-                self.metadata[keyu].append(values)
-            else:
-                try:
-                    dedupindex = self.metadata[keyu].index(values)
-                except ValueError:
-                    self.metadata[keyu].append(values)
+            if match.group("path"):
+                self.add_metadata("urlpath", match.group("path"))
 
-            if not self.__disableautosubfieldparsing:
-                # TODO: validate lengths for known types
-                if keyu == "c2_socketaddress":
-                    self.add_metadata("socketaddress", values)
-                    self.add_metadata("c2_address", values[0])
-                elif keyu == "socketaddress":
-                    self.add_metadata("address", values[0])
-                    if len(values) >= 3:
-                        self.add_metadata("port", [values[1], values[2]])
-                    if len(values) != 3:
-                        self.debug(
-                            "Expected three values in type socketaddress, received %i" % len(values))
-                elif keyu == "credential":
-                    self.add_metadata("username", values[0])
-                    if len(values) >= 2:
-                        self.add_metadata("password", values[1])
-                    if len(values) != 2:
-                        self.debug(
-                            "Expected two values in type credential, received %i" % len(values))
-                elif keyu == "port" or keyu == "listenport":
-                    if len(values) != 2:
-                        self.debug("Expected two values in type %s, received %i" % (
-                            keyu, len(values)))
-                    # check for integer number and valid proto?
-                    match = re.search(r"[0-9]{1,5}", values[0])
-                    if match:
-                        portnum = int(values[0])
-                        if portnum < 0 or portnum > 65535:
-                            self.debug(
-                                "Expected port to be number between 0 and 65535")
-                    else:
-                        self.debug(
-                            "Expected port to be number between 0 and 65535")
-                    if len(values) >= 2:
-                        if values[1] not in ["tcp", "udp", "icmp"]:
-                            self.debug(
-                                "Expected port type to be tcp or udp (or icmp)")
-                elif keyu == "registrypathdata":
-                    self.add_metadata("registrypath", values[0])
-                    # Don't put empty strings in the registrydata field
-                    if len(values) >= 2 and values[1]:
-                        self.add_metadata("registrydata", values[1])
-                    if len(values) != 2:
-                        self.debug(
-                            "Expected two values in type registrypathdata, received %i" % len(values))
-                elif keyu == "service":
-                    if values[0]:
-                        self.add_metadata("servicename", values[0])
-                    if len(values) >= 2:
-                        if values[1]:
-                            self.add_metadata("servicedisplayname", values[1])
-                    if len(values) >= 3:
-                        if values[2]:
-                            self.add_metadata("servicedescription", values[2])
-                    if len(values) >= 4:
-                        if values[3]:
-                            self.add_metadata("serviceimage", values[3])
-                    if len(values) >= 5:
-                        if values[4]:
-                            self.add_metadata("servicedll", values[4])
-
-                    if len(values) != 5:
-                        self.debug(
-                            "Expected 5 values in type service, received %i" % len(values))
-
-        except Exception:
-            self.debug("Error adding metadata for key: %s\n%s" %
-                       (keyu, traceback.format_exc()))
-
-    def __add_metadata_dictofstrings(self, keyu, value):
-        try:
-            # check for type of other?
-            for thiskey in value:
-                if isinstance(value[thiskey], (bytes, str)):
-                    thiskeyu = self.convert_to_unicode(thiskey)
-                    thisvalueu = self.convert_to_unicode(value[thiskey])
-                    if 'other' not in self.metadata:
-                        self.metadata['other'] = {}
-                    if thiskeyu in self.metadata['other']:
-                        # this key already exists, we don't want to clobber so
-                        # we turn into list?
-                        existingvalue = self.metadata['other'][thiskeyu]
-                        if isinstance(existingvalue, list):
-                            if thisvalueu not in self.metadata['other'][thiskeyu]:
-                                self.metadata['other'][thiskeyu].append(thisvalueu)
-                        else:
-                            if thisvalueu != existingvalue:
-                                self.metadata['other'][thiskeyu] = [existingvalue, thisvalueu]
-                    else:
-                        # normal insert of single value
-                        self.metadata['other'][thiskeyu] = thisvalueu
+            if match.group("address"):
+                address = match.group("address").rstrip(': ')
+                if address.startswith("["):
+                    # ipv6--something like
+                    # [fe80::20c:1234:5678:9abc]:80
+                    domain, found, port = address[1:].parition(']:')
                 else:
-                    # TODO: support inserts of lists (assuming members are strings)?
-                    self.debug("Could not add object of %s to metadata under other using key %s" % (
-                        str(type(value[thiskey])), thiskey))
-        except Exception:
-            self.debug("Error adding metadata for key: %s\n%s" %
-                       (keyu, traceback.format_exc()))
+                    domain, found, port = address.partition(":")
+
+                if found:
+                    if port:
+                        if key == "c2_url":
+                            self.add_metadata("c2_socketaddress", [domain, port, "tcp"])
+                        else:
+                            self.add_metadata("socketaddress", [domain, port, "tcp"])
+                    else:
+                        self.debug("Invalid URL {!r} found ':' at end without a port.".format(address))
+                else:
+                    if key == "c2_url":
+                        self.add_metadata("c2_address", address)
+                    else:
+                        self.add_metadata("address", address)
+
+    def _add_metadata_listofstringtuples(self, key, values):
+        values = map(convert_to_unicode, values)
+
+        # Pad values that allow for shorter versions.
+        expected_size = {
+            'proxy': 5,
+            'rsa_private_key': 8,
+        }
+        if key in expected_size:
+            values = tuple(values) + ('',) * (expected_size[key] - len(values))
+
+        obj = self.metadata.setdefault(key, [])
+        if self._disable_value_dedup or values not in obj:
+            obj.append(values)
+
+        if self._disable_auto_subfield_parsing:
+            return
+
+        # Add subfield components.
+        subfield_map = {
+            "registrypathdata": ["registrypath", "registrydata"],
+            "service": ["servicename", "servicedisplayname", "servicedescription", "serviceimage", "servicedll"],
+            "credential": ["username", "password"],
+        }
+        if key in subfield_map:
+            subfields = subfield_map[key]
+            for subfield, _value in zip(subfields, values):
+                if _value:
+                    self.add_metadata(subfield, _value)
+            if len(values) != len(subfields):
+                self.debug("Expected {} values in type {}, received {}".format(len(subfields), key, len(values)))
+
+        # Special case validation.
+        if key == "c2_socketaddress":
+            self.add_metadata("socketaddress", values)
+            self.add_metadata("c2_address", values[0])
+
+        if key == "proxy_socketaddress":
+            self.add_metadata("socketaddress", values)
+            self.add_metadata("proxy_address", values[0])
+
+        if key == "socketaddress":
+            if len(values) != 3:
+                self.debug(
+                    "Expected three values in type socketaddress, received %i" % len(values))
+            self.add_metadata("address", values[0])
+            self.add_metadata("port", values[1:])
+
+        if key in ("port", "listenport"):
+            if len(values) != 2:
+                self.debug("Expected two values in type %s, received %i" % (
+                    key, len(values)))
+            # check for integer number and valid proto?
+            match = self.PORT_RE.search(values[0])
+            if match:
+                portnum = int(values[0])
+                if portnum < 0 or portnum > 65535:
+                    self.debug(
+                        "Expected port to be number between 0 and 65535")
+            else:
+                self.debug(
+                    "Expected port to be number between 0 and 65535")
+            if len(values) >= 2:
+                if values[1] not in ["tcp", "udp", "icmp"]:
+                    self.debug(
+                        "Expected port type to be tcp or udp (or icmp)")
+
+        if key == "proxy":
+            if len(values) != 5:
+                self.debug("Expected 5 values in type %s, received %i" % (key, len(values)))
+            self.add_metadata("credential", values[:2])
+            if len(values[2:]) == 1:
+                self.add_metadata("proxy_address", values[2])
+            else:
+                self.add_metadata("proxy_socketaddress", values[2:])
+
+        if key == "ftp":
+            if len(values) != 3:
+                self.debug("Expected 3 values in type %s, received %i" % (key, len(values)))
+            self.add_metadata("credential", values[:2])
+            if len(values) >= 3:
+                self.add_metadata("url", values[2])
+
+        if key == "rsa_public_key":
+            if len(values) != 2:
+                self.debug("Expected 3 values in type %s, received %i" % (key, len(values)))
+
+        if key == "rsa_private_key":
+            if len(values) != 8:
+                self.debug("Expected 8 values in type %s, received %i" % (key, len(values)))
+
+    def _add_metadata_dictofstrings(self, key, value):
+        # check for type of other?
+        for subkey, subvalue in value.items():
+            if isinstance(subvalue, (bytes, str)):
+                subkey = convert_to_unicode(subkey)
+                subvalue = convert_to_unicode(subvalue)
+                obj = self.metadata.setdefault(key, {})
+                if subkey in obj:
+                    # this key already exists, we don't want to clobber so
+                    # we turn into list?
+                    existing_value = obj[subkey]
+                    if isinstance(existing_value, list):
+                        if subvalue not in obj[subkey]:
+                            obj[subkey].append(subvalue)
+                    elif subvalue != existing_value:
+                            obj[subkey] = [existing_value, subvalue]
+                else:
+                    # normal insert of single value
+                    obj[subkey] = subvalue
+            else:
+                # TODO: support inserts of lists (assuming members are strings)?
+                self.debug("Could not add object of %s to metadata under other using key %s" % (
+                    str(type(subvalue[subkey])), subkey))
 
     def add_metadata(self, key, value):
         """
@@ -458,12 +468,9 @@ class Reporter(object):
             value: string specifying the value of the metadata. Should be a utf-8 encoded string or a unicode object.
 
         """
-
-        try:
-            keyu = self.convert_to_unicode(key)
-        except Exception:
-            self.debug("Error adding metadata due to failure converting key to unicode: %s" % (
-                traceback.format_exc()))
+        keyu = convert_to_unicode(key)
+        if not value or all(not _value for _value in value):
+            self.debug("no values provided for %s, skipping" % key)
             return
 
         if keyu not in self.fields:
@@ -471,79 +478,59 @@ class Reporter(object):
 
         fieldtype = self.fields[keyu]['type']
 
-        if fieldtype == "listofstrings":
-            self.__add_metatadata_listofstrings(keyu, value)
+        try:
+            if fieldtype == "listofstrings":
+                self._add_metatadata_listofstrings(keyu, value)
 
-        if fieldtype == "listofstringtuples":
-            self.__add_metadata_listofstringtuples(keyu, value)
+            if fieldtype == "listofstringtuples":
+                self._add_metadata_listofstringtuples(keyu, value)
 
-        if fieldtype == "dictofstrings":
-            self.__add_metadata_dictofstrings(keyu, value)
+            if fieldtype == "dictofstrings":
+                self._add_metadata_dictofstrings(keyu, value)
+        except Exception:
+            self.debug("Error adding metadata for key: %s\n%s" %
+                       (keyu, traceback.format_exc()))
 
-    def convert_to_unicode(self, input_string):
-        if isinstance(input_string, str):
-            return input_string
-        else:
-            return str(input_string, encoding='utf8', errors='replace')
-
-    def run_parser(self, name, filename=None, data=b"", **kwargs):
+    def run_parser(self, name, file_path=None, data=b"", **kwargs):
         """
         Runs specified parser on file
 
         :param str name: name of parser module to run (use ":" notation to specify source if necessary e.g. "mwcp-acme:Foo")
-        :param str filename: file to parse
+        :param str file_path: file to parse
         :param bytes data: use data as file instead of loading data from filename
         """
         self.__reset()
 
-        if filename:
-            self.__filename = filename
-            with open(self.__filename, 'rb') as f:
-                self.data = f.read()
+        if file_path:
+            with open(file_path, b'rb') as f:
+                self.input_file = mwcp.FileObject(
+                    f.read(), self, file_name=os.path.basename(file_path), output_file=False)
+                self.input_file.file_path = file_path
         else:
-            self.data = data
-
-        self.handle = BytesIO(self.data)
-
-        if self.data[:2] == b"MZ":
-            # We create pefile object from input file if we can
-            # We want to be able to catch import error and log it using
-            # reporter object.
-            try:
-                self.pe = pefile.PE(data=self.data)
-            except Exception as e:
-                self.debug("Error parsing with pefile: %s" % (str(e)))
+            self.input_file = mwcp.FileObject(data, self, output_file=False)
 
         try:
             with self.__redirect_stdout():
                 found = False
                 for parser_name, source, parser_class in mwcp.iter_parsers(name):
                     found = True
-                    # Don't show source since it could be a file path and we don't want to that to be
-                    # exposed in our test cases.
-                    #self.debug('[*] Running parser: {}:{}'.format(source, parser_name))
-                    self.handle.seek(0)
-                    try:
-                        parser = parser_class(reporter=self)
-                        parser.run(**kwargs)
-                    except (Exception, SystemExit) as e:
-                        if filename:
-                            identifier = filename
-                        else:
-                            identifier = hashlib.md5(data).hexdigest()
-                        self.error("Error running parser {}:{} on {}: {}".format(
-                            source, parser_name, identifier, traceback.format_exc()))
+                    with self.input_file as fo:
+                        self._handle = fo
+                        try:
+                            parser = parser_class(reporter=self)
+                            parser.run(**kwargs)
+                        except (Exception, SystemExit) as e:
+                            if file_path:
+                                identifier = file_path
+                            else:
+                                identifier = hashlib.md5(data).hexdigest()
+                            self.error("Error running parser {}:{} on {}: {}".format(
+                                source, parser_name, identifier, traceback.format_exc()))
 
                 if not found:
                     self.error('Could not find parsers with name: {}'.format(name))
         finally:
             self.__cleanup()
-
-    def pprint(self, data):
-        """
-        JSON Pretty Print data
-        """
-        return json.dumps(data, indent=4)
 
     def output_file(self, data, filename, description=''):
         """
@@ -572,7 +559,7 @@ class Reporter(object):
         if self.__outputfile_prefix:
             if self.__outputfile_prefix == "md5":
                 fullpath = os.path.join(self.__outputdir, "%s_%s" % (
-                    hashlib.md5(self.data).hexdigest(), basename))
+                    self.input_file.md5.encode('hex'), basename))
             else:
                 fullpath = os.path.join(self.__outputdir, "%s_%s" % (
                     self.__outputfile_prefix, basename))
@@ -580,9 +567,9 @@ class Reporter(object):
             fullpath = os.path.join(self.__outputdir, basename)
 
         try:
-            with open(fullpath, "wb") as f:
+            with open(fullpath, b"wb") as f:
                 f.write(data)
-            self.debug("outputfile: %s" % fullpath)
+            self.debug("outputfile: %s" % (fullpath))
             self.outputfiles[filename]['path'] = fullpath
         except Exception as e:
             self.debug("Failed to write output file: %s, %s" %
@@ -593,7 +580,7 @@ class Reporter(object):
         load filename from filesystem and report using output_file
         """
         if os.path.isfile(filename):
-            with open(filename, "rb") as f:
+            with open(filename, b"rb") as f:
                 data = f.read()
             self.output_file(data, os.path.basename(filename), description)
         else:
@@ -605,32 +592,27 @@ class Reporter(object):
         if key == "credential" and len(values) == 2:
             return "%s:%s" % (values[0], values[1])
         elif key == "outputfile" and len(values) >= 3:
-            return "%s %s" % (values[0], values[1], values[2])
-        elif key == "port" and len(values) == 2:
-            return "%s/%s" % (values[0], values[1])
-        elif key == "listenport" and len(values) == 2:
+            return "%s %s" % (values[0], values[1])
+        elif key in ("port", "listenport") and len(values) == 2:
             return "%s/%s" % (values[0], values[1])
         elif key == "registrykeyvalue" and len(values) == 2:
             return "%s=%s" % (values[0], values[1])
-        elif key == "socketaddress" and len(values) == 3:
-            return "%s:%s/%s" % (values[0], values[1], values[2])
-        elif key == "c2_socketaddress" and len(values) == 3:
+        elif key in ("socketaddress", "c2_socketaddress", "proxy_socketaddress") and len(values) == 3:
             return "%s:%s/%s" % (values[0], values[1], values[2])
         elif key == "service" and len(values) == 5:
-            return "%s, %s, %s, %s, %s" % (values[0], values[1], values[2], values[3], values[4])
+            return ", ".join(values)
         else:
             return ' '.join(values)
 
     def print_keyvalue(self, key, value):
         print(self.get_printable_key_value(key, value))
 
-    def output_text(self):
+    def print_report(self):
         """
         Output in human readable report format
         """
-
         output = self.get_output_text()
-        print(output)
+        print(output.encode('utf8'))
 
     def get_printable_key_value(self, key, value):
         output = ""
@@ -721,30 +703,19 @@ class Reporter(object):
 
         Goal is to make the reporter safe to use for multiple run_parser instances
         """
-        self.__filename = ''
-        self.__tempfilename = ''
         self.__managed_tempdir = ''
-
-        self.data = b''
-        self.handle = None
+        self.input_file = None
+        self._handle = None
 
         self.metadata = {}
         self.outputfiles = {}
         self.errors = []
-        self.pe = None
 
     def __cleanup(self):
         """
         Cleanup things
         """
         if not self.__disabletempcleanup:
-            if self.__tempfilename:
-                try:
-                    os.remove(self.__tempfilename)
-                except Exception as e:
-                    self.debug("Failed to purge temp file: %s, %s" %
-                               (self.__tempfilename, str(e)))
-                self.__tempfilename = ''
             if self.__managed_tempdir:
                 try:
                     shutil.rmtree(self.__managed_tempdir, ignore_errors=True)
@@ -753,7 +724,6 @@ class Reporter(object):
                                (self.__managed_tempdir, str(e)))
                 self.__managed_tempdir = ''
 
-        self.__tempfilename = ''
         self.__managed_tempdir = ''
 
     def __del__(self):
