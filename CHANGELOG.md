@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+### Changed
+- Added new standard metadata fields
+- Cleaned up mwcp tool
+
+### Fixed
+- Fixed "unorderable types" error when outputting to csv
+
 ## [1.2.0] - 2018-04-17
 ### Added
 - Support for multiprocessing in tester.
