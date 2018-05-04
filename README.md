@@ -9,20 +9,23 @@ and facilitate parser sharing. DC3-MWCP supports both analyst directed analysis 
 large-scale automated execution, utilizing either the native python API, a REST API, or a provided
 command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 
-## TOC
 - [Install](#install)
+- [No-install Method](#no-install-method)
 - [Usage](#usage)
     - [CLI Tool](#cli-tool)
     - [REST API](#rest-api)
     - [Python API](#python-api)
 - [Updates](#updates)
 - [Schema](#schema)
+- [Helper Utilities](#helper-utilities)
 
 ### Documentation
 - [Parser Installation](docs/ParserInstallation.md)
 - [Parser Development](docs/ParserDevelopment.md)
 - [Dispatch Parser Development](docs/DispatcherParserDevelopment.md)
 - [Construct Tutorial](docs/construct.ipynb)
+- [Style Guide](docs/PythonStyleGuide.md)
+- [Testing](docs/Testing.md)
 
 ## Install
 

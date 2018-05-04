@@ -80,13 +80,10 @@ VERSION_FIELD_LIST = ['Version', 'version']
     End of key mapping lists
 """
 
-
 def map_ta_fields(data, reporter, field_list, mwcp_key):
     for field in field_list:
         if data.get(field):
             reporter.add_metadata(mwcp_key, data[field])
-
-
 def map_ta_domain_fields(data, reporter):
     for domain_key in DOMAIN_KEY_LIST:
         if domain_key in data:
@@ -214,7 +211,6 @@ def map_ftp_fields(data, reporter):
                     "c2_url", "ftp://" + data[address] + "/" + data[port])
             else:
                 reporter.add_metadata("c2_url", "ftp://" + data[address])
-
 
 def map_version_fields(data, reporter):
     map_ta_fields(data, reporter, VERSION_FIELD_LIST, 'version')

@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Added new standard metadata fields
 - Cleaned up mwcp tool
+- Updated and added documentation for developing/testing parsers.
 
 ### Fixed
 - Fixed "unorderable types" error when outputting to csv

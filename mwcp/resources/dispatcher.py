@@ -12,7 +12,6 @@ import os
 import traceback
 from collections import deque
 
-import pefile
 from mwcp.utils import pefileutils
 
 # Kordesii framework imports

@@ -42,13 +42,18 @@ $ mwcp-test -p parser -i file_paths_file -d     Delete test cases for a parser
                                      usage='%(prog)s -p parser [options] [input files]')
 
     # Required arguments
-    parser.add_argument("-o",
+    parser.add_argument("-o", "--testcasedir",
                         default=None,
                         type=str,
                         dest="test_case_dir",
                         help="Directory containing JSON test case files. "
                              "(defaults to a 'parsertests' directory located in the root of the "
                              "parser's home module)")
+    parser.add_argument("--parserdir",
+                        metavar="DIR",
+                        default=None,
+                        dest="parserdir",
+                        help="Parsers directory")
 
     # Arguments used to run test cases
     parser.add_argument("-t",
@@ -130,7 +135,7 @@ def main():
         parsers = [args.parser_name]
 
     # Configure reporter based on args
-    reporter = mwcp.Reporter(disableoutputfiles=True)
+    reporter = mwcp.Reporter(disableoutputfiles=True, parserdir=args.parserdir)
 
     # Configure test object
     tester = Tester(

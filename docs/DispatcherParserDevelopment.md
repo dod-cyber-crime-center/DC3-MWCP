@@ -1,18 +1,28 @@
 # Dispatcher Parser Development
 
+- [How the Dispatcher Works](#how-the-dispatcher-works)
+- [Initializing a Dispatch parser](#initializing-a-dispatch-parser)
+- [Creating Component Parsers](#creating-component-parsers)
+- [Identifying](#identifying)
+- [Running](#running)
+- [Raising UnableToParse error](#raising-unabletoparse-error)
+- [Sharing information across parsers](#sharing-information-across-parsers)
+- [Example Parser](#example-parser)
+
+
 ## How the Dispatcher Works
 A Dispatcher model allows for more robust file identification, reporting, and objectifying content to ease maintenance.
 
-The Dispatcher works by running a queue of input files on a list of registered parsers.
-Each parser identifies if it can parse the given file. If a parser identifies the file, the dispatcher
-will output the file to the mwcp reporter and run that parser. The parser can then report any metadata as well as extract and place any
+The Dispatcher works by running a queue of input files on a list of registered component parsers.
+Each component identifies if it can parse the given file. If it identifies the file, the dispatcher
+will output the file to the `mwcp.Reporter` and run that component. The component can then report any metadata as well as extract and place any
 embedded files onto the queue for further processing.
 
 This method allows you to separate each component (e.g. carrier, dropper, installer, implant) into their
 own class. Focusing on each part separately.
 
 
-## Initializing a MWCP Dispatch parser
+## Initializing a Dispatch parser
 A config parser can be written using the Dispatcher model by having the parser inherit from both the
 `mwcp.Parser` and `mwcp.Dispatcher` class. After which you will then need to run the `__init__` functions
 for both classes.
@@ -25,10 +35,12 @@ By default, only the first parser within the list that identifies the file will 
 You can set the `greedy` keyword argument to `True` in `Dispatcher.__init__` to make make the dispatcher run
 on all parsers that have identified it.
 
-By default, if no parsers have identified the file, it is reported as an "Unidentified file" using the `Dispatcher.UnidentifiedFile` parser.
+By default, if no parsers have identified the file, it is reported as an "Unidentified file" using the `Dispatcher.UnidentifiedFile`
+component parser.
 You can change this default to your own parser by setting the `default` keyword argument in `Dispatcher.__init__`.
 
-If you would like to change how the the dispatcher determines which parser to run, you can can overwrite the `Dispatcher._identify_file()` function.
+By default, all dispatched files, including unidentified files will be written out by the mwcp.Reporter. You
+can disable unidentified files from being written out by setting `output_unidentified` to `False` in `Dispatcher.__init__`.
 
 ```python
 from mwcp import Dispatcher, Parser
@@ -70,7 +82,7 @@ class FooDropper(ComponentParser):
 ```
 
 ### Identifying
-The parser must at least implement the `identify` function. *(Note: This is a class method not an instance method)* This function should return a boolean indicating if the given `file_object` can be parsed by this parser. Since the MWCP parser should only be run on a file that has already been identified using an external method like YARA, we know that the files being passed to it will either be files that matched the signature or files that were extracted by another parser in the same family. Therefore, this function only needs to be able to distinguish itself from the other parsers. For example, if the dropper is the only dll you could return `file_object.pe and file_object.pe.is_dll()`.
+Each ComponentParser must at least implement the `identify` function. *(Note: This is a class method not an instance method)* This function should return a boolean indicating if the given `file_object` can be parsed by this parser. Since the DC3-MWCP parser should only be run on a file that has already been identified using an external method like YARA, we know that the files being passed to it will either be files that matched the signature or files that were extracted by another parser in the same family. Therefore, this function only needs to be able to distinguish itself from the other componets in the family. For example, if the dropper is the only dll you could return `file_object.pe and file_object.pe.is_dll()`.
 
 ```python
     @classmethod
@@ -98,10 +110,10 @@ embedded_file = FileObject(embedded_data, reporter=self.reporter)
 self.dispatcher.add_to_queue(embedded_file)
 ```
 
-This will place the file onto the dispatcher to be then picked up by the appropriate Component parser.
+This will place the file onto the dispatcher to be then picked up by the appropriate ComponentParser.
 
-By default, anything placed onto the queue will automatically be output by the MWCP reporter. *(You can disable this by setting `output_file=False` keyword argument when initializing the `FileObject`)*
-Therefore, even if you don't have a parser that can pick this up, but would like to output it, it's still a good idea to put it on the queue instead of outputting the file manually. This will allow the possibility of a future Component parser being made that can handle the file.
+By default, anything placed onto the queue will automatically be output by the DC3-MWCP reporter. *(You can disable this by setting `output_file=False` keyword argument when initializing the `FileObject`)*
+Therefore, even if you don't have a parser that can pick this up, but would like to output it, it's still a good idea to put it on the queue instead of outputting the file manually. This will allow the possibility of a future ComponentParser being made that can handle the file.
 
 
 ```python
@@ -162,7 +174,7 @@ class FooTrojan(ComponentParser):
 ```
 
 
-## Shared information across parsers.
+## Sharing information across parsers
 If you would like to share information that can be used by another parser. (eg. encryption keys)
 You can store this information in the `knowledge_base` contained in the dispatcher object.
 Since all parsers will have access to the dispatcher, a parser can pull data stored in here from another parser.
@@ -191,6 +203,8 @@ def run(self):
 ```
 
 ## Example Parser
+
+The following is provided as an example that may be used as a template.
 
 ```python
 import os
@@ -258,6 +272,7 @@ class FooDropper(ComponentParser):
                 self.dispatcher.add_to_queue(implant_file_object)
 
 
+# Entry point parser that runs all of the component parsers.
 class Foo(Dispatcher, Parser):
     def __init__(self, reporter):
         Parser.__init__(
