@@ -375,7 +375,7 @@ class Dispatcher(object):
         """
         Entry point into parser, called by MWCP framework.
         If this class is used as a mixin along with the MWCP framework
-        this function can be used as the entry point into the mwcp framwork.
+        this function can be used as the entry point into the mwcp framework.
         """
         # Add and run dispatcher with starting file found in reporter.
         self.reporter.debug('[*] Configuration parsing started.')
