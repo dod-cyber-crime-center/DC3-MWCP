@@ -44,7 +44,6 @@ setup(
         ]
     },
     install_requires=[
-        'kordesii',
         'bottle',
         'construct==2.8.12',  # pin version, since we patch this library
         'future',
@@ -52,5 +51,13 @@ setup(
         'pefile',
         'requests',
         'six',
-    ]
+
+        # Testing
+        'pytest',
+        'pytest-console-scripts',
+        'tox',
+    ],
+    extras_require={
+        'kordesii': ['kordesii'],
+    }
 )

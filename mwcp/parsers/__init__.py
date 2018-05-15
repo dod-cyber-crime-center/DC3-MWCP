@@ -85,32 +85,32 @@ def iter_parsers(name=None, source=None):
                        (source is either the name of a python package or path to local directory)
 
     e.g.
-    >>> list(iter_parsers())
+    >> list(iter_parsers())
     [
         ('foo', 'C:\...\parsers', <class 'foo_malwareconfigparser.Foo'>),
         ('foo', 'mwcp-acme', <class 'mwcp-acme.parsers.foo.Foo'>),
         ('bar', 'mwcp-acme', <class 'mwcp-acme.parsers.bar.Bar'>)
     ]
-    >>> list(iter_parsers(name='foo'))
+    >> list(iter_parsers(name='foo'))
     [
         ('foo', 'C:\...\parsers', <class 'foo_malwareconfigparser.Foo'>),
         ('foo', 'mwcp-acme', <class 'mwcp-acme.parsers.foo.Foo'>)
     ]
-    >>> list(iter_parsers(source='mwcp-acme'))
+    >> list(iter_parsers(source='mwcp-acme'))
     [
         ('foo', 'mwcp-acme', <class 'mwcp_acme.parsers.foo.Foo'>),
         ('bar', 'mwcp-acme', <class 'mwcp_acme.parsers.bar.Bar'>
     ]
-    >>> list(iter_parsers('mwcp-acme:'))
+    >> list(iter_parsers('mwcp-acme:'))
     [
         ('foo', 'mwcp-acme', <class 'mwcp_acme.parsers.foo.Foo'>),
         ('bar', 'mwcp-acme', <class 'mwcp_acme.parsers.bar.Bar'>
     ]
-    >>> list(iter_parsers(name='foo', source='mwcp-acme'))
+    >> list(iter_parsers(name='foo', source='mwcp-acme'))
     [
         ('foo', 'mwcp-acme', <class 'mwcp_acme.parsers.foo.Foo'>)
     ]
-    >>> list(iter_parsers('mwcp-acme:foo'))
+    >> list(iter_parsers('mwcp-acme:foo'))
     [
         ('foo', 'mwcp-acme', <class 'mwcp_acme.parsers.foo.Foo'>)
     ]
@@ -139,7 +139,7 @@ def iter_parsers(name=None, source=None):
                 yield name, source_name, klass
 
 
-def get_parser_descriptions():
+def get_parser_descriptions(name=None, source=None):
     """
     Retrieve list of parser descriptions
 
@@ -150,9 +150,9 @@ def get_parser_descriptions():
     # temporarily initialize them in order to extract their info.
     # TODO: In the future, this information should be static attributes on the class itself.
     reporter = mwcp.Reporter()
-    for name, source, klass in sorted(iter_parsers()):
+    for _name, _source, klass in sorted(iter_parsers(name=name, source=None)):
         parser = klass(reporter)
-        descriptions.append((name, source, parser.author, parser.description))
+        descriptions.append((_name, _source, parser.author, parser.description))
     return descriptions
 
 

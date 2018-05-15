@@ -2,13 +2,18 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+## Added
+- Added unit testing using tox and pytest.
+
 ### Changed
 - Added new standard metadata fields
 - Cleaned up mwcp tool
 - Updated and added documentation for developing/testing parsers.
+- Set DC3-Kordesii as an optional dependency.
 
 ### Fixed
 - Fixed "unorderable types" error when outputting to csv
+- Fixed bugs found in  unit tests.
 
 ## [1.2.0] - 2018-04-17
 ### Added

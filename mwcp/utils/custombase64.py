@@ -2,17 +2,10 @@
 Custom Base64 related utility
 """
 
+from future.builtins import str, bytes
+
 import base64
 import logging
-import sys
-
-
-PY3 = sys.version_info.major == 3
-
-if PY3:
-    maketrans = bytes.maketrans
-else:
-    from string import maketrans
 
 
 logger = logging.getLogger(__name__)
@@ -64,21 +57,23 @@ def _adjust_pad(alphabet, data, decode):
 
 
 def _code(data, custom_alpha, size, decode, code_func):
-    if isinstance(custom_alpha, str if PY3 else unicode):
+    # TODO: Don't convert and require input to be bytes.
+    if isinstance(custom_alpha, str):
         custom_alpha = custom_alpha.encode()
-    if isinstance(data, str if PY3 else unicode):
+    if isinstance(data, str):
         data = data.encode()
+
     _validate_alphabet(custom_alpha, size)
     if size != 16 and len(custom_alpha) == size:
         _adjust_pad(custom_alpha, data, decode)
     std_alpha = _STD_ALPHA[size]
 
     if decode:
-        table = maketrans(custom_alpha, std_alpha)
+        table = bytes.maketrans(custom_alpha, std_alpha)
         data = data.translate(table)
         return code_func(data)
     else:
-        table = maketrans(std_alpha, custom_alpha)
+        table = bytes.maketrans(std_alpha, custom_alpha)
         data = code_func(data)
         return data.translate(table)
 
@@ -88,7 +83,7 @@ def b64encode(data, alphabet):
 
 
 def b64decode(data, alphabet):
-    data += alphabet[-1] * ((-len(data)) % 4)           # Pad the data, if necessary
+    data += bytes([alphabet[-1]]) * ((-len(data)) % 4)           # Pad the data, if necessary
     return _code(data, alphabet, 64, True, base64.b64decode)
 
 
@@ -106,3 +101,7 @@ def b16encode(data, alphabet):
 
 def b16decode(data, alphabet):
     return _code(data, alphabet, 16, True, base64.b16decode)
+
+# To match base64
+encode = b64encode
+decode = b64decode

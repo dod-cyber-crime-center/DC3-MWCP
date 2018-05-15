@@ -3,6 +3,8 @@ Description: Utility for generic, repeated functions. Expandable as needed
 python version: 2.7.8
 """
 
+from __future__ import unicode_literals
+
 import pefile
 import os
 

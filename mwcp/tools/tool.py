@@ -81,7 +81,7 @@ def _write_csv(input_files, results, csv_path, base64_outputfiles=False):
         #   Results in columns: other, other.unique_entry, other.unique_key
         if 'other' in metadata:
             for sub_key, sub_value in metadata['other'].items():
-                metadata['other.{}'.format(sub_key)] = sub_value
+                metadata['other.{}'.format(convert_to_unicode(sub_key))] = sub_value
             del metadata['other']
 
         # Split outputfile into multiple fields.
@@ -100,13 +100,11 @@ def _write_csv(input_files, results, csv_path, base64_outputfiles=False):
         column_names, key=lambda x: str(_STD_CSV_COLUMNS.index(x)) if x in _STD_CSV_COLUMNS else x)
 
     # Reformat metadata and write to CSV
-    with open(csv_path, b'wb') as csvfile:
-        dw = csv.DictWriter(csvfile, fieldnames=column_names)
+    with open(csv_path, 'wb' if sys.version_info.major < 3 else 'w') as csvfile:
+        dw = csv.DictWriter(csvfile, fieldnames=column_names, lineterminator='\n')
         dw.writeheader()
-        dw.writerows([
-            {k: _format_metadata_value(v).encode('utf8') for k, v in metadata.items()}
-            for metadata in results
-        ])
+        for metadata in results:
+            dw.writerow({k: _format_metadata_value(v) for k, v in metadata.items()})
 
 
 def _print_parsers(json_output=False):
@@ -157,7 +155,7 @@ def _get_file_paths(input_args, is_filelist=True):
         if input_args[0] == "-":
             return [line.rstrip() for line in sys.stdin]
         else:
-            with open(input_args[0], b"rb") as f:
+            with open(input_args[0], "r") as f:
                 return [line.rstrip() for line in f]
     else:
         file_paths = []
@@ -229,62 +227,62 @@ def get_arg_parser():
                         type=str,
                         dest="parser",
                         help="Malware config parser to call. (use ':' notation to specify source if necessary e.g. 'mwcp-acme:Foo')")
-    parser.add_argument("-l",
+    parser.add_argument("-l", "--parsers",
                         action="store_true",
                         default=False,
                         dest="list",
                         help="list all malware config parsers.")
-    parser.add_argument("-k",
+    parser.add_argument("-k", "--fields",
                         action="store_true",
                         default=False,
                         dest="fields",
                         help="List all standardized fields and examples. See resources/fields.json")
     parser.add_argument("-a", "--parserdir",
                         metavar="DIR",
-                        default=default_parserdir,
+                        default=None,
                         dest="parserdir",
-                        help="Parsers directory" + " [default: {}]".format(default_parserdir))
-    parser.add_argument("-o",
+                        help="Optional extra parser directory")
+    parser.add_argument("-o", "--outputdir",
                         metavar="DIR",
                         default="",
                         dest="outputdir",
                         help="Output directory.")
-    parser.add_argument("-c",
+    parser.add_argument("-c", "--csv",
                         metavar="CSVWRITE",
                         default="",
                         dest="csvwrite",
                         help="Output CSV file.")
-    parser.add_argument("-t",
+    parser.add_argument("-t", "--tempdir",
                         metavar="DIR",
                         default=tempfile.gettempdir(),
                         dest="tempdir",
                         help="Temp directory." + " [default: {}]".format(tempfile.gettempdir()))
-    parser.add_argument("-j",
+    parser.add_argument("-j", "--json",
                         action="store_true",
                         default=False,
                         dest="jsonoutput",
                         help="Enable json output for parser reports (instead of formatted text).")
-    parser.add_argument("-n",
+    parser.add_argument("-n", "--disable_output",
                         action="store_true",
                         default=False,
                         dest="disableoutputfiles",
                         help="Disable writing output files to filesystem.")
-    parser.add_argument("-g",
+    parser.add_argument("-g", "--disable-temp-cleanup",
                         action="store_true",
                         default=False,
                         dest="disabletempcleanup",
                         help="Disable cleanup of framework created temp files including managed tempdir.")
-    parser.add_argument("-f",
+    parser.add_argument("-f", "--include-filename",
                         action="store_true",
                         default=False,
                         dest="includefilename",
                         help="Include file information such as filename, hashes, and compile time in parser output.")
-    parser.add_argument("-d",
+    parser.add_argument("-d", "--no-debug",
                         action="store_true",
                         default=False,
                         dest="hidedebug",
                         help="Hide debug messages in output.")
-    parser.add_argument("-u",
+    parser.add_argument("-u", "--output-prefix",
                         metavar="FILENAME",
                         default="",
                         dest="outputfile_prefix",
@@ -293,22 +291,22 @@ def get_arg_parser():
                              "files for analysis, the default will be 'md5'. Passing in a value with the -u option " +
                              "or using the -U option can be used to override the 'md5' default for multiple files. " +
                              "[default: (No prefix|md5)]")
-    parser.add_argument("-U",
+    parser.add_argument("-U", "--no-output-prefix",
                         action="store_true",
                         default=False,
                         dest="disableoutputfileprefix",
                         help="When in effect, parser output files will not have a filename prefix.")
-    parser.add_argument("-i",
+    parser.add_argument("-i", "--filelist",
                         action="store_true",
                         default=False,
                         dest="filelistindirection",
                         help="Input file contains a list of filenames to process.")
-    parser.add_argument("-b",
+    parser.add_argument("-b", "--base64",
                         action="store_true",
                         default=False,
                         dest="base64outputfiles",
                         help="Base64 encode output files and include in metadata.")
-    parser.add_argument("-w",
+    parser.add_argument("-w", "--kwargs",
                         metavar="JSON",
                         default="",
                         dest="kwargs_raw",
@@ -319,9 +317,9 @@ def get_arg_parser():
     return parser
 
 
-def main():
+def main(args=None):
     argparser = get_arg_parser()
-    args, input_files = argparser.parse_known_args()
+    args, input_files = argparser.parse_known_args(args)
 
     # This is a preliminary check before creating the reporter to establish how output
     # file prefixes should be set.
@@ -352,7 +350,7 @@ def main():
         for key, value in list(kwargs.items()):
             if value and value.startswith('b64file(') and value.endswith(')'):
                 tmp_filename = value[len('b64file('):-1]
-                with open(tmp_filename, b'rb') as f:
+                with open(tmp_filename, 'rb') as f:
                     kwargs[key] = base64.b64encode(f.read())
 
     # Run MWCP
@@ -375,8 +373,6 @@ def main():
 
         if args.csvwrite:
             csv_path = args.csvwrite
-            if not csv_path.endswith('.csv'):
-                csv_path += '.csv'
             _write_csv(input_files, results, csv_path, args.base64outputfiles)
             if not args.jsonoutput:
                 print('Wrote csv file: {}'.format(csv_path))
@@ -386,6 +382,7 @@ def main():
 
     except Exception as e:
         error_message = "Error running DC3-MWCP: {}".format(e)
+        traceback.print_exc()
         if args.jsonoutput:
             print(json.dumps({'errors': [error_message]}))
         else:

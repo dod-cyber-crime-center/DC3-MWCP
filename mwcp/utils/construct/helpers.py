@@ -3,6 +3,7 @@
 from __future__ import division
 
 import base64
+import operator
 import os
 import io
 import re
@@ -195,9 +196,9 @@ class TerminatedString(construct.StringEncoded):
     >>> TerminatedString(PascalString(Byte)).build(b'hello')
     '\x05hello'
     >>> TerminatedString(String(10)).parse(b'hello\x00\x02\x04FA')
-    u'hello'
+    'hello'
     >>> TerminatedString(String(10)).parse(b'helloworld')
-    u'helloworld'
+    'helloworld'
     >>> TerminatedString(GreedyString()).parse(b'this is a valid string\x00\x00 GARBAGE!')
     'this is a valid string'
     >>> TerminatedString(PascalString(Byte)).parse(b'\x0Ahello\x00\x01\x03\x04F')
@@ -385,11 +386,11 @@ class Printable(Validator):
     NOTE: A ValidationError is a type of ConstructError and will be cause if catching ConstructError.
 
     >>> Printable(String(5)).parse(b'hello')
-    u'hello'
+    'hello'
     >>> Printable(String(5)).parse(b'he\x11o!')
     Traceback (most recent call last):
         ...
-    ValidationError: ('object failed validation', u'he\x11o!')
+    ValidationError: ('object failed validation', 'he\x11o!')
     >>> Printable(Bytes(3)).parse(b'\x01NO')
     Traceback (most recent call last):
         ...
@@ -674,16 +675,16 @@ class PEPhysicalAddress(Adapter):
     )
 
     e.g.
-    >>> with open(r'C:\32bit_exe', 'rb') as fo:
-    ...     file_data = fo.read()
-    >>> pe = pefileutils.obtain_pe(file_data)
-    >>> PEPhysicalAddress(Int32ul, pe=pe).build(100)
+    >> with open(r'C:\32bit_exe', 'rb') as fo:
+    ...    file_data = fo.read()
+    >> pe = pefileutils.obtain_pe(file_data)
+    >> PEPhysicalAddress(Int32ul, pe=pe).build(100)
     'd\x00@\x00'
-    >>> PEPhysicalAddress(Int32ul, pe=pe).parse(b'd\x00@\x00')
+    >> PEPhysicalAddress(Int32ul, pe=pe).parse(b'd\x00@\x00')
     100
-    >>> PEPhysicalAddress(Int32ul).build(100, pe=pe)
+    >> PEPhysicalAddress(Int32ul).build(100, pe=pe)
     'd\x00@\x00'
-    >>> PEPhysicalAddress(Int32ul).parse(b'd\x00@\x00', pe=pe)
+    >> PEPhysicalAddress(Int32ul).parse(b'd\x00@\x00', pe=pe)
     100
     """
     def __init__(self, subcon, pe=None):
@@ -939,21 +940,21 @@ class Regex(Construct):
     >>> regex = re.compile('\x01\x02(?P<size>.{4})\x03\x04(?P<path>[A-Za-z].*\x00)', re.DOTALL)
     >>> data = 'GARBAGE!\x01\x02\x0A\x00\x00\x00\x03\x04C:\Windows\x00MORE GARBAGE!'
     >>> Regex(regex, size=Int32ul, path=CString()).parse(data)
-    Container(path='C:\\Windows')(size=10)
+    Container(size=10)(path='C:\\Windows')
     >>> Regex(regex).parse(data)
-    Container(path='C:\\Windows\x00')(size='\n\x00\x00\x00')
+    Container(size='\n\x00\x00\x00')(path='C:\\Windows\x00')
     >>> Struct(
     ...     're' / Regex(regex, size=Int32ul, path=CString()),
     ...     'after_re' / Tell,
     ...     'garbage' / GreedyBytes
     ... ).parse(data)
-    Container(re=Container(path='C:\\Windows')(size=10))(after_re=27L)(garbage='MORE GARBAGE!')
+    Container(re=Container(size=10)(path='C:\\Windows'))(after_re=27L)(garbage='MORE GARBAGE!')
     >>> Struct(
     ...     Embedded(Regex(regex, size=Int32ul, path=CString())),
     ...     'after_re' / Tell,
     ...     'garbage' / GreedyBytes
     ... ).parse(data)
-    Container(path='C:\\Windows')(size=10)(after_re=27L)(garbage='MORE GARBAGE!')
+    Container(size=10)(path='C:\\Windows')(after_re=27L)(garbage='MORE GARBAGE!')
 
     You can use Regex as a trigger to find a particular piece of data before you start parsing.
     >>> Struct(
@@ -965,7 +966,7 @@ class Regex(Construct):
     If no data is captured, the associated subcon will received a stream with the position set at the location
     of that captured group. Thus, allowing you to use it as an anchor point.
     >>> Regex('hello (?P<anchor>)world(?P<extra_data>.*)', anchor=Tell).parse('hello world!!!!')
-    Container(extra_data='!!!!')(anchor=6L)
+    Container(anchor=6L)(extra_data='!!!!')
 
     If no named capture groups are used, you can instead parse the entire matched string by supplying
     a subconstruct as a positional argument. (If no subcon is provided, the raw bytes are returned instead.
@@ -1032,10 +1033,9 @@ class Regex(Construct):
             raise ConstructError('regex did not match')
 
         try:
-            group_dict = match.groupdict()
-
+            group_index = self.regex.groupindex
             # If there are no named groups. Return parsed full match instead.
-            if not group_dict:
+            if not group_index:
                 if self.subcon:
                     sub_stream = io.BytesIO(match.group())
                     return self.subcon._parse(sub_stream, context, path)
@@ -1046,9 +1046,12 @@ class Regex(Construct):
             obj = Container()
             context = Container(_=context)
 
-            # Default to displaying matched data as pure bytes.
-            obj.update(group_dict)
-            context.update(group_dict)
+            # Default to displaying matched data as pure bytes
+            # (inserted in the order they show up in the pattern)
+            for name, index in sorted(group_index.items(), key=operator.itemgetter(1)):
+                value = match.group(index)
+                obj[name] = value
+                context[name] = value
 
             # Parse groups using supplied constructs.
             for name, subcon in self.group_subcons.items():

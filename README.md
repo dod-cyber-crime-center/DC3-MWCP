@@ -11,6 +11,8 @@ command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 
 - [Install](#install)
 - [No-install Method](#no-install-method)
+- [DC3-Kordesii Support](#dc3-kordesii-support)
+- [Unit Tests](#unit-tests)
 - [Usage](#usage)
     - [CLI Tool](#cli-tool)
     - [REST API](#rest-api)
@@ -45,10 +47,6 @@ git clone https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP.git
 pip install -e ./DC3-MWCP
 ```
 
-When installing locally from a cloned repo, you may need to
-install the [kordesii](https://github.com/Defense-Cyber-Crime-Center/kordesii)
-dependency first.
-
 ## No-install Method
 You can also use MWCP without installing using the *mwcp-\*.py* scripts.
 However, you will need to manually install all the dependencies.
@@ -60,6 +58,71 @@ Example:
 ```
 python mwcp-tool.py -h
 ```
+
+## DC3-Kordesii Support
+DC3-MWCP optionally supports [DC3-Kordesii](https://github.com/Defense-Cyber-Crime-Center/kordesii)
+if it is installed. This will allow you to run any DC3-Kordesii decoder from the
+`mwcp.FileObject` object with the `run_kordesii_decoder` function.
+
+You can install DC3-Kordesii along with DC3-MWCP by adding `[kordesii]` to your appropriate install command:
+```
+pip install mwcp[kordesii]
+pip install ./DC3-MWCP[kordesii]
+pip install -e ./DC3-MWCP[kordesii]
+```
+
+## Unit Tests
+DC3-MWCP uses [tox](https://tox.readthedocs.io) with [pytest](https://pytest.org) to test the core code
+and parsers. These libraries will be installed when you install DC3-MWCP.
+To run all tests on Python 2.7 and 3.6 run the `tox` command after installation.
+
+```bash
+$ tox
+GLOB sdist-make: C:\dev\DC3_MWCP\setup.py
+py27 inst-nodeps: C:\dev\DC3_MWCP\.tox\dist\mwcp-1.2.0.zip
+py27 installed: attrs==17.4.0,bottle==0.12.13,certifi==2018.4.16,chardet==3.0.4,colorama==0.3.9,construct==2.8.12,funcsigs==1.0.2,future==0.16.0,idna==2.6,Jinja2==2.10,MarkupSafe==1.0,mock==2.0.0,more-itertools==4.1.0,mwcp==1.2.0,pbr==4.0.2,pefile==2017.11.5,pluggy==0.6.0,py==1.5.3,pytest==3.5.0,pytest-console-scripts==0.1.4,pytest-mock==1.9.0,requests==2.18.4,six==1.11.0,tox==3.0.0,urllib3==1.22,virtualenv==15.2.0
+py27 runtests: PYTHONHASHSEED='155'
+py27 runtests: commands[0] | pytest --doctest-modules
+============================= test session starts =============================
+platform win32 -- Python 2.7.14, pytest-3.5.0, py-1.5.3, pluggy-0.6.0
+rootdir: C:\dev\DC3_MWCP, inifile: tox.ini
+plugins: mock-1.9.0, console-scripts-0.1.4
+collected 59 items
+
+mwcp\utils\construct\construct_html.py .                                 [  1%]
+mwcp\utils\construct\helpers.py .........................                [ 44%]
+mwcp\utils\construct\windows_enums.py ....                               [ 50%]
+mwcp\utils\construct\windows_structures.py .                             [ 52%]
+tests\test_cli.py .......                                                [ 64%]
+tests\test_custombase64.py ...                                           [ 69%]
+tests\test_dispatcher.py .....                                           [ 77%]
+tests\test_parser_registry.py ..                                         [ 81%]
+tests\test_reporter.py ...........                                       [100%]
+
+========================== 59 passed in 8.30 seconds ==========================
+py36 inst-nodeps: C:\dev\DC3_MWCP\.tox\dist\mwcp-1.2.0.zip
+py36 installed: attrs==17.4.0,bottle==0.12.13,certifi==2018.4.16,chardet==3.0.4,colorama==0.3.9,construct==2.8.12,future==0.16.0,idna==2.6,Jinja2==2.10,MarkupSafe==1.0,mock==2.0.0,more-itertools==4.1.0,mwcp==1.2.0,pbr==4.0.2,pefile==2017.11.5,pluggy==0.6.0,py==1.5.3,pytest==3.5.0,pytest-console-scripts==0.1.4,pytest-mock==1.9.0,requests==2.18.4,six==1.11.0,tox==3.0.0,urllib3==1.22,virtualenv==15.2.0
+py36 runtests: PYTHONHASHSEED='155'
+py36 runtests: commands[0] | pytest
+============================= test session starts =============================
+platform win32 -- Python 3.6.3, pytest-3.5.0, py-1.5.3, pluggy-0.6.0
+rootdir: C:\dev\DC3_MWCP, inifile: tox.ini
+plugins: mock-1.9.0, console-scripts-0.1.4
+collected 28 items
+
+tests\test_cli.py .......                                                [ 25%]
+tests\test_custombase64.py ...                                           [ 35%]
+tests\test_dispatcher.py .....                                           [ 53%]
+tests\test_parser_registry.py ..                                         [ 60%]
+tests\test_reporter.py ...........                                       [100%]
+
+========================== 28 passed in 6.33 seconds ==========================
+___________________________________ summary ___________________________________
+  py27: commands succeeded
+  py36: commands succeeded
+  congratulations :)
+```
+
 
 ## Usage
 DC3-MWCP is designed to allow easy development and use of malware config parsers. DC3-MWCP is also designed to ensure

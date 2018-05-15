@@ -4,7 +4,10 @@ more robust file identification, reporting, and objectifying
 content to ease maintenance.
 """
 
+from __future__ import unicode_literals
+
 # Python standard imports
+import codecs
 import pefile
 import hashlib
 import io
@@ -15,7 +18,11 @@ from collections import deque
 from mwcp.utils import pefileutils
 
 # Kordesii framework imports
-from kordesii.kordesiireporter import kordesiireporter
+try:
+    from kordesii.kordesiireporter import kordesiireporter
+except ImportError:
+    # Kordesii support is optional.
+    kordesiireporter = None
 
 
 class UnableToParse(Exception):
@@ -68,7 +75,7 @@ class FileObject(object):
             self.file_name = file_name
         else:
             self.file_name = pefileutils.obtain_original_filename(
-                def_stub or self.md5.encode('hex'), pe=self.pe, reporter=reporter, use_arch=use_arch)
+                def_stub or codecs.encode(self.md5, 'hex').decode('utf8'), pe=self.pe, reporter=reporter, use_arch=use_arch)
 
         # Sanity check
         assert self.file_name
@@ -78,10 +85,10 @@ class FileObject(object):
         This allows us to use the file_data as a file-like object when used as a context manager.
 
         e.g.
-            >>> file_object = FileObject('hello world', None)
-            >>> with file_object as fo:
-            ...     _ = fo.seek(6)
-            ...     print fo.read()
+            >> file_object = FileObject('hello world', None)
+            >> with file_object as fo:
+            ..     _ = fo.seek(6)
+            ..     print fo.read()
             world
         """
         self._open_file = io.BytesIO(self.file_data)
@@ -176,7 +183,12 @@ class FileObject(object):
 
         :param decoder_name: name of the decoder to run
         :return: Instance of the kordesii_reporter.
+
+        :raises RuntimeError: If kordesii is not installed.
         """
+        if not kordesiireporter:
+            raise RuntimeError('Please install kordesii to use this function.')
+
         self.reporter.debug('[*] Running {} kordesii decoder on file {}.'.format(decoder_name, self.file_name))
         kordesii_reporter = kordesiireporter(base64outputfiles=True, enableidalog=True)
 

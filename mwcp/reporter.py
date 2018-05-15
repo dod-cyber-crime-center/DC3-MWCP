@@ -5,7 +5,7 @@ from __future__ import print_function, unicode_literals
 
 import contextlib
 
-from future.builtins import str
+from future.builtins import str, open, map
 
 import base64
 import hashlib
@@ -139,7 +139,7 @@ class Reporter(object):
         self._resourcedir = None
         self.resourcedir = os.path.dirname(resources.__file__)
 
-        self.__managed_tempdir = ''
+        self.__managed_tempdir = None
         self.__outputdir = outputdir or ''
         self.__outputfile_prefix = outputfile_prefix or ''
 
@@ -152,19 +152,19 @@ class Reporter(object):
         if self.parserdir != self.DEFAULT_PARSERDIR or not any(mwcp.iter_parsers(source='mwcp')):
             mwcp.register_parser_directory(self.parserdir)
 
-        self.__interpreter_path = interpreter_path
-        self.__disabledebug = disabledebug
-        self.__disableoutputfiles = disableoutputfiles
-        self.__disabletempcleanup = disabletempcleanup
+        self._interpreter_path = interpreter_path
+        self._disable_debug = disabledebug
+        self._disable_output_files = disableoutputfiles
+        self._disable_temp_cleanup = disabletempcleanup
         self._disable_auto_subfield_parsing = disableautosubfieldparsing
         self._disable_value_dedup = disablevaluededup
-        self.__disablemodulesearch = disablemodulesearch
-        self.__base64outputfiles = base64outputfiles
+        self._disable_module_search = disablemodulesearch
+        self._base64_output_files = base64outputfiles
 
         # TODO: Move fields.json to shared data or config folder.
         fieldspath = os.path.join(os.path.dirname(mwcp.resources.__file__), "fields.json")
 
-        with open(fieldspath, b'rb') as f:
+        with open(fieldspath, 'rb') as f:
             self.fields = json.load(f)
 
     # Allow user to still use resourcedir feature, but warn about deprecation.
@@ -185,11 +185,11 @@ class Reporter(object):
         # we put resourcedir in PYTHONPATH in case we shell out or children
         # processes need this
         # Windows environment variables must be byte strings.
-        if b'PYTHONPATH' in os.environ:
-            if resourcedir not in os.environ[b'PYTHONPATH']:
-                os.environ[b'PYTHONPATH'] = os.environ[b'PYTHONPATH'] + os.pathsep + resourcedir
+        if 'PYTHONPATH' in os.environ:
+            if resourcedir not in os.environ['PYTHONPATH']:
+                os.environ['PYTHONPATH'] = os.environ['PYTHONPATH'] + os.pathsep + resourcedir
         else:
-            os.environ[b'PYTHONPATH'] = resourcedir
+            os.environ['PYTHONPATH'] = resourcedir
 
     @property
     def data(self):
@@ -237,7 +237,7 @@ class Reporter(object):
             self.__managed_tempdir = tempfile.mkdtemp(
                 dir=self.tempdir, prefix="mwcp-managed_tempdir-")
 
-            if self.__disabletempcleanup:
+            if self._disable_temp_cleanup:
                 self.debug("Using managed temp dir: %s" %
                            self.__managed_tempdir)
 
@@ -246,27 +246,27 @@ class Reporter(object):
     def interpreter_path(self):
         """
         Returns the path for python interpreter, assuming it can be found. Because of various
-        factors (inlcuding ablity to override) this may not be accurate.
+        factors (including ability to override) this may not be accurate.
 
         """
-        if not self.__interpreter_path:
+        if not self._interpreter_path:
             # first try sys.executable--this is reliable most of the time but
             # doesn't work when python is embedded, ex. using wsgi mod for web
             # server
             if "python" in os.path.basename(sys.executable):
-                self.__interpreter_path = sys.executable
+                self._interpreter_path = sys.executable
             # second try sys.prefix and common executable names
             else:
                 possible_path = os.path.join(sys.prefix, "python.exe")
                 if os.path.exists(possible_path):
-                    self.__interpreter_path = possible_path
+                    self._interpreter_path = possible_path
                 possible_path = os.path.join(sys.prefix, "bin", "python")
                 if os.path.exists(possible_path):
-                    self.__interpreter_path = possible_path
+                    self._interpreter_path = possible_path
             # other options to consider:
             # look at some library paths, such as os.__file__, use system path to find python
             # executable that uses that library use shell and let it find python. Ex. which python
-        return self.__interpreter_path
+        return self._interpreter_path
 
     def error(self, message):
         """
@@ -278,7 +278,7 @@ class Reporter(object):
         """
         Record a debug message
         """
-        if not self.__disabledebug:
+        if not self._disable_debug:
             self.add_metadata("debug", message)
 
     def _add_metatadata_listofstrings(self, key, value):
@@ -294,7 +294,7 @@ class Reporter(object):
             return
 
         if key == "filepath":
-            # use ntpath instead of os.path so we are consistant across platforms. ntpath
+            # use ntpath instead of os.path so we are consistent across platforms. ntpath
             # should work for both windows and unix paths. os.path works for the platform
             # you are running on, not necessarily what the malware was written for.
             # Ex. when running mwcp on linux to process windows
@@ -321,7 +321,7 @@ class Reporter(object):
 
         if key == "ssl_cer_sha1":
             if not self.SHA1_RE.match(value):
-                self.debug("Invalid SHA1 hash found: {!r}".format(value))
+                self.error("Invalid SHA1 hash found: {!r}".format(value))
 
         if key in ("url", "c2_url"):
             # http://[fe80::20c:1234:5678:9abc]:80/badness
@@ -329,7 +329,7 @@ class Reporter(object):
             # ftp://127.0.0.1/really/bad?hostname=pwned
             match = self.URL_RE.search(value)
             if not match:
-                self.debug("Error parsing as url: %s" % value)
+                self.error("Error parsing as url: %s" % value)
                 return
 
             if match.group("path"):
@@ -340,7 +340,7 @@ class Reporter(object):
                 if address.startswith("["):
                     # ipv6--something like
                     # [fe80::20c:1234:5678:9abc]:80
-                    domain, found, port = address[1:].parition(']:')
+                    domain, found, port = address[1:].partition(']:')
                 else:
                     domain, found, port = address.partition(":")
 
@@ -351,7 +351,7 @@ class Reporter(object):
                         else:
                             self.add_metadata("socketaddress", [domain, port, "tcp"])
                     else:
-                        self.debug("Invalid URL {!r} found ':' at end without a port.".format(address))
+                        self.error("Invalid URL {!r} found ':' at end without a port.".format(address))
                 else:
                     if key == "c2_url":
                         self.add_metadata("c2_address", address)
@@ -359,8 +359,6 @@ class Reporter(object):
                         self.add_metadata("address", address)
 
     def _add_metadata_listofstringtuples(self, key, values):
-        values = map(convert_to_unicode, values)
-
         # Pad values that allow for shorter versions.
         expected_size = {
             'proxy': 5,
@@ -368,6 +366,8 @@ class Reporter(object):
         }
         if key in expected_size:
             values = tuple(values) + ('',) * (expected_size[key] - len(values))
+
+        values = list(map(convert_to_unicode, values))
 
         obj = self.metadata.setdefault(key, [])
         if self._disable_value_dedup or values not in obj:
@@ -504,7 +504,7 @@ class Reporter(object):
             if fieldtype == "dictofstrings":
                 self._add_metadata_dictofstrings(keyu, value)
         except Exception:
-            self.debug("Error adding metadata for key: %s\n%s" %
+            self.error("Error adding metadata for key: %s\n%s" %
                        (keyu, traceback.format_exc()))
 
     def run_parser(self, name, file_path=None, data=b"", **kwargs):
@@ -518,7 +518,7 @@ class Reporter(object):
         self.__reset()
 
         if file_path:
-            with open(file_path, b'rb') as f:
+            with open(file_path, 'rb') as f:
                 self.input_file = mwcp.FileObject(
                     f.read(), self, file_name=os.path.basename(file_path), output_file=False)
                 self.input_file.file_path = file_path
@@ -563,13 +563,13 @@ class Reporter(object):
         self.outputfiles[filename] = {
             'data': data, 'description': description, 'md5': md5}
 
-        if self.__base64outputfiles:
+        if self._base64_output_files:
             self.add_metadata(
                 "outputfile", [basename, description, md5, base64.b64encode(data)])
         else:
             self.add_metadata("outputfile", [basename, description, md5])
 
-        if self.__disableoutputfiles:
+        if self._disable_output_files:
             return
 
         if self.__outputfile_prefix:
@@ -583,7 +583,7 @@ class Reporter(object):
             fullpath = os.path.join(self.__outputdir, basename)
 
         try:
-            with open(fullpath, b"wb") as f:
+            with open(fullpath, "wb") as f:
                 f.write(data)
             self.debug("outputfile: %s" % (fullpath))
             self.outputfiles[filename]['path'] = fullpath
@@ -596,7 +596,7 @@ class Reporter(object):
         load filename from filesystem and report using output_file
         """
         if os.path.isfile(filename):
-            with open(filename, b"rb") as f:
+            with open(filename, "rb") as f:
                 data = f.read()
             self.output_file(data, os.path.basename(filename), description)
         else:
@@ -627,22 +627,20 @@ class Reporter(object):
         """
         Output in human readable report format
         """
-        output = self.get_output_text()
-        print(output.encode('utf8'))
+        print(self.get_output_text())
 
     def get_printable_key_value(self, key, value):
         output = ""
         printkey = key
 
-        if isinstance(value, str):
-            output += "{:20} {}\n".format(printkey, value)
+        if isinstance(value, (str, bytes)):
+            output += "{:20} {}\n".format(printkey, convert_to_unicode(value))
         else:
             for item in value:
-                if isinstance(item, str):
-                    output += "{:20} {}\n".format(printkey, item)
+                if isinstance(item, (str, bytes)):
+                    output += "{:20} {}\n".format(printkey, convert_to_unicode(item))
                 else:
-                    output += "{:20} {}\n".format(printkey,
-                                                   self.format_list(item, key=key))
+                    output += "{:20} {}\n".format(printkey, self.format_list(item, key=key))
                 printkey = ""
 
         return output
@@ -708,7 +706,7 @@ class Reporter(object):
         try:
             yield
         finally:
-            if not self.__disabledebug:
+            if not self._disable_debug:
                 for line in debug_stdout.getvalue().splitlines():
                     self.debug(line)
             sys.stdout = orig_stdout
@@ -719,7 +717,7 @@ class Reporter(object):
 
         Goal is to make the reporter safe to use for multiple run_parser instances
         """
-        self.__managed_tempdir = ''
+        self.__managed_tempdir = None
         self.input_file = None
         self._handle = None
 
@@ -731,7 +729,7 @@ class Reporter(object):
         """
         Cleanup things
         """
-        if not self.__disabletempcleanup:
+        if not self._disable_temp_cleanup:
             if self.__managed_tempdir:
                 try:
                     shutil.rmtree(self.__managed_tempdir, ignore_errors=True)
@@ -740,7 +738,7 @@ class Reporter(object):
                                (self.__managed_tempdir, str(e)))
                 self.__managed_tempdir = ''
 
-        self.__managed_tempdir = ''
+        self.__managed_tempdir = None
 
     def __del__(self):
         self.__cleanup()
