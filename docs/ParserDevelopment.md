@@ -43,20 +43,20 @@ All control is handled by the `mwcp.Reporter` object which can be accessed from 
 You can access the original input malware file using `input_file` attribute to access the file as an instance of a `mwcp.FileObject`.
 
 Add metadata using the `reporter.add_metadata(key, value)` function
-    - `key` is the file name of the metadata item. This should be one of the standardized fields reported in [mwcp/resources/fields.json](../mwcp/resources/fields.json). (Hint: Run `mwcp-tool -k` to get a list of all fields.
-    - `value` is the actual value to report.
-        - For a "listofstrings" type, this is simply the string to report.
-        - For a "listofstringtuples" type, this is a tuple or list.
-        - For a "dictofstrings" type, this is a dictionary with string values.
-    - Malware specific metadata that does not fit one of the standard fields can be added to the "other" field, passing in a dictionary containing the key:value pair for this custom metadata item.
-    - All strings provided to the add_metadata function should be either unicode objects or utf8 encoded strings. If string values cannot be decoded as utf-8, they will be replaced.
+- `key` is the field name of the metadata item. This should be one of the standardized fields reported in [mwcp/resources/fields.json](../mwcp/resources/fields.json). (Hint: Run `mwcp-tool -k` to get a list of all fields.
+- `value` is the actual value to report.
+   - For a "listofstrings" type, this is simply the string to report.
+   - For a "listofstringtuples" type, this is a tuple or list.
+   - For a "dictofstrings" type, this is a dictionary with string values.
+- Malware specific metadata that does not fit one of the standard fields can be added to the "other" field, passing in a dictionary containing the key:value pair for this custom metadata item.
+- All strings provided to the add_metadata function should be either unicode objects or utf8 encoded strings. If string values cannot be decoded as utf-8, they will be replaced.
 
 You can manually report output files that are of interest to the user using the `output_file()` function.
 
 The `managed_tempdir()` function can be used to access the temporary directory used by the reporter. You may use this to write out any files that need to be written to the filesystem. (e.g. to use an external utility)
-    - However, if you are trying to temporarily write out the malware file to get a path, it is recommend to call
+However, if you are trying to temporarily write out the malware file to get a path, it is recommend to call
       `self.reporter.input_file.file_path` instead.
-    - Everything in this temporary directory will be deleted when the framework exits.
+Everything in this temporary directory will be deleted when the framework exits.
 
 #### Guidance on standardized fields
 
@@ -184,7 +184,7 @@ of the enstructured library.
 
 Our usual strategy is:
 1. Create a parser using the [dispatcher model](#DispatcherParserDevelopment.md).
-1. For each component, we create construct spec that defines how to retrieve and extract our wanted data.
+1. For each component, we create a construct spec that defines how to retrieve and extract our wanted data.
     - Our extra helper utilities ([mwcp.utils.construct](../mwcp/utils/construct/helpers.py)) contains a `construct.Regex` and `construct.PEPointer` constructs, that make it easy to find a particular pointer within the malware code and trace it to the referenced data.
 1. If the construct spec has some validation components (Regex, Const, OneOf, Check, etc.) the spec can also
 be used in the `identify()` function.

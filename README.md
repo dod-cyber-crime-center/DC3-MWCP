@@ -267,9 +267,9 @@ DC3-MWCP code updates are implemented to be backwards compatible.
 One exception to backwards compatibility is when new attributes are amended to previously existing
 fields. An example of this is the MD5 entry being amended to the 'outputfile' field. When attribute
 additions like this are made, it causes a backwards compatibility conflict with test cases. If
-`test.py` is being used to manage regression tests, the amended attributes can cause previously
+`mwcp-test` is being used to manage regression tests, the amended attributes can cause previously
 passing test cases to fail. To resolve this issue, work in an environment where parsers are in a known
-good state and run the command `test.py -ua` to update all test cases. The newly generated test
+good state and run the command `mwcp-test -ua` to update all test cases. The newly generated test
 cases will include the updated field values.
 
 ## Schema
@@ -277,7 +277,7 @@ cases will include the updated field values.
 One of the major goals of DC3-MWCP is to standardize output for malware configuration parsers, making the data
 from one parser comparable with that of other parsers. This is achieved by establishing a schema of
 standardized fields that represent the common malware attributes seen across malware families. To see the
-list of standardized fields and their definitions, see `tool.py -k` or mwcp/resources/fields.json.
+list of standardized fields and their definitions, see `mwcp-tool -k` or mwcp/resources/fields.json.
 
 It is acknowledged that a set of generic fields will often not be adequate to capture the nuances of
 individual malware families. To ensure that malware family specific attributes are appropriately captured
