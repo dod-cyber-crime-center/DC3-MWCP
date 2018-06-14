@@ -7,6 +7,7 @@ content to ease maintenance.
 from __future__ import unicode_literals
 
 # Python standard imports
+import binascii
 import codecs
 import pefile
 import hashlib
@@ -23,6 +24,8 @@ try:
 except ImportError:
     # Kordesii support is optional.
     kordesiireporter = None
+
+from mwcp.utils.stringutils import convert_to_unicode
 
 
 class UnableToParse(Exception):
@@ -72,13 +75,11 @@ class FileObject(object):
         use_supplied_fname = use_supplied_fname or not self.pe
 
         if file_name and use_supplied_fname:
-            self.file_name = file_name
+            self._file_name = file_name
         else:
-            self.file_name = pefileutils.obtain_original_filename(
-                def_stub or codecs.encode(self.md5, 'hex').decode('utf8'), pe=self.pe, reporter=reporter, use_arch=use_arch)
-
-        # Sanity check
-        assert self.file_name
+            self._file_name = pefileutils.obtain_original_filename(
+                def_stub or binascii.hexlify(self.md5).decode('utf8'), pe=self.pe, reporter=reporter, use_arch=use_arch)
+        self._file_name = convert_to_unicode(self._file_name)
 
     def __enter__(self):
         """
@@ -96,6 +97,18 @@ class FileObject(object):
 
     def __exit__(self, *args):
         self._open_file.close()
+
+    @property
+    def file_name(self):
+        return self._file_name
+
+    @file_name.setter
+    def file_name(self, value):
+        # If someone changes the name, record the rename.
+        value = convert_to_unicode(value)
+        if self._file_name != value:
+            self.reporter.debug('[*] Renamed {} to {}'.format(self._file_name, value))
+        self._file_name = value
 
     @property
     def parser_history(self):
@@ -169,12 +182,9 @@ class FileObject(object):
         """
         # Output file if we are allowed to and the file hasn't already been outputted.
         if self.output_file and not self._outputted_file:
-            # TODO: There is the chance that two unique files have the same filename, unfortunately the
-            # Reporter assumes all outputted filenames are unique, so there is nothing we can do.
-            if self.file_name not in self.reporter.outputfiles:
-                self.reporter.output_file(
-                    data=self.file_data, filename=self.file_name or '', description=self.description or '')
-                self._outputted_file = True
+            self.reporter.output_file(
+                data=self.file_data, filename=self.file_name or '', description=self.description or '')
+            self._outputted_file = True
 
     def run_kordesii_decoder(self, decoder_name):
         """
@@ -446,7 +456,7 @@ class Dispatcher(object):
 
                 except UnableToParse as exception:
                     self.reporter.debug(
-                        '[*] File {} was miss-identified as {}, due to: ({}) '
+                        '[*] File {} was misidentified as {}, due to: ({}) '
                         'Trying other parsers...'.format(file_object.file_name, parser_class.DESCRIPTION, exception))
                     continue
 

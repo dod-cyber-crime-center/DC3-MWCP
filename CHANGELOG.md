@@ -1,8 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+### Fixed
+- Reporter will now modify the output filename on a name collision.
+
 ## [1.3.0] - 2018-05-15
-## Added
+### Added
 - Added unit testing using tox and pytest.
 
 ### Changed

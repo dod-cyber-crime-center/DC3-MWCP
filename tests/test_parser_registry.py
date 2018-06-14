@@ -18,7 +18,7 @@ def test_register_parser_directory(monkeypatch, test_parser):
     parsers = list(mwcp.iter_parsers('test_parser'))
     assert len(parsers) == 1
 
-    # Test it was register properly
+    # Test it was registered properly
     name, source_name, klass = parsers[0]
     assert name == 'test_parser'
     assert source_name == os.path.dirname(test_parser)

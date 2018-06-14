@@ -483,16 +483,25 @@ class ResultComparer(object):
             if self.missing:
                 report += tab_1 + "Missing From New Results:\n"
                 for item in self.missing:
-                    report += tab_2 + "{}\n".format(item)
+                    report += tab_2 + "{}\n".format(convert_to_unicode(item))
             if self.unexpected:
                 report += tab_1 + "Unexpected New Results:\n"
                 for item in self.unexpected:
-                    report += tab_2 + "{}\n".format(item)
+                    report += tab_2 + "{}\n".format(convert_to_unicode(item))
 
             return report
 
-    def __str__(self):
+    def __bytes__(self):
         return self.get_report().encode('utf8')
+
+    def __unicode__(self):
+        return self.get_report()
+
+    def __str__(self):
+        if sys.version_info >= (3, 0):
+            return self.__unicode__()
+        else:
+            return self.__bytes__()
 
     def __repr__(self):
         return self.__str__()

@@ -49,7 +49,7 @@ Add metadata using the `reporter.add_metadata(key, value)` function
    - For a "listofstringtuples" type, this is a tuple or list.
    - For a "dictofstrings" type, this is a dictionary with string values.
 - Malware specific metadata that does not fit one of the standard fields can be added to the "other" field, passing in a dictionary containing the key:value pair for this custom metadata item.
-- All strings provided to the add_metadata function should be either unicode objects or utf8 encoded strings. If string values cannot be decoded as utf-8, they will be replaced.
+- All strings provided to the add_metadata function should either be a Unicode string or a UTF-8 encoded byte string. If a string contains characters that cannot be decoded as UTF-8, they will be replaced with the Unicode replacement character (�).
 
 You can manually report output files that are of interest to the user using the `output_file()` function.
 

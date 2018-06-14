@@ -558,8 +558,24 @@ class Reporter(object):
         :param str filename: filename (basename) of file
         :param str description: description of the file
         """
-        basename = os.path.basename(filename)
         md5 = hashlib.md5(data).hexdigest()
+
+        # TODO: Add filename sanitization.
+
+        # Rename file if we have a name collision.
+        num_char = 5
+        orig_filename = filename
+        while filename in self.outputfiles:
+            if md5 == self.outputfiles[filename]['md5']:
+                self.debug('[*] Ignoring duplicate output file: {}'.format(filename))
+                return
+            assert num_char <= 32  # We shouldn't get into an infinite loop due to the check above.
+            filename = orig_filename + '_' + md5[:num_char]
+            num_char += 1
+        if orig_filename != filename:
+            self.debug('[*] Renamed {} to {}'.format(orig_filename, filename))
+
+        basename = os.path.basename(filename)
         self.outputfiles[filename] = {
             'data': data, 'description': description, 'md5': md5}
 
@@ -585,10 +601,10 @@ class Reporter(object):
         try:
             with open(fullpath, "wb") as f:
                 f.write(data)
-            self.debug("outputfile: %s" % (fullpath))
+            self.debug("[*] Output file: %s" % (fullpath))
             self.outputfiles[filename]['path'] = fullpath
         except Exception as e:
-            self.debug("Failed to write output file: %s, %s" %
+            self.debug("[-] Failed to write output file: %s, %s" %
                        (fullpath, str(e)))
 
     def report_tempfile(self, filename, description=''):

@@ -10,6 +10,7 @@ import re
 import io
 import json
 import os
+import pytest
 import sys
 
 from mwcp.tools import tool
@@ -48,7 +49,7 @@ address              127.0.0.1
 ----Debug----
 
 size of inputfile is 23 bytes
-outputfile: fooconfigtest.txt
+[*] Output file: fooconfigtest.txt
 operating on inputfile [INPUT FILE PATH]
 
 ----Output Files----
@@ -81,7 +82,7 @@ address              127.0.0.1
 ----Debug----
 
 size of inputfile is 23 bytes
-outputfile: fooconfigtest.txt
+[*] Output file: fooconfigtest.txt
 operating on inputfile [INPUT FILE PATH]
 
 ----Output Files----
