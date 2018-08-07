@@ -1,2 +1,3 @@
 include *.md LICENSE.txt
 recursive-include mwcp/resources *.json *.txt
+recursive-include mwcp/config *.yml

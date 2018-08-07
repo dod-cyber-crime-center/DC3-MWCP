@@ -340,7 +340,7 @@ See mwcp/resources/fields.txt for additional explanation.
 MWCP comes with a few helper utilities (located in `mwcp.utils`) that may become useful for parsing malware files.
 
 - `pefileutils` - Provides helper functions for common routines done with the `pefile` library. (obtaining or checking for exports, imports, resources, sections, etc.)
-- `elffileutils` - Provides helper functions for common routines don ewith the `elftools` library. Provides a consistent interface similar to `pefileutils`.
+- `elffileutils` - Provides helper functions for common routines done with the `elftools` library. Provides a consistent interface similar to `pefileutils`.
 - `custombase64` - Provides functions for base64 encoding/decoding data with a custom alphabet.
 - `construct` - Provides extended functionality to the [construct](https://construct.readthedocs.io) library.
     - This library has replaced the `enstructured` library originally found in the resources directory.
