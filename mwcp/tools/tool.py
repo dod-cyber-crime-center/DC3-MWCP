@@ -386,7 +386,7 @@ def main(args=None):
 
         if args.csvwrite:
             csv_path = args.csvwrite
-            _write_csv(input_files, results, csv_path, args.base64outputfiles)
+            _write_csv(file_paths, results, csv_path, args.base64outputfiles)
             if not args.jsonoutput:
                 print('Wrote csv file: {}'.format(csv_path))
 

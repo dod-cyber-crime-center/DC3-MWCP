@@ -13,6 +13,18 @@ def test_file(tmpdir):
     return file_path
 
 
+@pytest.fixture
+def test_dir(tmpdir):
+    """Fixture for providing a test directory to pass to mwcp."""
+    directory = os.path.join(str(tmpdir), 'test_dir')
+    os.makedirs(directory)
+    for i in range(5):
+        file_path = os.path.join(directory, 'test_{}.txt'.format(i))
+        with open(file_path, 'wb') as f:
+            f.write(b"This is some test data!")
+    return directory
+
+
 TEST_PARSER = '''
 from mwcp import Parser
 

@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Reporter will now modify the output filename on a name collision.
+- Fixed bug with incorrect csv output formatting when input is a directory.
 
 ## [1.3.0] - 2018-05-15
 ### Added
