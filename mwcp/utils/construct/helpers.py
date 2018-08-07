@@ -3,7 +3,6 @@
 from __future__ import division
 
 import base64
-import operator
 import os
 import io
 import re
@@ -13,13 +12,14 @@ import uuid
 import datetime
 import time
 import zlib
+import warnings
 
 import construct
 from construct import *
 from construct.core import globalstringencoding, _write_stream, _read_stream, int2byte, byte2int, singleton
 from construct.lib import py3compat
 
-from mwcp.utils import custombase64, pefileutils
+from mwcp.utils import custombase64, elffileutils, pefileutils
 
 PY3 = sys.version_info.major == 3
 
@@ -28,9 +28,10 @@ PY3 = sys.version_info.major == 3
 # library here.
 __all__ = ['BYTE', 'WORD', 'DWORD', 'QWORD', 'ULONG', 'ULONGLONG', 'TerminatedString',
            'CString', 'String', 'String16', 'String32', 'MACAddressAdapter', 'MacAddress', 'IP4Address', 'SkipNull',
-           'HexString', 'Base64', 'ZLIB', 'UUID', 'PEPhysicalAddress', 'PEPointer', 'PEPointer64',
+           'HexString', 'Base64', 'ZLIB', 'UUID', 'ELFPointer', 'PEPhysicalAddress', 'PEPointer', 'PEPointer64',
            'Regex', 'find_constructs', 'Boolean', 'Delimited', 'Printable', 'DateTimeDateData', 'ErrorMessage',
-           'Compressed', 'Iter', 'DotNetUInt', 'DotNetNullString', 'DotNetSigToken', 'Backwards']
+           'Compressed', 'Iter', 'DotNetUInt', 'DotNetNullString', 'DotNetSigToken', 'Backwards', 'EpochTime',
+           'FocusLast']
 
 BYTE = Byte
 WORD = Int16ul
@@ -54,6 +55,16 @@ def pop(self, key, *default):
 
 
 Container.pop = pop
+
+
+def _get_param(context, name):
+    """Retrieves the parameter the user passed in initially to the context."""
+    while '_' in context:
+        context = context['_']
+    try:
+        return context[name]
+    except IndexError:
+        raise ValueError('Missing {} parameter.'.format(name))
 
 
 def chunk(seq, size):
@@ -207,6 +218,8 @@ class TerminatedString(construct.StringEncoded):
     __slots__ = ["encoding", "terminator"]
 
     def __init__(self, subcon, encoding=None, terminator='\x00'):
+        warnings.warn(
+            "TerminatedString is deprecated, please use Padded with CString instead.", DeprecationWarning)
         super(TerminatedString, self).__init__(subcon, encoding)
         if not isinstance(terminator, str):
             raise ValueError('Terminator must be str and not bytes.')
@@ -499,6 +512,21 @@ class DateTimeDateDataAdapter(Adapter):
 DateTimeDateData = DateTimeDateDataAdapter(Int64sl)
 
 
+# TODO: Implement _encode
+class _EpochTimeAdapter(construct.Adapter):
+    r"""
+    Adapter to convert time_t, EpochTime, to an isoformat
+
+    >>> _EpochTimeAdapter(construct.Int32ul).parse('\xff\x93\x37\x57')
+    '2016-05-14T17:09:19'
+    """
+    def _decode(self, obj, context):
+        return datetime.datetime.fromtimestamp(obj).isoformat()
+
+# Hide the adapter
+EpochTime = _EpochTimeAdapter(construct.Int32ul)
+
+
 class Base64(Adapter):
     r"""
     Adapter used to Base64 encoded/decode a value.
@@ -536,19 +564,10 @@ class Base64(Adapter):
         self.custom_alpha = custom_alpha
 
     def _encode(self, obj, context):
-        if self.custom_alpha:
-            return custombase64.b64encode(obj, self.custom_alpha)
-        else:
-            return base64.b64encode(obj)
+        return custombase64.b64encode(obj, alphabet=self.custom_alpha)
 
     def _decode(self, obj, context):
-        # try:
-        if self.custom_alpha:
-            return custombase64.b64decode(obj, self.custom_alpha)
-        else:
-            return base64.b64decode(obj)
-        # except TypeError as e:
-        #     raise ConstructError('[*] Error while Base64 decoding provided data: {}'.format(e))
+        return custombase64.b64decode(obj, alphabet=self.custom_alpha)
 
 
 class ZLIB(Adapter):
@@ -651,13 +670,29 @@ def UUID(le=True):
     return UUIDAdapter(Bytes(16), le=le)
 
 
-def _get_pe(context):
-    """Gets the PE the user passed in initially to the context."""
-    while '_' in context:
-        context = context['_']
-    if 'pe' not in context:
-        raise ValueError('Missing pe parameter.')
-    return context.pe
+def ELFPointer(mem_off, subcon, elf=None):
+    r"""
+    Pointer for ELF files. This works for both memory sizes.
+
+    NOTE: This only works for x86 instructions. For other architectures,
+    please see the "ELFPointer" within their respective submodules. (e.g. construct.ARM.ELFPointer)
+
+    spec.parse(file_data, pe=elf_object)
+
+    :param mem_off: an int or a function that represents the memory offset for the equivalent physical offset.
+    :param subcon: the subcon to use at the offset
+    :param elf: Optional elftools.ELFFile file object.
+        (if not supplied here, this must be supplied during parse()/build()
+    """
+    def _obtain_physical_offset(ctx):
+        _elf = elf or _get_param(ctx, 'elf')
+        _mem_off = mem_off(ctx) if callable(mem_off) else mem_off
+        phy_off = elffileutils.obtain_physical_offset(_mem_off, elf=_elf)
+        if phy_off is None:
+            raise ConstructError('Unable to decode virtual address')
+        return phy_off
+
+    return Pointer(_obtain_physical_offset, subcon)
 
 
 class PEPhysicalAddress(Adapter):
@@ -696,14 +731,14 @@ class PEPhysicalAddress(Adapter):
         self._pe = pe
 
     def _encode(self, obj, context):
-        pe = self._pe or _get_pe(context)
+        pe = self._pe or _get_param(context, 'pe')
         address = pefileutils.obtain_memory_offset(obj, pe=pe)
         if address is None:
             raise ConstructError('Unable to encode physical address.')
         return address
 
     def _decode(self, obj, context):
-        pe = self._pe or _get_pe(context)
+        pe = self._pe or _get_param(context, 'pe')
         address = pefileutils.obtain_physical_offset(obj, pe=pe)
         if address is None:
             raise ConstructError('Unable to decode virtual address.')
@@ -732,7 +767,7 @@ def PEPointer(mem_off, subcon, pe=None):
     :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
     """
     def _obtain_physical_offset(ctx):
-        _pe = pe or _get_pe(ctx)
+        _pe = pe or _get_param(ctx, 'pe')
         _mem_off = mem_off(ctx) if callable(mem_off) else mem_off
         phy_off = pefileutils.obtain_physical_offset(_mem_off, pe=_pe)
         if phy_off is None:
@@ -771,7 +806,7 @@ def PEPointer64(mem_off, inst_end, subcon, pe=None):
     :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
     """
     def _obtain_physical_offset(ctx):
-        _pe = pe or _get_pe(ctx)
+        _pe = pe or _get_param(ctx, 'pe')
         _mem_off = mem_off(ctx) if callable(mem_off) else mem_off
         _inst_end = inst_end(ctx) if callable(inst_end) else inst_end
         phy_off = pefileutils.obtain_physical_offset_x64(_mem_off, _inst_end, pe=_pe)
@@ -821,6 +856,31 @@ class Delimited(Construct):
     Container(first='Hello')(second=None)(third=1)
     >>> spec.parse(b'Hello\x00\x00||')
     Container(first='Hello')(second=None)(third=None)
+
+    delimiters may have a length > 1
+    >>> spec = Delimited(b'YOYO',
+    ...     'first' / CString(),
+    ...     'second' / Int32ul,
+    ...     # When using a Greedy construct, either all data till EOF or the next delimiter will be consumed.
+    ...     'third' / GreedyBytes,
+    ...     'fourth' / Byte
+    ... )
+    >>> spec.parse(b'Hello\x00\x00YOYO\x01\x00\x00\x00YOYOworld!!YO!!\x01\x02YOYO\xff')
+    Container(first='Hello')(second=1)(third='world!!YO!!\x01\x02')(fourth=255)
+    >>> spec.build(dict(first=b'Hello', second=1, third=b'world!!YO!!\x01\x02', fourth=255))
+    'Hello\x00YOYO\x01\x00\x00\x00YOYOworld!!YO!!\x01\x02YOYO\xff'
+
+    # TODO: Add support for using a single construct for parsing an unknown number of times
+    # (or within a min, max, or exact)
+    # (Perhaps call it "Split" to avoid overloading too much functionality.)
+    # e.g.
+    # >>> spec = Delimited(b'|', GreedyString())
+    # >>> spec.parse(b'hello|world')
+    # ['hello', 'world']
+    # >>> spec.parse(b'hello|world|hi|bob')
+    # ['hello', 'world', 'hi', 'bob']
+    # >>> spec.parse(b'hello')
+    # ['hello']
     """
 
     __slots__ = ['delimiter', 'subcons']
@@ -837,67 +897,84 @@ class Delimited(Construct):
         super(Delimited, self).__init__()
         self.delimiter = delimiter
         self.subcons = subcons
-        if not subcons:
-            raise ValueError('At least one subconstruct must be defined.')
+        if len(subcons) < 2:
+            raise ValueError('At least two subconstruct must be defined.')
+
+    def _find_delimiter(self, stream, delimiter):
+        """
+        Finds given delimiter in stream.
+
+        :returns: Stream offset for delimiter.
+        :raises ConstructError: If delimiter isn't found.
+        """
+        fallback = stream.tell()
+        try:
+            for byte in iter(lambda: stream.read(1), ''):
+                if delimiter[0] == byte:
+                    delimiter_offset = stream.seek(-1, os.SEEK_CUR)
+                    if stream.read(len(delimiter)) == delimiter:
+                        return delimiter_offset
+                    else:
+                        stream.seek(delimiter_offset + 1)
+            raise ConstructError('Unable to find delimiter: {}'.format(delimiter))
+        finally:
+            stream.seek(fallback)
+
+    def _parse_subcon(self, subcon, stream, obj, context, path):
+        """Parses and fills obj and context."""
+        subobj = subcon._parse(stream, context, path)
+        if subcon.flagembedded:
+            if subobj is not None:
+                obj.update(subobj.items())
+                context.update(subobj.items())
+        else:
+            if subcon.name is not None:
+                obj[subcon.name] = subobj
+                context[subcon.name] = subobj
 
     def _parse(self, stream, context, path):
         delimiter = self.delimiter(context) if callable(self.delimiter) else self.delimiter
-        if not isinstance(delimiter, bytes) or len(delimiter) != 1:
+        if not isinstance(delimiter, bytes) or not delimiter:
             raise ValueError('Invalid delimiter.')
 
         obj = Container()
         context = Container(_=context)
 
-        # Parse all by the last element.
+        # Parse all but the last element.
         for sc in self.subcons[:-1]:
             # Don't count probes as an element.
             if isinstance(sc, Probe):
                 sc._parse(stream, context, path)
                 continue
 
-            # Read bytes until we find delimiter.
-            start_offset = stream.tell()
-            data = []
-            for byte in iter(lambda: stream.read(1), ''):
-                if byte == delimiter:
-                    break
-                data.append(byte)
-            else:
-                raise ConstructError('Unable to find delimiter: {}'.format(delimiter))
+            delimiter_offset = self._find_delimiter(stream, delimiter)
 
-            sub_stream = io.BytesIO(b''.join(data))
-            orig_tell = sub_stream.tell
-            # Fake the tell() so that RawCopy and Tell still works.
-            # TODO: This is a little hacky, figure out a better way to preserve stream offsets but still allow
-            # the user to easily request all bytes between two delimiters.
-            sub_stream.tell = lambda: start_offset + orig_tell()
-            subobj = sc._parse(sub_stream, context, path)
-            if sc.flagembedded:
-                if subobj is not None:
-                    obj.update(subobj.items())
-                    context.update(subobj.items())
-            else:
-                if sc.name is not None:
-                    obj[sc.name] = subobj
-                    context[sc.name] = subobj
+            # Temporaily fake the read() so that we can force EOF before delimiter.
+            orig_read = stream.read
+            def new_read(size=None):
+                max_size = delimiter_offset - stream.tell()
+                if size is None:
+                    size = max_size
+                else:
+                    size = min(max_size, size)
+                return orig_read(size)
+            try:
+                stream.read = new_read
+                self._parse_subcon(sc, stream, obj, context, path)
+            finally:
+                stream.read = orig_read
+
+            # Align to after delimiter
+            stream.seek(delimiter_offset + len(delimiter))
 
         # Parse the last element.
-        sc = self.subcons[-1]
-        subobj = sc._parse(stream, context, path)
-        if sc.flagembedded:
-            if subobj is not None:
-                obj.update(subobj.items())
-                context.update(subobj.items())
-        else:
-            if sc.name is not None:
-                obj[sc.name] = subobj
-                context[sc.name] = subobj
+        self._parse_subcon(self.subcons[-1], stream, obj, context, path)
 
         return obj
 
     def _build(self, obj, stream, context, path):
         delimiter = self.delimiter(context) if callable(self.delimiter) else self.delimiter
-        if not isinstance(delimiter, bytes) or len(delimiter) != 1:
+        if not isinstance(delimiter, bytes) or not delimiter:
             raise ValueError('Invalid delimiter.')
 
         context = Container(_=context)
@@ -940,21 +1017,21 @@ class Regex(Construct):
     >>> regex = re.compile('\x01\x02(?P<size>.{4})\x03\x04(?P<path>[A-Za-z].*\x00)', re.DOTALL)
     >>> data = 'GARBAGE!\x01\x02\x0A\x00\x00\x00\x03\x04C:\Windows\x00MORE GARBAGE!'
     >>> Regex(regex, size=Int32ul, path=CString()).parse(data)
-    Container(size=10)(path='C:\\Windows')
+    Container(path='C:\\Windows')(size=10)
     >>> Regex(regex).parse(data)
-    Container(size='\n\x00\x00\x00')(path='C:\\Windows\x00')
+    Container(path='C:\\Windows\x00')(size='\n\x00\x00\x00')
     >>> Struct(
     ...     're' / Regex(regex, size=Int32ul, path=CString()),
     ...     'after_re' / Tell,
     ...     'garbage' / GreedyBytes
     ... ).parse(data)
-    Container(re=Container(size=10)(path='C:\\Windows'))(after_re=27L)(garbage='MORE GARBAGE!')
+    Container(re=Container(path='C:\\Windows')(size=10))(after_re=27L)(garbage='MORE GARBAGE!')
     >>> Struct(
     ...     Embedded(Regex(regex, size=Int32ul, path=CString())),
     ...     'after_re' / Tell,
     ...     'garbage' / GreedyBytes
     ... ).parse(data)
-    Container(size=10)(path='C:\\Windows')(after_re=27L)(garbage='MORE GARBAGE!')
+    Container(path='C:\\Windows')(size=10)(after_re=27L)(garbage='MORE GARBAGE!')
 
     You can use Regex as a trigger to find a particular piece of data before you start parsing.
     >>> Struct(
@@ -966,7 +1043,7 @@ class Regex(Construct):
     If no data is captured, the associated subcon will received a stream with the position set at the location
     of that captured group. Thus, allowing you to use it as an anchor point.
     >>> Regex('hello (?P<anchor>)world(?P<extra_data>.*)', anchor=Tell).parse('hello world!!!!')
-    Container(anchor=6L)(extra_data='!!!!')
+    Container(extra_data='!!!!')(anchor=6L)
 
     If no named capture groups are used, you can instead parse the entire matched string by supplying
     a subconstruct as a positional argument. (If no subcon is provided, the raw bytes are returned instead.
@@ -1033,9 +1110,10 @@ class Regex(Construct):
             raise ConstructError('regex did not match')
 
         try:
-            group_index = self.regex.groupindex
+            group_dict = match.groupdict()
+
             # If there are no named groups. Return parsed full match instead.
-            if not group_index:
+            if not group_dict:
                 if self.subcon:
                     sub_stream = io.BytesIO(match.group())
                     return self.subcon._parse(sub_stream, context, path)
@@ -1046,12 +1124,9 @@ class Regex(Construct):
             obj = Container()
             context = Container(_=context)
 
-            # Default to displaying matched data as pure bytes
-            # (inserted in the order they show up in the pattern)
-            for name, index in sorted(group_index.items(), key=operator.itemgetter(1)):
-                value = match.group(index)
-                obj[name] = value
-                context[name] = value
+            # Default to displaying matched data as pure bytes.
+            obj.update(group_dict)
+            context.update(group_dict)
 
             # Parse groups using supplied constructs.
             for name, subcon in self.group_subcons.items():
@@ -1293,11 +1368,12 @@ class _DotNetSigToken(Adapter):
 DotNetSigToken = _DotNetSigToken(DotNetUInt)
 
 
-def Backwards(subcon):
+class Backwards(Subconstruct):
     r"""
-    Adapter used to parse a given subconstruct backwards in the stream.
+    Subconstruct used to parse a given subconstruct backwards in the stream.
     This ia a macro for seeking backwards before parsing the construct.
-    (This will not work for subcons that don't have a valid sizeof)
+    (This will not work for subcons that don't have a valid sizeof.
+    Except for GreedyBytes and GreedyString)
 
     The stream will be left off at the start of the parsed result by design.
     Therefore, doing something like Int32ul >> Backwards(Int32ul) >> Int32ul will parse
@@ -1317,9 +1393,87 @@ def Backwards(subcon):
       ...
     SizeofError: cannot calculate size
         parsing -> name
+
+    However, GreedyBytes and GreedyString are allowed.
+    >>> spec = Struct(Seek(0, os.SEEK_END), 'name' / Backwards(String(9)), 'rest' / Backwards(GreedyBytes))
+    >>> spec.parse(b'A BUNCH OF JUNK DATA\x01\x00\x00\x00joe shmoe')
+    Container(name='joe shmoe')(rest='A BUNCH OF JUNK DATA\x01\x00\x00\x00')
+    >>> spec = Struct(Seek(0, os.SEEK_END), 'name' / Backwards(String(9)), 'rest' / Backwards(GreedyString(encoding='utf-16-le')))
+    >>> spec.parse(b'h\x00e\x00l\x00l\x00o\x00joe shmoe')
+    Container(name='joe shmoe')(rest=u'hello')
+
+    WARNING: This will also break if you read more data that is behind the current position.
+    >>> (Seek(0, os.SEEK_END) >> Backwards(String(10))).parse('yo')
+    Traceback (most recent call last):
+      ...
+    FieldError: could not read enough bytes, expected 10, found 2
     """
-    return construct.FocusedSeq(
-        1,
-        construct.Seek(lambda ctx: subcon.sizeof(ctx) * -1, os.SEEK_CUR),
-        construct.Peek(subcon)
-    )
+    __slots__ = ['greedy']
+
+    def __init__(self, subcon):
+        super(Backwards, self).__init__(subcon)
+        # GreedyBytes and GreedyString are allowed special cases.
+        self.greedy = self.subcon is GreedyBytes or (
+                isinstance(self.subcon, construct.StringEncoded) and self.subcon.subcon is GreedyBytes)
+
+    def _parse(self, stream, context, path):
+        # Seek back to start of subcon.
+        orig_pos = stream.tell()
+        if self.greedy:
+            start_pos = stream.seek(0)
+            size = orig_pos - start_pos
+            try:
+                sub_stream = io.BytesIO(_read_stream(stream, size))
+                return self.subcon._parse(sub_stream, context, path)
+            finally:
+                stream.seek(start_pos)
+        else:
+            size = self.subcon.sizeof(context)
+            start_pos = stream.seek(size * -1, os.SEEK_CUR)
+            # Determine if we fell off the front.
+            if orig_pos - start_pos < size:
+                raise FieldError("could not read enough bytes, expected %d, found %d" % (size, orig_pos - start_pos))
+            try:
+                return self.subcon._parse(stream, context, path)
+            finally:
+                stream.seek(start_pos)
+
+    def _build(self, obj, stream, context, path):
+        raise NotImplementedError('Building is not supported.')
+
+
+# Monkey patch RawCopy so that it can handle when we read the stream backwards.
+def _parse(self, stream, context, path):
+    offset1 = stream.tell()
+    obj = self.subcon._parse(stream, context, path)
+    offset2 = stream.tell()
+    # Swap if subcon read backwards.
+    if offset1 > offset2:
+        offset1, offset2 = offset2, offset1
+    fallback = stream.tell()
+    stream.seek(offset1)
+    data = _read_stream(stream, offset2-offset1)
+    stream.seek(fallback)
+    return Container(data=data, value=obj, offset1=offset1, offset2=offset2, length=(offset2-offset1))
+construct.RawCopy._parse = _parse
+
+
+def FocusLast(*subcons, **kw):
+    """
+    A helper for performing the common technique of using FocusedSeq to
+    parse a bunch of subconstructs and then grab the last element.
+
+    e.g.:
+        # Simplifies this:
+        construct.FocusedSeq(
+            'value',
+            're' / construct.Regex(.., offset=construct.Int32ul, size=construct.Byte),
+            'value' / construct.PEPointer(this.re.offset, construct.Bytes(this.re.size)
+        )
+        # To this:
+        construct.FocusLast(
+            're' / construct.Regex(.., offset=construct.Int32ul, size=construct.Byte),
+            construct.PEPointer(this.re.offset, construct.Bytes(this.re.size)
+        )
+    """
+    return FocusedSeq(len(subcons) - 1, *subcons, **kw)

@@ -5,15 +5,20 @@ All notable changes to this project will be documented in this file.
 ### Added
 - `elffileutils` helper utility that works similar to `pefileutils`, but for ELF files.
 - Timing statistics in `mwcp-test`
+- New `construct` helpers: `EpochTime`, `ELFPointer`, `FocusLast`
 
 ### Changed
 - Logging is now performed using Python's builtin `logging` module.
     - Please see the [README](README.md#logging) for more information.
 - Removed "_malwareconfigparser" suffix from example parsers.
+- Updated `custombase64` to also support standard alphabet.
+    - (Making it suitable as a drop-in replacement of `base64`)
+- Updated `construct` helpers: `Delimited`, `Backwards`
 
 ### Deprecated
 - Deprecated the use of `debug()` and `error()` functions in the Reporter class.
     - Parsers should use the ComponentParser's `logger` or create one at the top of your module.
+- Deprecated `TerminatedString` in `construct` helpers. (Please use Padded with CString instead.)
 
 ### Fixed
 - Reporter will now modify the output filename on a name collision.
