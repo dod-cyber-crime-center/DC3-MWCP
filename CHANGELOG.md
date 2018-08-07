@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+### Added
+- `elffileutils` helper utility that works similar to `pefileutils`, but for ELF files.
+- Timing statistics in `mwcp-test`
+
+### Changed
+- Logging is now performed using Python's builtin `logging` module.
+    - Please see the [README](README.md#logging) for more information.
+- Removed "_malwareconfigparser" suffix from example parsers.
+
+### Deprecated
+- Deprecated the use of `debug()` and `error()` functions in the Reporter class.
+    - Parsers should use the ComponentParser's `logger` or create one at the top of your module.
+
 ### Fixed
 - Reporter will now modify the output filename on a name collision.
 

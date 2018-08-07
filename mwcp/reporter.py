@@ -11,19 +11,21 @@ import base64
 import hashlib
 import json
 import ntpath
+import logging
 import os
-import pefile
 import re
 import shutil
 import sys
 import tempfile
-import traceback
 import warnings
-from io import BytesIO
 
 import mwcp
 from mwcp import resources
 from mwcp.utils.stringutils import convert_to_unicode
+from mwcp.utils import logutil
+
+
+logger = logging.getLogger(__name__)
 
 
 PY3 = sys.version_info > (3,)
@@ -43,6 +45,23 @@ STANDARD_FIELD_ORDER = ["c2_url", "c2_socketaddress", "c2_address",
                         "serviceimage", "servicedll", "injectionprocess",
                         "filepath", "directory", "filename",
                         "registrykeyvalue", "registrykey", "registryvalue", "key"]
+
+
+class ReporterLogHandler(logging.Handler):
+    """Custom logging handler used to keep backwards compatible with legacy logging mechanism."""
+
+    def __init__(self, reporter):
+        super(ReporterLogHandler, self).__init__()
+        self._reporter = reporter
+
+    def emit(self, record):
+        message = self.format(record)
+        if record.levelno >= logging.WARNING:
+            self._reporter.errors.append(message)
+        # Even though reporter uses the name "debug".. This really is an INFO level debug message.
+        # (Adding true DEBUG level messages would spam our console.)
+        elif record.levelno == logging.INFO:
+            self._reporter.add_metadata("debug", message)
 
 
 class Reporter(object):
@@ -97,7 +116,6 @@ class Reporter(object):
                  tempdir=None,
                  outputfile_prefix=None,
                  interpreter_path=None,
-                 disabledebug=False,
                  disableoutputfiles=False,
                  disabletempcleanup=False,
                  disableautosubfieldparsing=False,
@@ -117,7 +135,6 @@ class Reporter(object):
             sets prefix for output files written to outputdir. Special value "md5" causes prefix
             by md5 of the input file.
         :param str interpreter_path: overrides value returned by interpreter_path()
-        :param bool disabledebug: disable inclusion of debug messages in output
         :param bool disableoutputfiles: disable writing if files to filesystem
         :param bool disabletempcleanup: disable cleanup (deletion) of temp files
         :param bool disableautosubfieldparsing: disable parsing of metadata item of subfields
@@ -129,6 +146,7 @@ class Reporter(object):
         self.tempdir = tempdir or tempfile.gettempdir()
         self.outputfiles = {}
         self._handle = None
+        self._log_handler = None
         self.fields = {"debug": {"description": "debug", "type": "listofstrings"}}
         self.metadata = {}
         self.errors = []
@@ -153,7 +171,6 @@ class Reporter(object):
             mwcp.register_parser_directory(self.parserdir)
 
         self._interpreter_path = interpreter_path
-        self._disable_debug = disabledebug
         self._disable_output_files = disableoutputfiles
         self._disable_temp_cleanup = disabletempcleanup
         self._disable_auto_subfield_parsing = disableautosubfieldparsing
@@ -184,12 +201,38 @@ class Reporter(object):
 
         # we put resourcedir in PYTHONPATH in case we shell out or children
         # processes need this
-        # Windows environment variables must be byte strings.
-        if 'PYTHONPATH' in os.environ:
-            if resourcedir not in os.environ['PYTHONPATH']:
-                os.environ['PYTHONPATH'] = os.environ['PYTHONPATH'] + os.pathsep + resourcedir
+        # Windows environment variables must be ascii encoded byte strings.
+        if not isinstance(resourcedir, bytes):
+            resourcedir = resourcedir.encode('ascii')
+        if b'PYTHONPATH' in os.environ:
+            if resourcedir not in os.environ[b'PYTHONPATH']:
+                os.environ[b'PYTHONPATH'] = os.environ[b'PYTHONPATH'] + os.pathsep + resourcedir
         else:
-            os.environ['PYTHONPATH'] = resourcedir
+            os.environ[b'PYTHONPATH'] = resourcedir
+
+    @property
+    def data(self):
+        warnings.warn(
+            'data attribute has been deprecated, please access the data through input_file.file_data',
+            DeprecationWarning
+        )
+        return self.input_file.file_data
+
+    @property
+    def pe(self):
+        warnings.warn(
+            'pe attribute has been deprecated, please access the pe through input_file.pe',
+            DeprecationWarning
+        )
+        return self.input_file.pe
+
+    @property
+    def handle(self):
+        warnings.warn(
+            'handle attribute has been deprecated, please use input_file in a "with" context instead',
+            DeprecationWarning
+        )
+        return self._handle
 
     @property
     def data(self):
@@ -238,8 +281,7 @@ class Reporter(object):
                 dir=self.tempdir, prefix="mwcp-managed_tempdir-")
 
             if self._disable_temp_cleanup:
-                self.debug("Using managed temp dir: %s" %
-                           self.__managed_tempdir)
+                logger.info("Using managed temp dir: {}".format(self.__managed_tempdir))
 
         return self.__managed_tempdir
 
@@ -272,18 +314,22 @@ class Reporter(object):
         """
         Record an error message--typically only framework reports error and parsers report via debug
         """
-        self.errors.append(message)
+        warnings.warn('This function is deprecated. Please use Python\'s built in logging framework '
+                      'to log messages.', DeprecationWarning, 2)
+        logger.error(message)
 
     def debug(self, message):
         """
         Record a debug message
         """
-        if not self._disable_debug:
-            self.add_metadata("debug", message)
+        warnings.warn('This function is deprecated. Please use Python\'s built in logging framework '
+                      'to log messages.', DeprecationWarning, 2)
+        # Even though reporter uses the name "debug".. This really is an INFO level debug message.
+        logger.info(message)
 
     def _add_metatadata_listofstrings(self, key, value):
         if not value:
-            self.debug("no values provided for {}, skipping".format(key))
+            logger.error("no values provided for {}, skipping".format(key))
             return
         value = convert_to_unicode(value)
         obj = self.metadata.setdefault(key, [])
@@ -321,7 +367,7 @@ class Reporter(object):
 
         if key == "ssl_cer_sha1":
             if not self.SHA1_RE.match(value):
-                self.error("Invalid SHA1 hash found: {!r}".format(value))
+                logger.error("Invalid SHA1 hash found: {!r}".format(value))
 
         if key in ("url", "c2_url"):
             # http://[fe80::20c:1234:5678:9abc]:80/badness
@@ -329,7 +375,7 @@ class Reporter(object):
             # ftp://127.0.0.1/really/bad?hostname=pwned
             match = self.URL_RE.search(value)
             if not match:
-                self.error("Error parsing as url: %s" % value)
+                logger.error("Error parsing as url: %s" % value)
                 return
 
             if match.group("path"):
@@ -351,7 +397,7 @@ class Reporter(object):
                         else:
                             self.add_metadata("socketaddress", [domain, port, "tcp"])
                     else:
-                        self.error("Invalid URL {!r} found ':' at end without a port.".format(address))
+                        logger.error("Invalid URL {!r} found ':' at end without a port.".format(address))
                 else:
                     if key == "c2_url":
                         self.add_metadata("c2_address", address)
@@ -388,7 +434,7 @@ class Reporter(object):
                 if _value:
                     self.add_metadata(subfield, _value)
             if len(values) != len(subfields):
-                self.debug("Expected {} values in type {}, received {}".format(len(subfields), key, len(values)))
+                logger.error("Expected {} values in type {}, received {}".format(len(subfields), key, len(values)))
 
         # Special case validation.
         if key == "c2_socketaddress":
@@ -401,33 +447,33 @@ class Reporter(object):
 
         if key == "socketaddress":
             if len(values) != 3:
-                self.debug(
+                logger.error(
                     "Expected three values in type socketaddress, received %i" % len(values))
             self.add_metadata("address", values[0])
             self.add_metadata("port", values[1:])
 
         if key in ("port", "listenport"):
             if len(values) != 2:
-                self.debug("Expected two values in type %s, received %i" % (
+                logger.error("Expected two values in type %s, received %i" % (
                     key, len(values)))
             # check for integer number and valid proto?
             match = self.PORT_RE.search(values[0])
             if match:
                 portnum = int(values[0])
                 if portnum < 0 or portnum > 65535:
-                    self.debug(
+                    logger.error(
                         "Expected port to be number between 0 and 65535")
             else:
-                self.debug(
+                logger.error(
                     "Expected port to be number between 0 and 65535")
             if len(values) >= 2:
                 if values[1] not in ["tcp", "udp", "icmp"]:
-                    self.debug(
+                    logger.error(
                         "Expected port type to be tcp or udp (or icmp)")
 
         if key == "proxy":
             if len(values) != 5:
-                self.debug("Expected 5 values in type %s, received %i" % (key, len(values)))
+                logger.error("Expected 5 values in type %s, received %i" % (key, len(values)))
             self.add_metadata("credential", values[:2])
             if len(values[2:]) == 1:
                 self.add_metadata("proxy_address", values[2])
@@ -436,18 +482,18 @@ class Reporter(object):
 
         if key == "ftp":
             if len(values) != 3:
-                self.debug("Expected 3 values in type %s, received %i" % (key, len(values)))
+                logger.error("Expected 3 values in type %s, received %i" % (key, len(values)))
             self.add_metadata("credential", values[:2])
             if len(values) >= 3:
                 self.add_metadata("url", values[2])
 
         if key == "rsa_public_key":
             if len(values) != 2:
-                self.debug("Expected 3 values in type %s, received %i" % (key, len(values)))
+                logger.error("Expected 3 values in type %s, received %i" % (key, len(values)))
 
         if key == "rsa_private_key":
             if len(values) != 8:
-                self.debug("Expected 8 values in type %s, received %i" % (key, len(values)))
+                logger.error("Expected 8 values in type %s, received %i" % (key, len(values)))
 
     def _add_metadata_dictofstrings(self, key, value):
         # check for type of other?
@@ -470,7 +516,7 @@ class Reporter(object):
                     obj[subkey] = subvalue
             else:
                 # TODO: support inserts of lists (assuming members are strings)?
-                self.debug("Could not add object of %s to metadata under other using key %s" % (
+                logger.error("Could not add object of %s to metadata under other using key %s" % (
                     str(type(subvalue[subkey])), subkey))
 
     def add_metadata(self, key, value):
@@ -486,7 +532,7 @@ class Reporter(object):
         """
         keyu = convert_to_unicode(key)
         if not value or all(not _value for _value in value):
-            self.debug("no values provided for %s, skipping" % key)
+            logger.warn("no values provided for %s, skipping" % key)
             return
 
         if keyu not in self.fields:
@@ -504,8 +550,7 @@ class Reporter(object):
             if fieldtype == "dictofstrings":
                 self._add_metadata_dictofstrings(keyu, value)
         except Exception:
-            self.error("Error adding metadata for key: %s\n%s" %
-                       (keyu, traceback.format_exc()))
+            logger.exception("Error adding metadata for key: {}".format(keyu))
 
     def run_parser(self, name, file_path=None, data=b"", **kwargs):
         """
@@ -540,11 +585,11 @@ class Reporter(object):
                                 identifier = file_path
                             else:
                                 identifier = hashlib.md5(data).hexdigest()
-                            self.error("Error running parser {}:{} on {}: {}".format(
-                                source, parser_name, identifier, traceback.format_exc()))
+                            logger.exception("Error running parser {}:{} on {}".format(
+                                source, parser_name, identifier))
 
                 if not found:
-                    self.error('Could not find parsers with name: {}'.format(name))
+                    logger.error('Could not find parsers with name: {}'.format(name))
         finally:
             self.__cleanup()
 
@@ -567,13 +612,13 @@ class Reporter(object):
         orig_filename = filename
         while filename in self.outputfiles:
             if md5 == self.outputfiles[filename]['md5']:
-                self.debug('[*] Ignoring duplicate output file: {}'.format(filename))
+                logger.info('Ignoring duplicate output file: {}'.format(filename))
                 return
             assert num_char <= 32  # We shouldn't get into an infinite loop due to the check above.
             filename = orig_filename + '_' + md5[:num_char]
             num_char += 1
         if orig_filename != filename:
-            self.debug('[*] Renamed {} to {}'.format(orig_filename, filename))
+            logger.info('Renamed {} to {}'.format(orig_filename, filename))
 
         basename = os.path.basename(filename)
         self.outputfiles[filename] = {
@@ -601,11 +646,10 @@ class Reporter(object):
         try:
             with open(fullpath, "wb") as f:
                 f.write(data)
-            self.debug("[*] Output file: %s" % (fullpath))
+            logger.info("Output file: %s" % (fullpath))
             self.outputfiles[filename]['path'] = fullpath
         except Exception as e:
-            self.debug("[-] Failed to write output file: %s, %s" %
-                       (fullpath, str(e)))
+            logger.error("Failed to write output file: %s, %s" % (fullpath, str(e)))
 
     def report_tempfile(self, filename, description=''):
         """
@@ -616,7 +660,7 @@ class Reporter(object):
                 data = f.read()
             self.output_file(data, os.path.basename(filename), description)
         else:
-            self.debug(
+            logger.info(
                 "Could not output file because it could not be found: %s" % filename)
 
     def format_list(self, values, key=None):
@@ -715,16 +759,15 @@ class Reporter(object):
 
     @contextlib.contextmanager
     def __redirect_stdout(self):
-        """Redirects stdout temporarily to self.debug."""
-        debug_stdout = BytesIO()
+        """Redirects stdout temporarily to the logger."""
+        class _LogWriter(object):
+            def write(self, message):
+                logger.info(message)
         orig_stdout = sys.stdout
-        sys.stdout = debug_stdout
+        sys.stdout = _LogWriter()
         try:
             yield
         finally:
-            if not self._disable_debug:
-                for line in debug_stdout.getvalue().splitlines():
-                    self.debug(line)
             sys.stdout = orig_stdout
 
     def __reset(self):
@@ -741,16 +784,31 @@ class Reporter(object):
         self.outputfiles = {}
         self.errors = []
 
+        # To keep backwards compatibility, setup log handler to add errors and debug messages to reporter.
+        # TODO: Remove this when the Reporter object should no longer be responsible for logging.
+        log_handler = ReporterLogHandler(self)
+        logging.root.addHandler(log_handler)
+        # Setup a simple format that doesn't contain any runtime variables.
+        log_handler.addFilter(logutil.LevelCharFilter())
+        log_handler.setFormatter(logging.Formatter("[%(level_char)s] %(message)s"))
+        self._log_handler = log_handler
+
     def __cleanup(self):
         """
         Cleanup things
         """
+        # Remove log handler.
+        if self._log_handler:
+            logging.root.removeHandler(self._log_handler)
+            self._log_handler = None
+
+        # Delete temporary directory.
         if not self._disable_temp_cleanup:
             if self.__managed_tempdir:
                 try:
                     shutil.rmtree(self.__managed_tempdir, ignore_errors=True)
                 except Exception as e:
-                    self.debug("Failed to purge temp dir: %s, %s" %
+                    logger.error("Failed to purge temp dir: %s, %s" %
                                (self.__managed_tempdir, str(e)))
                 self.__managed_tempdir = ''
 

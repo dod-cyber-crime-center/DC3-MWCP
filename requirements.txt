@@ -1,8 +1,10 @@
 bottle
 construct==2.8.12
+elftools==0.24
 kordesii==1.1.0
 future
 jinja2==2.10
 pefile
+pyyaml==3.12
 requests
 six

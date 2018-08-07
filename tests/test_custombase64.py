@@ -7,8 +7,8 @@ from mwcp.utils import custombase64
 
 def test_base64():
     custom_alphabet = b'EFGHQRSTUVWefghijklmnopIJKLMNOPABCDqrstuvwxyXYZabcdz0123456789+/='
-    assert custombase64.encode(b'hello world', custom_alphabet) == b'LSoXMS8BO29dMSj='
-    assert custombase64.decode(b'LSoXMS8BO29dMSj=', custom_alphabet) == b'hello world'
+    assert custombase64.b64encode(b'hello world', custom_alphabet) == b'LSoXMS8BO29dMSj='
+    assert custombase64.b64decode(b'LSoXMS8BO29dMSj=', custom_alphabet) == b'hello world'
 
 
 def test_base32():

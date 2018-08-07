@@ -260,6 +260,50 @@ for filename in reporter.outputfiles:
 ```
 
 
+## Logging
+DC3-MWCP uses Python's builtin in `logging` module to log all messages.
+By default, logging is configured using the [log_config.yml](mwcp/config/log_config.yml) configuration
+file. Which is currently set to log messages to the console as well as create a `errors.log` file in
+the current directory. You can provide your own custom log configuration file by adding a path
+to the environment variable `MWCP_LOG_CFG`. (Please see [Python's documentation](http://docs.python.org/dev/library/logging.config.html) for more information on how to write your own configuration file.)
+
+You may also use the `--no-debug` or `--debug` flags in `mwcp-tool` or `-v`/`-vv` in `mwcp-test` to adjust the logging level.
+
+When writing a parser, please create a module level logger or use the `logger` variable provided by
+the ComponentParser class. *(Using the ComponentParser's `logger` will ensure the component's name is added to the log message.)*
+
+e.g.
+```python
+import logging
+
+from mwcp import Parser, ComponentParser
+
+logger = logging.getLogger(__name__)
+
+
+# ...
+
+def some_module_level_function():
+    logger.info('Doing this thing.')
+    return True
+
+# ...
+
+class BarImplant(ComponentParser):
+    # ...
+
+    def run(self):
+        """Extracts config and embedded Implant files."""
+        success = some_module_level_function()
+        if not success:
+            self.logger.error('Uhoh! The thing did not work!')
+            return
+
+        self.logger.info('Processing the thing.')
+        # ...
+
+```
+
 ## Updates
 
 DC3-MWCP code updates are implemented to be backwards compatible.
@@ -295,7 +339,8 @@ See mwcp/resources/fields.txt for additional explanation.
 ## Helper Utilities
 MWCP comes with a few helper utilities (located in `mwcp.utils`) that may become useful for parsing malware files.
 
-- `pefileutils` - Provides helper functions for common routines done with the pefile library. (obtaining or checking for exports, imports, resources, sections, etc.)
+- `pefileutils` - Provides helper functions for common routines done with the `pefile` library. (obtaining or checking for exports, imports, resources, sections, etc.)
+- `elffileutils` - Provides helper functions for common routines don ewith the `elftools` library. Provides a consistent interface similar to `pefileutils`.
 - `custombase64` - Provides functions for base64 encoding/decoding data with a custom alphabet.
 - `construct` - Provides extended functionality to the [construct](https://construct.readthedocs.io) library.
     - This library has replaced the `enstructured` library originally found in the resources directory.

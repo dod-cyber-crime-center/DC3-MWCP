@@ -3,14 +3,17 @@
 """
 DC3-MWCP Framework test case tool
 """
-from __future__ import print_function
+from __future__ import print_function, division
 
 # Standard imports
 import argparse
+import datetime
+import logging
 import os
 import sys
-
 # pkg_resources is optional, to keep backwards compatibility.
+import timeit
+
 try:
     import pkg_resources
 except ImportError:
@@ -21,6 +24,25 @@ import mwcp
 from mwcp.tester import DEFAULT_EXCLUDE_FIELDS
 # DC3-MWCP framework imports
 from mwcp.tester import Tester
+
+
+def _median(data):
+    """
+    'Borrowed' from Py3's statistics library.
+
+    :param data: Data to get median of
+    :return: Median as a float or int
+    :rtype: float or int
+    """
+    data = sorted(data)
+    length = len(data)
+    if length == 0:
+        raise ValueError('No median for empty data.')
+    elif length % 2 == 1:
+        return data[length // 2]
+    else:
+        i = length // 2
+        return (data[i - 1] + data[i]) / 2
 
 
 def get_arg_parser():
@@ -71,7 +93,7 @@ $ mwcp-test -p parser -i file_paths_file -d     Delete test cases for a parser
                         dest="field_names",
                         default="",
                         help="Fields (csv) to compare results for. Reference 'fields.json'. " +
-                        "Ex. socketaddress,registrykey")
+                             "Ex. socketaddress,registrykey")
     parser.add_argument("-x",
                         type=str,
                         dest="exclude_field_names",
@@ -82,6 +104,11 @@ $ mwcp-test -p parser -i file_paths_file -d     Delete test cases for a parser
                         dest="all_tests",
                         action="store_true",
                         help="select all available parsers, used with -t to test all parsers")
+    parser.add_argument("-n",
+                        type=int,
+                        dest="nprocs",
+                        default=None,
+                        help="Number of test cases to run simultaneously. Default: 3/4 * logical CPU cores.")
 
     # Arguments used to generate and update test cases
     parser.add_argument("-i",
@@ -116,6 +143,11 @@ $ mwcp-test -p parser -i file_paths_file -d     Delete test cases for a parser
                         action="store_true",
                         dest="silent",
                         help="Limit output to statement saying whether all tests passed or not.")
+    parser.add_argument("-v", "--verbose",
+                        default=0,
+                        action="count",
+                        dest="verbose",
+                        help="Level of log messages to display. 1 for INFO, 2 for DEBUG")
 
     return parser
 
@@ -128,6 +160,10 @@ def main():
     # Get command line arguments
     argparser = get_arg_parser()
     args, input_files = argparser.parse_known_args()
+
+    # Setup logging
+    mwcp.setup_logging()
+    logging.root.setLevel(logging.WARNING - (args.verbose * 10))
 
     if args.all_tests or not args.parser_name:
         parsers = [None]
@@ -149,31 +185,70 @@ def main():
     if args.run_tests:
         print("Running test cases. May take a while...")
 
-        # Run tests
-        test_results = tester.run_tests(parsers, list(filter(None, args.field_names.split(","))),
-                                        ignore_field_names=list(filter(None, args.exclude_field_names.split(","))))
-
-        # Determine if any test cases failed
+        start_time = timeit.default_timer()
+        test_infos = []
+        test_results = []
+        # json_list = []
         all_passed = True
-        if any([not test_result.passed for test_result in test_results]):
-            all_passed = False
-        print("All Passed = {0}\n".format(all_passed))
+
+        test_iter = tester.run_tests(
+            parsers,
+            list(filter(None, args.field_names.split(","))),
+            ignore_field_names=list(filter(None, args.exclude_field_names.split(","))),
+            nprocs=args.nprocs
+        )
+
+        for test_result, test_info in test_iter:
+            test_infos.append(test_info)
+            test_results.append(test_result)
+            all_passed &= test_result.passed
+
+            if not args.silent:
+                # Skip print() to immediately flush stdout buffer (issue in Docker containers)
+                sys.stdout.write(
+                    "{finished}/{total} - {parser} {filename} {run_time:.4f}s\n".format(**test_info)
+                )
+                sys.stdout.flush()
+                if args.only_failed_tests:
+                    tester.print_test_results(
+                        test_results,
+                        failed_tests=True,
+                        passed_tests=False,
+                        json_format=args.json)
+                else:
+                    tester.print_test_results(
+                        test_results,
+                        failed_tests=True,
+                        passed_tests=True,
+                        json_format=args.json)
+
+        end_time = timeit.default_timer()
 
         if not args.silent:
-            if args.only_failed_tests:
-                tester.print_test_results(test_results,
-                                          failed_tests=True,
-                                          passed_tests=False,
-                                          json_format=args.json)
-            else:
-                tester.print_test_results(test_results,
-                                          failed_tests=True,
-                                          passed_tests=True,
-                                          json_format=args.json)
-        if all_passed:
-            sys.exit(0)
-        else:
-            sys.exit(1)
+            print('\nTest stats:')
+            print('\nTop 10 Slowest Test Cases:')
+            # Cases sorted slowest first
+            sorted_cases = sorted(test_infos, key=lambda x: x['run_time'], reverse=True)
+            for i, info in enumerate(sorted_cases[:10]):
+                print('{:2}. {} {} {:.4f}s'.format(i + 1, info['parser'], info['filename'], info['run_time']))
+
+            print('\nTop 10 Fastest Test Cases:')
+            for i, info in enumerate(list(reversed(sorted_cases))[:10]):
+                print('{:2}. {} {} {:.4f}s'.format(i + 1, info['parser'], info['filename'], info['run_time']))
+
+            run_times = [info['run_time'] for info in test_infos]
+            print('\nMean Running Time: {:.4f}s'.format(
+                sum(run_times) / len(test_infos)
+            ))
+            print('Median Running Time: {:.4f}s'.format(
+                _median(run_times)
+            ))
+            print('Cumulative Running Time: {}'.format(datetime.timedelta(seconds=sum(run_times))))
+            print()
+
+        print("Total Running Time: {}".format(datetime.timedelta(seconds=end_time - start_time)))
+        print("All Passed = {0}\n".format(all_passed))
+        exit(0 if all_passed else 1)
 
     # Delete files from test cases
     elif args.delete:
@@ -185,6 +260,7 @@ def main():
 
     # Update previously existing test cases
     elif args.update and args.parser_name:
+        logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
         print("Updating test cases. May take a while...")
         results_file_path = tester.get_results_filepath(args.parser_name)
         if os.path.isfile(results_file_path):
@@ -209,6 +285,7 @@ def main():
 
     # Add/update test cases for specified input files and specified parser
     elif args.parser_name and not args.delete and input_files:
+        logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
         results_file_path = tester.get_results_filepath(args.parser_name)
         for input_file in input_files:
             metadata = tester.gen_results(

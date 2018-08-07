@@ -3,19 +3,23 @@ Test case support for DC3-MWCP. Parser output is stored in a json file per parse
 parser is re-run and compared to previous results.
 """
 from __future__ import print_function, unicode_literals
-from future.builtins import open, str
 
 # Standard imports
-import itertools
 import json
 import multiprocessing as mp
-import locale
+import logging
 import os
 import sys
 import traceback
+from timeit import default_timer
+
+from future.builtins import open, str
+
+logger = logging.getLogger(__name__)
 
 import mwcp
 from mwcp.utils.stringutils import convert_to_unicode
+from mwcp.utils import multi_proc
 
 try:
     import pkg_resources
@@ -24,7 +28,6 @@ except ImportError:
 
 DEFAULT_EXCLUDE_FIELDS = ["debug"]
 
-
 # Setting encoding to utf8 is a hotfix for a larger issue
 encode_params = {
     'encoding': 'utf8',
@@ -32,14 +35,18 @@ encode_params = {
 }
 
 
-def multiproc_test_wrapper(tester_instance, *args):
+def multiproc_test_wrapper(args):
     """Wrapper function for running tests in multiple processes."""
-    return tester_instance.get_test_results(*args)
+    tester_instance = args[0]
+    try:
+        return tester_instance.async_test(*args[1:])
+    except KeyboardInterrupt:
+        return
 
 
 class Tester(object):
     """DC3-MWCP test case class"""
-    
+
     # Constants
     INPUT_FILE_PATH = "inputfilename"
     FILE_EXTENSION = ".json"
@@ -65,7 +72,7 @@ class Tester(object):
         try:
             self.reporter.run_parser(parser_name, input_file_path)
         except Exception:
-            self.reporter.error(traceback.print_exc())
+            logger.exception('Failed to generate results.')
 
         self.reporter.metadata[self.INPUT_FILE_PATH] = convert_to_unicode(input_file_path)
 
@@ -175,7 +182,7 @@ class Tester(object):
 
         return removed_files
 
-    def run_tests(self, parser_names=None, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
+    def run_tests(self, parser_names=None, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS, nprocs=None):
         """
 
         Run tests and compare produced results to expected results.
@@ -215,32 +222,76 @@ class Tester(object):
                 print("Parser not found for: {}".format(parser_name).encode(**encode_params))
 
         cores = mp.cpu_count()
+        procs = nprocs or (3 * cores) // 4
+        pool = multi_proc.TPool(
+            processes=procs, initializer=mwcp.register_parser_directory,
+            initargs=(self.reporter.parserdir,))
 
-        if len(test_case_file_paths) == 1:
-            parser_name, results_file_path = test_case_file_paths[0]
-            res_list = [self.get_test_results(parser_name, results_file_path, field_names, ignore_field_names)]
-        else:
-            # Use at most 3/4 of available logical cores.
-            # Adjust fraction as needed.
-            procs = (3 * cores) // 4
+        tests = []
+        # Just for nicer formatting...
+        parser_len = 0
+        filename_len = 0
+        # Parse test case/results files, run tests, and compare expected results to produced results
+        for parser_name, results_file_path in test_case_file_paths:
+            results_data = self.parse_results_file(results_file_path)
 
-            # When creating multiprocessing pool we need to re-register the parser_directory because
-            # global variables don't stick with Windows processes.
-            pool = mp.Pool(processes=procs,
-                           initializer=mwcp.register_parser_directory,
-                           initargs=(self.reporter.parserdir,))
+            for result_data in results_data:
+                parser_len = max(parser_len, len(os.path.basename(parser_name)))
+                filename_len = max(filename_len, len(os.path.basename(result_data[self.INPUT_FILE_PATH])))
+                tests.append((self, result_data, parser_name, field_names, ignore_field_names))
 
-            # Feed each parser's test case(s) into the process pool.
-            multi_res = []
-            for parser_name, results_file_path in test_case_file_paths:
-                multi_res.append(pool.apply_async(
-                    multiproc_test_wrapper, (self, parser_name, results_file_path, field_names, ignore_field_names)))
+        # While the tests will start in the order they were added, they will be yielded roughly in the
+        # order they complete.
+        test_iter = pool.imap_unordered(multiproc_test_wrapper, tests)
+        pool.close()
 
-            # Very generous 1 hour timeout for each job.
-            res_list = [res.get(timeout=3600) for res in multi_res]
+        finished_tests = 0
+        digits = len(str(len(tests)))
 
-        # Flatten the list of lists and return
-        return list(itertools.chain.from_iterable(res_list))
+        try:
+            for results in test_iter:
+                # Add an info dict to the returned results
+                # Built with formatting here since we have knowledge of all test cases
+                finished_tests += 1
+                test_info = {
+                    'finished': str(finished_tests).zfill(digits),
+                    'total': str(len(tests)).zfill(digits),
+                    'parser': os.path.basename(results.parser).ljust(parser_len),
+                    'filename': os.path.basename(results.input_file_path).ljust(filename_len),
+                    'run_time': results.run_time
+                }
+                yield results, test_info
+        except KeyboardInterrupt:
+            pool.terminate()
+            raise
+
+    def async_test(self, result_data, parser_name, field_names, ignore_field_names):
+        """Test running logic, separated into its own function for multi-processing purposes."""
+        start_time = default_timer()
+        input_file_path = result_data[self.INPUT_FILE_PATH]
+        new_results = self.gen_results(parser_name, input_file_path)
+        comparer_results = self.compare_results(
+            result_data,
+            new_results,
+            field_names,
+            ignore_field_names=ignore_field_names
+        )
+        passed = all(comparer.passed for comparer in comparer_results)
+
+        done_time = default_timer()
+        run_time = done_time - start_time
+        debug = self.reporter.metadata["debug"] if "debug" in self.reporter.metadata else None
+        test_result = TestResult(
+            parser=parser_name,
+            input_file_path=input_file_path,
+            passed=passed,
+            errors=self.reporter.errors,
+            debug=debug,
+            results=comparer_results,
+            run_time=run_time
+        )
+
+        return test_result
 
     def get_test_results(self, parser_name, results_file_path, field_names, ignore_field_names):
         """
@@ -302,7 +353,7 @@ class Tester(object):
                         results_a, results_b, field_name)
                 except:
                     comparer = ResultComparer(field_name)
-                    self.reporter.error(traceback.format_exc())
+                    logger.exception('Failed to compare results.')
                 results.append(comparer)
         else:
             for ignore_field in ignore_field_names:
@@ -315,7 +366,7 @@ class Tester(object):
                         results_a, results_b, field_name)
                 except:
                     comparer = ResultComparer(field_name)
-                    self.reporter.error(traceback.format_exc())
+                    logger.exception('Failed to compare results.')
                 results.append(comparer)
 
         return results
@@ -427,13 +478,15 @@ class Tester(object):
 
 class TestResult(object):
 
-    def __init__(self, parser, input_file_path, passed, errors=None, debug=None, results=None):
+    def __init__(self, parser, input_file_path, passed, errors=None, debug=None, results=None, run_time=None):
         self.parser = parser
         self.input_file_path = input_file_path
         self.passed = passed
         self.errors = [] if not errors else errors
         self.debug = [] if not debug else debug
         self.results = results
+        self.run_time = run_time
+
 
 ####################################################
 # Comparer classes for various MWCP field types
@@ -571,6 +624,7 @@ class DictOfStringsComparer(ResultComparer):
                 self.unexpected.append(u"{}: {}".format(key, dict_new[key]))
             elif set(dict_new[key]) != set(dict_test[key]):
                 self.unexpected.append(u"{}: {}".format(key, dict_new[key]))
+
 
 ####################################################
 # JSON encoders

@@ -12,6 +12,7 @@ import datetime
 import hashlib
 import itertools
 import json
+import logging
 import os
 import sys
 import tempfile
@@ -277,11 +278,17 @@ def get_arg_parser():
                         default=False,
                         dest="includefilename",
                         help="Include file information such as filename, hashes, and compile time in parser output.")
-    parser.add_argument("-d", "--no-debug",
+    # TODO: Determine if we can remove this option. It is conflicting what we call "debug".
+    parser.add_argument("--no-debug",
                         action="store_true",
                         default=False,
                         dest="hidedebug",
                         help="Hide debug messages in output.")
+    parser.add_argument("-d", "--debug",
+                        action="store_true",
+                        default=False,
+                        dest="debug",
+                        help="Turn on all debugging messages. (WARNING: This WILL spam the console)")
     parser.add_argument("-u", "--output-prefix",
                         metavar="FILENAME",
                         default="",
@@ -321,6 +328,13 @@ def main(args=None):
     argparser = get_arg_parser()
     args, input_files = argparser.parse_known_args(args)
 
+    # Setup logging
+    mwcp.setup_logging()
+    if args.hidedebug:
+        logging.root.setLevel(logging.WARNING)
+    elif args.debug:
+        logging.root.setLevel(logging.DEBUG)
+
     # This is a preliminary check before creating the reporter to establish how output
     # file prefixes should be set.
     if args.disableoutputfileprefix:
@@ -359,7 +373,6 @@ def main(args=None):
                             outputdir=args.outputdir,
                             outputfile_prefix=args.outputfile_prefix,
                             tempdir=args.tempdir,
-                            disabledebug=args.hidedebug,
                             disableoutputfiles=args.disableoutputfiles,
                             disabletempcleanup=args.disabletempcleanup,
                             base64outputfiles=args.base64outputfiles)

@@ -12,11 +12,11 @@ import codecs
 import pefile
 import hashlib
 import io
+import logging
 import os
-import traceback
 from collections import deque
 
-from mwcp.utils import pefileutils
+logger = logging.getLogger(__name__)
 
 # Kordesii framework imports
 try:
@@ -25,6 +25,7 @@ except ImportError:
     # Kordesii support is optional.
     kordesiireporter = None
 
+from mwcp.utils import elffileutils, pefileutils
 from mwcp.utils.stringutils import convert_to_unicode
 
 
@@ -44,7 +45,8 @@ class FileObject(object):
 
     def __init__(
             self, file_data, reporter, pe=None, file_name=None, def_stub=None,
-            description=None, output_file=True, use_supplied_fname=True, use_arch=False):
+            description=None, output_file=True, use_supplied_fname=True, use_arch=False,
+            ext='.bin'):
         """
         Initializes the FileObject.
 
@@ -57,11 +59,14 @@ class FileObject(object):
         :param bool use_supplied_fname: Boolean indicating if the file_name should be used even if the file is a PE.
         :param str def_stub: def_stub argument to pass to obtain_original_filename()
         :param bool use_arch: use_arch argument to pass to obtain_original_filename()
+        :param str ext: default extension to use if not determined from pe file.
         """
         self._file_path = None
         self._md5 = None
         self._stack_strings = None
         self._resources = None
+        self._elf = None
+        self._elf_attempt = False
         self.output_file = output_file
         self._outputted_file = False
         self.parent = None   # Parent FileObject from which FileObject was extracted from (this is set externally).
@@ -78,7 +83,8 @@ class FileObject(object):
             self._file_name = file_name
         else:
             self._file_name = pefileutils.obtain_original_filename(
-                def_stub or binascii.hexlify(self.md5).decode('utf8'), pe=self.pe, reporter=reporter, use_arch=use_arch)
+                def_stub or binascii.hexlify(self.md5).decode('utf8'), 
+                pe=self.pe, use_arch=use_arch, ext=ext)
         self._file_name = convert_to_unicode(self._file_name)
 
     def __enter__(self):
@@ -97,6 +103,14 @@ class FileObject(object):
 
     def __exit__(self, *args):
         self._open_file.close()
+
+    @property
+    def elf(self):
+        """Returns elftools.ELFFile object or None if not an ELF file."""
+        if not self._elf and not self._elf_attempt:
+            self._elf_attempt = True
+            self._elf = elffileutils.obtain_elf(self.file_data)
+        return self._elf
 
     @property
     def file_name(self):
@@ -199,20 +213,20 @@ class FileObject(object):
         if not kordesiireporter:
             raise RuntimeError('Please install kordesii to use this function.')
 
-        self.reporter.debug('[*] Running {} kordesii decoder on file {}.'.format(decoder_name, self.file_name))
+        logger.info('Running {} kordesii decoder on file {}.'.format(decoder_name, self.file_name))
         kordesii_reporter = kordesiireporter(base64outputfiles=True, enableidalog=True)
 
         kordesii_reporter.run_decoder(decoder_name, data=self.file_data)
         for message in kordesii_reporter.get_debug():
-            self.reporter.debug('[kordesii_debug] {}'.format(message))
+            logger.info('[kordesii_debug] {}'.format(message))
 
         for message in kordesii_reporter.get_errors():
-            self.reporter.debug('[kordesii_error] {}'.format(message))
+            logger.error('[kordesii_error] {}'.format(message))
 
         decrypted_strings = kordesii_reporter.get_strings()
         if not decrypted_strings:
-            self.reporter.debug(
-                '[*] No decrypted strings were returned by the decoder for file {}.'.format(self.file_name))
+            logger.warn(
+                'No decrypted strings were returned by the decoder for file {}.'.format(self.file_name))
 
         return kordesii_reporter
 
@@ -241,6 +255,7 @@ class ComponentParser(object):
         self.reporter = reporter
         self.dispatcher = dispatcher
         self.kordesii_reporter = None
+        self.logger = logging.getLogger('.'.join([self.__class__.__module__, self.__class__.__name__]))
         if not self.DESCRIPTION:
             raise NotImplementedError('Parser class is missing a DESCRIPTION.')
 
@@ -261,14 +276,6 @@ class ComponentParser(object):
         :return bool: Boolean indicating if this parser supports the file_object
         """
         raise NotImplementedError
-
-    def _debug_msg(self, msg):
-        """
-        Helper function to output a debug string which will format using only the file name.
-        :param msg: message to be output
-        :return:
-        """
-        self.reporter.debug(msg.format(self.file_object.file_name))
 
     def run(self):
         """
@@ -388,7 +395,7 @@ class Dispatcher(object):
         this function can be used as the entry point into the mwcp framework.
         """
         # Add and run dispatcher with starting file found in reporter.
-        self.reporter.debug('[*] Configuration parsing started.')
+        logger.debug('Configuration parsing started.')
         self.add_to_queue(self.reporter.input_file)
         self.dispatch()
 
@@ -402,8 +409,8 @@ class Dispatcher(object):
         file_object.parent = self._current_file_object
         self._fifo_buffer.appendleft(file_object)
         if self._current_file_object:
-            self.reporter.debug(
-                '[*] {} dispatched residual file: {}'.format(self._current_file_object.file_name, file_object.file_name))
+            logger.info('{} dispatched residual file: {}'.format(
+                self._current_file_object.file_name, file_object.file_name))
 
     def _identify_file(self, file_object):
         """
@@ -416,8 +423,8 @@ class Dispatcher(object):
         identified = False
         for parser_class in self.parsers:
             if parser_class.identify(file_object):
-                self.reporter.debug(
-                    '[*] File {} identified as {}.'.format(file_object.file_name, parser_class.DESCRIPTION))
+                logger.info(
+                    'File {} identified as {}.'.format(file_object.file_name, parser_class.DESCRIPTION))
                 identified = True
                 yield parser_class
 
@@ -427,7 +434,7 @@ class Dispatcher(object):
             # If no parsers match and developer didn't set a description, mark as unidentified file and run
             # default.
             if not file_object.description:
-                self.reporter.debug('[*] Supplied file {} was not identified.'.format(file_object.file_name))
+                logger.info('Supplied file {} was not identified.'.format(file_object.file_name))
                 if self.default:
                     yield self.default
 
@@ -455,15 +462,13 @@ class Dispatcher(object):
                     parser.run()
 
                 except UnableToParse as exception:
-                    self.reporter.debug(
-                        '[*] File {} was misidentified as {}, due to: ({}) '
+                    logger.info(
+                        'File {} was misidentified as {}, due to: ({}) '
                         'Trying other parsers...'.format(file_object.file_name, parser_class.DESCRIPTION, exception))
                     continue
 
                 except Exception:
-                    self.reporter.debug(
-                        '[*] {} dispatch parser failed with error:\n{}'.format(
-                            parser_class.__name__, traceback.format_exc()))
+                    logger.exception('{} dispatch parser failed'.format(parser_class.__name__))
 
                 if not self.greedy:
                     break

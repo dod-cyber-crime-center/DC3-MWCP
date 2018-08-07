@@ -1,5 +1,8 @@
 """This is an example parser used to show the different methods of adding data to the reporter."""
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 from mwcp import Parser
 
@@ -21,7 +24,7 @@ class Foo(Parser):
         self.reporter.add_metadata("url", "http://127.0.0.1")
 
         # demonstrate access to sample
-        self.reporter.debug("size of inputfile is{} bytes".format(len(input_file.file_data)))
+        logger.info("size of inputfile is{} bytes".format(len(input_file.file_data)))
 
         # other, non-standardized metadata
         # also demonstrate use of pefile object
@@ -34,7 +37,7 @@ class Foo(Parser):
             b"hello world", "fooconfigtest.txt", "example output file")
 
         # demonstrate use of filename()
-        self.reporter.debug("operating on inputfile {}".format(input_file.file_name))
+        logger.info("operating on inputfile {}".format(input_file.file_name))
 
         # demonstrate use of managed tempdir
         with open(os.path.join(self.reporter.managed_tempdir(), "footmp.txt"), "w") as f:

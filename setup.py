@@ -39,16 +39,18 @@ setup(
             'mwcp-test = mwcp.tools.test:main'
         ],
         'mwcp.parsers': [
-            'bar = mwcp.parsers.bar_malwareconfigparser:Bar',
-            'foo = mwcp.parsers.foo_malwareconfigparser:Foo'
+            'bar = mwcp.parsers.bar:Bar',
+            'foo = mwcp.parsers.foo:Foo'
         ]
     },
     install_requires=[
         'bottle',
         'construct==2.8.12',  # pin version, since we patch this library
+        'elftools',
         'future',
         'jinja2',  # For construct.html_hex()
         'pefile',
+        'pyyaml',
         'requests',
         'six',
 
