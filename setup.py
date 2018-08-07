@@ -46,10 +46,10 @@ setup(
     install_requires=[
         'bottle',
         'construct==2.8.12',  # pin version, since we patch this library
-        'elftools',
         'future',
         'jinja2',  # For construct.html_hex()
         'pefile',
+        'pyelftools',
         'pyyaml',
         'requests',
         'six',

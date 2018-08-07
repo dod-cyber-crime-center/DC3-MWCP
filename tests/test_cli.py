@@ -32,14 +32,14 @@ def test_parse(tmpdir, script_runner, test_file):
     """Test running a parser"""
     # Change working directory so we can cleanup outputted files.
     cwd = str(tmpdir)
+    test_file = os.path.basename(test_file)
 
     # Run the foo parser on the test input file.
     ret = script_runner.run('mwcp-tool', '-p', 'foo', test_file, cwd=cwd)
     print(ret.stdout)
     print(ret.stderr, file=sys.stderr)
     assert ret.success
-    output = ret.stdout.replace(test_file, '[INPUT FILE PATH]')
-    assert output == \
+    assert ret.stdout == \
 '''
 ----Standard Metadata----
 
@@ -48,28 +48,27 @@ address              127.0.0.1
 
 ----Debug----
 
-size of inputfile is 23 bytes
-[*] Output file: fooconfigtest.txt
-operating on inputfile [INPUT FILE PATH]
+[+] size of inputfile is 23 bytes
+[+] Output file: fooconfigtest.txt
+[+] operating on inputfile {}
 
 ----Output Files----
 
 fooconfigtest.txt    example output file
                      5eb63bbbe01eeed093cb22bb8f5acdc3
 
-'''
+'''.format(test_file)
 
     # Test the "-f" flag.
     ret = script_runner.run('mwcp-tool', '-f', '-p', 'foo', test_file, cwd=cwd)
     print(ret.stdout)
     print(ret.stderr, file=sys.stderr)
     assert ret.success
-    output = ret.stdout.replace(test_file, '[INPUT FILE PATH]')
-    assert output == \
+    assert ret.stdout == \
 '''
 ----File Information----
 
-inputfilename        [INPUT FILE PATH]
+inputfilename        {0}
 md5                  fb843efb2ffec987db12e72ca75c9ea2
 sha1                 5e90c4c2be31a7a0be133b3dbb4846b0434bc2ab
 sha256               fe5af8c641835c24f3bbc237a659814b96ed64d2898fae4cb3d2c0ac5161f5e9
@@ -81,16 +80,16 @@ address              127.0.0.1
 
 ----Debug----
 
-size of inputfile is 23 bytes
-[*] Output file: fooconfigtest.txt
-operating on inputfile [INPUT FILE PATH]
+[+] size of inputfile is 23 bytes
+[+] Output file: fooconfigtest.txt
+[+] operating on inputfile {0}
 
 ----Output Files----
 
 fooconfigtest.txt    example output file
                      5eb63bbbe01eeed093cb22bb8f5acdc3
 
-'''
+'''.format(test_file)
 
     # Check that the output file was created
     output_file = os.path.join(cwd, 'fooconfigtest.txt')
@@ -199,6 +198,7 @@ def test_csv(tmpdir, monkeypatch):
 def test_csv_cli(tmpdir, script_runner, test_file):
     """Tests the csv feature on the command line."""
     cwd = str(tmpdir)
+    test_file = os.path.basename(test_file)
     csv_path = os.path.join(cwd, 'csv_file.csv')
     ret = script_runner.run('mwcp-tool', '-p', 'foo', '-n', test_file, '-c', csv_path, cwd=cwd)
     print(ret.stdout)
@@ -209,12 +209,12 @@ def test_csv_cli(tmpdir, script_runner, test_file):
 
     expected = (
         'scan_date,inputfilename,outputfile.name,outputfile.description,outputfile.md5,address,debug,url\n'
-        '[TIMESTAMP],[INPUT FILE PATH],fooconfigtest.txt,example output file,5eb63bbbe01eeed093cb22bb8f5acdc3,127.0.0.1,'
-        '"size of inputfile is 23 bytes\noperating on inputfile [INPUT FILE PATH]",http://127.0.0.1\n'
+        '[TIMESTAMP],{0},fooconfigtest.txt,example output file,5eb63bbbe01eeed093cb22bb8f5acdc3,127.0.0.1,'
+        '"[+] size of inputfile is 23 bytes\n[+] operating on inputfile {0}",http://127.0.0.1\n'.format(test_file)
 
     )
     with open(csv_path, 'r') as fo:
-        results = fo.read().replace(test_file, '[INPUT FILE PATH]')
-        # Can't mock timestamp this time, so we are just going to have to use regex to replace it.
-        results = re.sub('\n.*,\[', '\n[TIMESTAMP],[', results)
-        assert results == expected
+        results = fo.read()
+    # Can't mock timestamp this time, so we are just going to have to use regex to replace it.
+    results = re.sub('\n[^"]*?,', '\n[TIMESTAMP],', results)
+    assert results == expected

@@ -166,7 +166,7 @@ def obtain_exports_list(pe=None, file_data=None):
     :return: A list of export names, or None.
     """
     if file_data:
-        pe = obtain_pe(file_data).
+        pe = obtain_pe(file_data)
     if pe:
         try:
             return [export.name for export in pe.DIRECTORY_ENTRY_EXPORT.symbols]
@@ -588,7 +588,7 @@ def extract_rsrc_dir(dirtype, pe=None, file_data=None):
     :return: List of pefileutils.Resource objects matching the dirtype, or an empty list.
     """
     if file_data:
-        pe = obtain_pe(file_data).
+        pe = obtain_pe(file_data)
     if pe:
         return list(iter_rsrc(pe, dirtype=dirtype))
     return []

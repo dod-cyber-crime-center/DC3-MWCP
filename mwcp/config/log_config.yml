@@ -17,7 +17,7 @@ handlers:
     class: logging.StreamHandler
     formatter: simple
     filters: [level_char]
-    stream: ext://sys.stdout
+    stream: ext://sys.stderr
 
   error_file:
     # Custom handler necessary to fix issues that can occur in Windows.

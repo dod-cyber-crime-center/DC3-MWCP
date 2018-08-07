@@ -24,7 +24,7 @@ class Foo(Parser):
         self.reporter.add_metadata("url", "http://127.0.0.1")
 
         # demonstrate access to sample
-        logger.info("size of inputfile is{} bytes".format(len(input_file.file_data)))
+        logger.info("size of inputfile is {} bytes".format(len(input_file.file_data)))
 
         # other, non-standardized metadata
         # also demonstrate use of pefile object
