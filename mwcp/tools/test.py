@@ -224,6 +224,10 @@ def main():
 
         end_time = timeit.default_timer()
 
+        # Avoid a ZeroDivisionError.
+        if not test_infos:
+            return
+
         if not args.silent:
             print('\nTest stats:')
             print('\nTop 10 Slowest Test Cases:')

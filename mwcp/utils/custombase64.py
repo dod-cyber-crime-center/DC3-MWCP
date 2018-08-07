@@ -116,8 +116,8 @@ def b64decode(data, alphabet=None):
     'hello world'
     """
     alphabet = alphabet or _STD_ALPHA[64]
-    # Pad the data, if necessary
-    data += alphabet[-1] * ((-len(data)) % 4)
+    # Pad the data, if necessary (colon needed for py2/3 compatibility)
+    data += alphabet[-1:] * ((-len(data)) % 4)
     return _code(data, alphabet, 64, True, base64.b64decode)
 
 
@@ -154,8 +154,8 @@ def b32decode(data, alphabet=None):
     'hello world'
     """
     alphabet = alphabet or _STD_ALPHA[32]
-    # Pad the data, if necessary
-    data += alphabet[-1] * ((-len(data)) % 8)
+    # Pad the data, if necessary (colon needed for py2/3 compatibility)
+    data += alphabet[-1:] * ((-len(data)) % 8)
     return _code(data, alphabet, 32, True, base64.b32decode)
 
 

@@ -8,6 +8,7 @@ import contextlib
 from future.builtins import str, open, map
 
 import base64
+import binascii
 import hashlib
 import json
 import ntpath
@@ -201,14 +202,21 @@ class Reporter(object):
 
         # we put resourcedir in PYTHONPATH in case we shell out or children
         # processes need this
-        # Windows environment variables must be ascii encoded byte strings.
-        if not isinstance(resourcedir, bytes):
-            resourcedir = resourcedir.encode('ascii')
-        if b'PYTHONPATH' in os.environ:
-            if resourcedir not in os.environ[b'PYTHONPATH']:
-                os.environ[b'PYTHONPATH'] = os.environ[b'PYTHONPATH'] + os.pathsep + resourcedir
+        if PY3:
+            if 'PYTHONPATH' in os.environ:
+                if resourcedir not in os.environ['PYTHONPATH']:
+                    os.environ['PYTHONPATH'] = os.environ['PYTHONPATH'] + os.pathsep + resourcedir
+            else:
+                os.environ['PYTHONPATH'] = resourcedir
         else:
-            os.environ[b'PYTHONPATH'] = resourcedir
+            # Windows environment variables must be ascii encoded byte strings.
+            if not isinstance(resourcedir, bytes):
+                resourcedir = resourcedir.encode('ascii')
+            if b'PYTHONPATH' in os.environ:
+                if resourcedir not in os.environ[b'PYTHONPATH']:
+                    os.environ[b'PYTHONPATH'] = os.environ[b'PYTHONPATH'] + os.pathsep + resourcedir
+            else:
+                os.environ[b'PYTHONPATH'] = resourcedir
 
     @property
     def data(self):
@@ -636,7 +644,7 @@ class Reporter(object):
         if self.__outputfile_prefix:
             if self.__outputfile_prefix == "md5":
                 fullpath = os.path.join(self.__outputdir, "%s_%s" % (
-                    self.input_file.md5.encode('hex'), basename))
+                    binascii.hexlify(self.input_file.md5).decode('utf8'), basename))
             else:
                 fullpath = os.path.join(self.__outputdir, "%s_%s" % (
                     self.__outputfile_prefix, basename))
