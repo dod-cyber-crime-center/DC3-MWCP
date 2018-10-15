@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.4.1] - 2018-10-15
 ### Changed
 - Parsers are now imported on-demand to save initial startup time.
 - Small tweaks to logging level.
@@ -93,7 +93,8 @@ All notable changes to this project will be documented in this file.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.4.0...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.4.1...HEAD
+[1.4.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.4.0...1.4.1
 [1.4.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.3.0...1.4.0
 [1.3.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.2.0...1.3.0
 [1.2.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.1.0...1.2.0
