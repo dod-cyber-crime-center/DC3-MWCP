@@ -175,7 +175,10 @@ def main():
 
     # Configure test object
     tester = Tester(
-        reporter=reporter, results_dir=args.test_case_dir)
+        reporter=reporter, results_dir=args.test_case_dir, parser_names=parsers, nprocs=args.nprocs,
+        field_names=filter(None, args.field_names.split(",")),
+        ignore_field_names=filter(None, args.exclude_field_names.split(","))
+    )
 
     # Gather all our input files
     if args.input_file:
@@ -186,63 +189,73 @@ def main():
         print("Running test cases. May take a while...")
 
         start_time = timeit.default_timer()
-        test_infos = []
         test_results = []
-        # json_list = []
         all_passed = True
+        total = tester.total
 
-        test_iter = tester.run_tests(
-            parsers,
-            list(filter(None, args.field_names.split(","))),
-            ignore_field_names=list(filter(None, args.exclude_field_names.split(","))),
-            nprocs=args.nprocs
-        )
+        # Generate format string.
+        digits = len(str(total))
+        if not tester.test_cases:
+            parser_len = 10
+            filename_len = 10
+        else:
+            parser_len = max(len(test_case.parser_name) for test_case in tester.test_cases)
+            filename_len = max(len(test_case.filename) for test_case in tester.test_cases)
+        msg_format = "{{parser:{0}}} {{filename:{1}}} {{run_time:.4f}}s".format(parser_len, filename_len)
 
-        for test_result, test_info in test_iter:
-            test_infos.append(test_info)
-            test_results.append(test_result)
+        format_str = "{{count:> {0}d}}/{{total:0{0}d}} - ".format(digits) + msg_format
+
+        # Run tests and output progress results.
+        for count, test_result in enumerate(tester, start=1):
             all_passed &= test_result.passed
+            if test_result.run_time:  # Ignore missing tests from stat summary.
+                test_results.append(test_result)
 
             if not args.silent:
-                # Skip print() to immediately flush stdout buffer (issue in Docker containers)
-                sys.stdout.write(
-                    "{finished}/{total} - {parser} {filename} {run_time:.4f}s\n".format(**test_info)
+                message = format_str.format(
+                    count=count,
+                    total=total,
+                    parser=test_result.parser_name,
+                    filename=test_result.filename,
+                    run_time=test_result.run_time
                 )
+                # Skip print() to immediately flush stdout buffer (issue in Docker containers)
+                sys.stdout.write(message + '\n')
                 sys.stdout.flush()
-                if args.only_failed_tests:
-                    tester.print_test_results(
-                        test_results,
-                        failed_tests=True,
-                        passed_tests=False,
-                        json_format=args.json)
-                else:
-                    tester.print_test_results(
-                        test_results,
-                        failed_tests=True,
-                        passed_tests=True,
-                        json_format=args.json)
+                test_result.print(
+                    failed_tests=True, passed_tests=not args.only_failed_tests, json_format=args.json)
 
         end_time = timeit.default_timer()
 
-        # Avoid a ZeroDivisionError.
-        if not test_infos:
-            return
-
-        if not args.silent:
+        # Present test statistics
+        if not args.silent and test_results:
             print('\nTest stats:')
             print('\nTop 10 Slowest Test Cases:')
+
+            format_str = "{index:2}. " + msg_format
+
             # Cases sorted slowest first
-            sorted_cases = sorted(test_infos, key=lambda x: x['run_time'], reverse=True)
-            for i, info in enumerate(sorted_cases[:10]):
-                print('{:2}. {} {} {:.4f}s'.format(i + 1, info['parser'], info['filename'], info['run_time']))
+            sorted_cases = sorted(test_results, key=lambda x: x.run_time, reverse=True)
+            for i, test_result in enumerate(sorted_cases[:10], start=1):
+                print(format_str.format(
+                    index=i,
+                    parser=test_result.parser_name,
+                    filename=test_result.filename,
+                    run_time=test_result.run_time
+                ))
 
             print('\nTop 10 Fastest Test Cases:')
-            for i, info in enumerate(list(reversed(sorted_cases))[:10]):
-                print('{:2}. {} {} {:.4f}s'.format(i + 1, info['parser'], info['filename'], info['run_time']))
+            for i, test_result in enumerate(list(reversed(sorted_cases))[:10], start=1):
+                print(format_str.format(
+                    index=i,
+                    parser=test_result.parser_name,
+                    filename=test_result.filename,
+                    run_time=test_result.run_time
+                ))
 
-            run_times = [info['run_time'] for info in test_infos]
+            run_times = [test_result.run_time for test_result in test_results]
             print('\nMean Running Time: {:.4f}s'.format(
-                sum(run_times) / len(test_infos)
+                sum(run_times) / len(test_results)
             ))
             print('Median Running Time: {:.4f}s'.format(
                 _median(run_times)
@@ -264,47 +277,42 @@ def main():
 
     # Update previously existing test cases
     elif args.update and args.parser_name:
-        logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
         print("Updating test cases. May take a while...")
         results_file_path = tester.get_results_filepath(args.parser_name)
         if os.path.isfile(results_file_path):
             input_files = tester.list_test_files(args.parser_name)
         else:
-            print("No test case file found for parser '{}'. No update could be made.".format(args.parser_name))
-            return
-
-        for input_file in input_files:
-            metadata = tester.gen_results(
-                parser_name=args.parser_name, input_file_path=input_file)
-            if len(metadata) > 1 and len(reporter.errors) == 0:
-                print(u"Updating results for {} in {}".format(input_file, results_file_path))
-                tester.update_test_results(results_file_path=results_file_path,
-                                           results_data=metadata,
-                                           replace=True)
-            elif len(metadata) > 1 and len(reporter.errors) > 0:
-                print(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path))
-                print('\n'.join(reporter.errors))
-            else:
-                print(u"Empty results for {} in {}, not updating".format(input_file, results_file_path))
+            sys.exit(u"No test case file found for parser '{}'. "
+                     u"No update could be made.".format(args.parser_name))
+        update_tests(tester, input_files, args.parser_name)
 
     # Add/update test cases for specified input files and specified parser
     elif args.parser_name and not args.delete and input_files:
-        logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
-        results_file_path = tester.get_results_filepath(args.parser_name)
-        for input_file in input_files:
-            metadata = tester.gen_results(
-                parser_name=args.parser_name, input_file_path=input_file)
-            if len(metadata) > 1 and len(reporter.errors) == 0:
+        update_tests(tester, input_files, args.parser_name)
+
+    else:
+        argparser.print_help()
+
+
+def update_tests(tester, input_files, parser_name):
+    """Updates the test cases for given input files and parser_name."""
+    logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
+    results_file_path = tester.get_results_filepath(parser_name)
+    for input_file in input_files:
+        metadata = tester.gen_results(
+            parser_name=parser_name, input_file_path=input_file)
+        if metadata:
+            # TODO: Now that parsers can produce warning messages, we need to allow errors
+            # or move warning messages to debug.
+            if not tester.reporter.errors:
                 print(u"Updating results for {} in {}".format(input_file, results_file_path))
                 tester.update_test_results(results_file_path=results_file_path,
                                            results_data=metadata,
                                            replace=True)
-            elif len(metadata) > 1 and len(reporter.errors) > 0:
-                print(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path))
             else:
-                print(u"Empty results for {} in {}, not updating".format(input_file, results_file_path))
-    else:
-        argparser.print_help()
+                sys.exit(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path))
+        else:
+            sys.exit(u"Empty results for {} in {}, not updating".format(input_file, results_file_path))
 
 
 def read_input_list(filename):

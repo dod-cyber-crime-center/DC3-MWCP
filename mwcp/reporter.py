@@ -57,11 +57,11 @@ class ReporterLogHandler(logging.Handler):
 
     def emit(self, record):
         message = self.format(record)
-        if record.levelno >= logging.WARNING:
+        if record.levelno > logging.WARNING:
             self._reporter.errors.append(message)
         # Even though reporter uses the name "debug".. This really is an INFO level debug message.
         # (Adding true DEBUG level messages would spam our console.)
-        elif record.levelno == logging.INFO:
+        elif logging.INFO <= record.levelno <= logging.WARNING:
             self._reporter.add_metadata("debug", message)
 
 
@@ -766,6 +766,8 @@ class Reporter(object):
         class _LogWriter(object):
             def write(self, message):
                 logger.info(message)
+            def flush(self):
+                pass
         orig_stdout = sys.stdout
         sys.stdout = _LogWriter()
         try:

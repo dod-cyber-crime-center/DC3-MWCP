@@ -4,6 +4,7 @@ Interface for registering and accessing parsers.
 
 import collections
 import glob
+import importlib
 import inspect
 import logging
 import os
@@ -42,6 +43,31 @@ def _register_entry_points():
         _PARSERS[parser_name][source_name] = klass
 
 
+def _load_parser_class(file_path):
+    """
+    Imports and then finds the mwcp Parser from the given file path.
+    (The first mwcp.Parser type object found will be returned.)
+
+    :param file_path: File path to the python file containing the parser.
+    :return: a class that subclasses mwcp.Parser or None on failure.
+    """
+    # In order to import the modules in a cross-compatible way, we are going to have to
+    # temporarily extend the path to include the parser's directory.
+    orig_path = list(sys.path)
+    sys.path.insert(0, os.path.dirname(file_path))
+    try:
+        module_name, _ = os.path.splitext(os.path.basename(file_path))
+        module = importlib.import_module(module_name)
+
+        # find descendants of mwcp.Parser in this module.
+        for _, klass in inspect.getmembers(module, inspect.isclass):
+            if issubclass(klass, mwcp.Parser) and klass != mwcp.Parser:
+                return klass
+        return None
+    finally:
+        sys.path = orig_path
+
+
 def register_parser_directory(parser_dir):
     """
     Registers parsers found in parser_dir. This function allows you to register one-off parsers
@@ -52,28 +78,17 @@ def register_parser_directory(parser_dir):
     """
     global _PARSERS
 
-    # In order to import the modules in a cross-compatible way, we are going to have to
-    # temporarily extend the path to include the extra_dir
-    orig_path = list(sys.path)
-    sys.path.insert(0, parser_dir)
-    try:
-        # Look for .py file parsers in the directory.
-        for fullpath in glob.glob(os.path.join(parser_dir, '[!_]*.py')):
-            module_name = os.path.basename(fullpath)[:-3]
-            # Account for old-style parsers that have a "_malwareconfigparser.py" prefix.
-            if module_name.endswith('_malwareconfigparser'):
-                parser_name = module_name[:-len('_malwareconfigparser')]
-            else:
-                parser_name = module_name
-            module = __import__(module_name)
+    # Look for .py file parsers in the directory.
+    for fullpath in glob.glob(os.path.join(parser_dir, '[!_]*.py')):
+        module_name = os.path.basename(fullpath)[:-3]
+        # Account for old-style parsers that have a "_malwareconfigparser.py" prefix.
+        if module_name.endswith('_malwareconfigparser'):
+            parser_name = module_name[:-len('_malwareconfigparser')]
+        else:
+            parser_name = module_name
 
-            # find descendants of mwcp.Parser in this module.
-            for _, klass in inspect.getmembers(module, inspect.isclass):
-                if issubclass(klass, mwcp.Parser) and klass != mwcp.Parser:
-                    _PARSERS[parser_name][parser_dir] = klass
-                    break  # Only count the first one we see.
-    finally:
-        sys.path = orig_path
+        # Store full path instead of class so we can import on-demand.
+        _PARSERS[parser_name][parser_dir] = fullpath
 
 
 def iter_parsers(name=None, source=None):
@@ -117,6 +132,7 @@ def iter_parsers(name=None, source=None):
 
     :yields: tuple containing: (parser_name, source_name, parser_class)
     """
+    global _PARSERS
     # Automatically register any parsers found with 'mwcp.parsers' entry_points.
     global _parsers_registered
     if not _parsers_registered:
@@ -134,7 +150,14 @@ def iter_parsers(name=None, source=None):
     for name, source_dict in parser_dict.items():
         if source:
             source_dict = {source: source_dict.get(source, None)}
-        for source_name, klass in source_dict.items():
+        for source_name, klass_or_file_path in source_dict.items():
+            # If we have a string, it is a file path to our parser so we need to load it.
+            if isinstance(klass_or_file_path, (str, bytes)):
+                klass = _load_parser_class(klass_or_file_path)
+                # Save this for next time.
+                _PARSERS[name][source_name] = klass
+            else:
+                klass = klass_or_file_path
             if klass:
                 yield name, source_name, klass
 
@@ -150,7 +173,7 @@ def get_parser_descriptions(name=None, source=None):
     # temporarily initialize them in order to extract their info.
     # TODO: In the future, this information should be static attributes on the class itself.
     reporter = mwcp.Reporter()
-    for _name, _source, klass in sorted(iter_parsers(name=name, source=None)):
+    for _name, _source, klass in sorted(iter_parsers(name=name, source=source)):
         parser = klass(reporter)
         descriptions.append((_name, _source, parser.author, parser.description))
     return descriptions

@@ -74,6 +74,7 @@ class FileObject(object):
         self.file_data = file_data
         self.reporter = reporter
         self.description = description
+        self.knowledge_base = {}
 
         self.pe = pe or pefileutils.obtain_pe(file_data)
 
@@ -158,7 +159,8 @@ class FileObject(object):
         the file would be output before a description is set.
         """
         if not self._file_path:
-            file_path = os.path.join(self.reporter.managed_tempdir(), self.file_name)
+            safe_file_name = convert_to_unicode(binascii.hexlify(self.md5))
+            file_path = os.path.join(self.reporter.managed_tempdir(), safe_file_name)
             with open(file_path, 'wb') as file_object:
                 file_object.write(self.file_data)
             self._file_path = file_path
@@ -200,12 +202,14 @@ class FileObject(object):
                 data=self.file_data, filename=self.file_name or '', description=self.description or '')
             self._outputted_file = True
 
-    def run_kordesii_decoder(self, decoder_name):
+    def run_kordesii_decoder(self, decoder_name, warn_no_strings=True):
         """
         Run the specified kordesii decoder against the file data.  The reporter object is returned
         and can be accessed as necessary to obtain output files, etc.
 
         :param decoder_name: name of the decoder to run
+        :param warn_no_strings: Whether to produce a warning if no string were found.
+
         :return: Instance of the kordesii_reporter.
 
         :raises RuntimeError: If kordesii is not installed.
@@ -223,10 +227,12 @@ class FileObject(object):
         for message in kordesii_reporter.get_errors():
             logger.error('[kordesii_error] {}'.format(message))
 
-        decrypted_strings = kordesii_reporter.get_strings()
-        if not decrypted_strings:
-            logger.warn(
-                'No decrypted strings were returned by the decoder for file {}.'.format(self.file_name))
+        if warn_no_strings:
+            decrypted_strings = kordesii_reporter.get_strings()
+            if not decrypted_strings:
+                # Not necessarily a bad thing, the decoder might be used for something else.
+                logger.info(
+                    'No decrypted strings were returned by the decoder for file {}.'.format(self.file_name))
 
         return kordesii_reporter
 

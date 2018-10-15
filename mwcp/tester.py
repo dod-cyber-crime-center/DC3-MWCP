@@ -26,7 +26,10 @@ try:
 except ImportError:
     pkg_resources = None
 
+# Constants
 DEFAULT_EXCLUDE_FIELDS = ["debug"]
+INPUT_FILE_PATH = "inputfilename"
+FILE_EXTENSION = ".json"
 
 # Setting encoding to utf8 is a hotfix for a larger issue
 encode_params = {
@@ -37,45 +40,115 @@ encode_params = {
 
 def multiproc_test_wrapper(args):
     """Wrapper function for running tests in multiple processes."""
-    tester_instance = args[0]
+    test_case = args[0]
     try:
-        return tester_instance.async_test(*args[1:])
+        return test_case.run(*args[1:])
     except KeyboardInterrupt:
         return
 
 
 class Tester(object):
-    """DC3-MWCP test case class"""
+    """DC3-MWCP Tester class"""
 
-    # Constants
-    INPUT_FILE_PATH = "inputfilename"
-    FILE_EXTENSION = ".json"
-
-    # Properties
-    reporter = None
-
-    def __init__(self, reporter, results_dir=None):
+    def __init__(self, reporter, results_dir=None, parser_names=None, nprocs=None,
+                 field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
         """
-        Initailizes Tester.
+
+        Run tests and compare produced results to expected results.
 
         :param mwcp.Reporter reporter: MWCP reporter object
-        :param str results_dir: Results dir, or leave as None to dynamically pull.
+        :param str results_dir: Directory of json test cases
+                (defaults to dynamically pulling from a "parsertests" folder next to parser's directory.)
+        :param [str] parser_names:
+                A list of parser names to run tests for. If the list is empty (default),
+                then test cases for all parsers will be run.
+        :param [str] field_names:
+                A restricted list of fields (metadata key values) that should be compared
+                during testing. If the list is empty (default), then all fields, except those in
+                ignore_field_names will be compared.
+        :param int nprocs: Number of processes to use. (defaults to (3*num_cores)/4)
         """
         self.reporter = reporter
         self.results_dir = results_dir
+        self.parser_names = parser_names or [None]
+        self.field_names = field_names or []
+        self.ignore_field_names = ignore_field_names
+        self._test_cases = None
+        self._results = []  # Cached results.
+        self._processed = False
+        self._nprocs = nprocs or (3 * mp.cpu_count()) // 4
+
+    def __iter__(self):
+        return self._iter_results()
+
+    def _iter_results(self):
+        # First yield any cached results.
+        for result in self._results:
+            yield result
+
+        # Run tests in multiprocessing pool (if not already run)
+        if not self._processed:
+            self._processed = True
+            pool = multi_proc.TPool(
+                processes=self._nprocs, initializer=mwcp.register_parser_directory,
+                initargs=(self.reporter.parserdir,))
+            test_iter = pool.imap_unordered(
+                multiproc_test_wrapper, [(test_case,) for test_case in self.test_cases])
+            pool.close()
+
+            try:
+                for result in test_iter:
+                    self._results.append(result)
+                    yield result
+            except KeyboardInterrupt:
+                pool.terminate()
+                raise
+
+    @property
+    def test_cases(self):
+        """Returns test cases."""
+        if self._test_cases is None:
+            self._test_cases = []
+            for parser_name in self.parser_names:
+                # We want to iterate parsers in case parser_name represents a set of parsers from different sources.
+                found = False
+                for name, source, _ in mwcp.iter_parsers(parser_name):
+                    found = True
+                    parser = '{}:{}'.format(source, name)
+                    results_file_path = self.get_results_filepath(parser)
+                    if os.path.isfile(results_file_path):
+                        for expected_results in self.parse_results_file(results_file_path):
+                            self._test_cases.append(TestCase(
+                                self.reporter, parser, expected_results,
+                                field_names=self.field_names, ignore_field_names=self.ignore_field_names))
+                    else:
+                        # Add a failed result if the test case is missing.
+                        self._results.append(TestResult(
+                            parser=parser,
+                            passed=False,
+                            errors=['Test case file not found: {}'.format(results_file_path)],
+                        ))
+
+                if not found and parser_name:
+                    # Add a failed results if we have an orphan test.
+                    self._results.append(TestResult(
+                        parser=parser_name,
+                        passed=False,
+                        errors=['Parser not found.']
+                    ))
+        return self._test_cases
+
+    @property
+    def total(self):
+        """Returns total number of results."""
+        return len(self._results) + len(self.test_cases)
 
     def gen_results(self, parser_name, input_file_path):
         """
         Generate JSON results for the given file using the given parser name.
         """
-
-        try:
-            self.reporter.run_parser(parser_name, input_file_path)
-        except Exception:
-            logger.exception('Failed to generate results.')
-
-        self.reporter.metadata[self.INPUT_FILE_PATH] = convert_to_unicode(input_file_path)
-
+        self.reporter.run_parser(parser_name, input_file_path)
+        self.reporter.metadata[INPUT_FILE_PATH] = convert_to_unicode(input_file_path)
         return self.reporter.metadata
 
     def list_test_files(self, parser_name):
@@ -84,24 +157,24 @@ class Tester(object):
         """
         filelist = []
         for metadata in self.parse_results_file(self.get_results_filepath(parser_name)):
-            filelist.append(metadata[self.INPUT_FILE_PATH])
+            filelist.append(metadata[INPUT_FILE_PATH])
         return filelist
 
     def get_results_filepath(self, name, source=None):
         """
-        Yields the results file path based on the parser name provided and the
+        Returns the results file path based on the parser name provided and the
         previously specified output directory.
         """
         # TODO: Remove hardcoding "parsertests" folder. Determine better way to handle this.
         for parser_name, source, klass in mwcp.iter_parsers(name, source=source):
-            file_name = parser_name + self.FILE_EXTENSION
+            file_name = parser_name + FILE_EXTENSION
             # Use hardcoded results dir if requested.
             if self.results_dir:
                 return os.path.join(self.results_dir, file_name)
 
             # If source is a directory, assume there is a "parsertests" folder next to it.
             if os.path.isdir(source):
-                return os.path.join(source, '..', 'parsertests', file_name)
+                return os.path.normpath(os.path.join(source, '..', 'parsertests', file_name))
 
             # Otherwise dynamically pull based on parser's top level module.
             top_level_module, _, _ = klass.__module__.partition('.')
@@ -110,25 +183,20 @@ class Tester(object):
 
         raise ValueError('Invalid parser: {}'.format(name))
 
-    def parse_results_file(self,
-                           results_file_path):
+    def parse_results_file(self, results_file_path):
         """
-        Parse the the JSON results file and return the parsed data.
+        Parses and validates the the JSON results file and returns the parsed data.
         """
-
         with open(results_file_path) as results_file:
             data = json.load(results_file)
 
-        # The results file data is expected to be a list of metadata
-        # dictionaries
-        assert type(data) == list and all(type(a) is dict for a in data)
+        # The results file data is expected to be a list of metadata dictionaries
+        if not isinstance(data, list) or not all(isinstance(a, dict) for a in data):
+            raise ValueError('Results file is invalid: {}'.format(results_file_path))
 
         return data
 
-    def update_test_results(self,
-                            results_file_path,
-                            results_data,
-                            replace=True):
+    def update_test_results(self, results_file_path, results_data, replace=True):
         """
         Update results in the results file with the passed in results data. If the
         file path for the results data matches a file path that is already found in
@@ -146,7 +214,7 @@ class Tester(object):
             # Check if there is a duplicate file path already in the results
             # path
             for index, metadata in enumerate(results_file_data):
-                if metadata[self.INPUT_FILE_PATH] == results_data[self.INPUT_FILE_PATH]:
+                if metadata[INPUT_FILE_PATH] == results_data[INPUT_FILE_PATH]:
                     if replace:
                         results_file_data[index] = results_data
                     break
@@ -172,8 +240,8 @@ class Tester(object):
         removed_files = []
         results_file_data = []
         for metadata in self.parse_results_file(self.get_results_filepath(parser_name)):
-            if metadata[self.INPUT_FILE_PATH] in filenames:
-                removed_files.append(metadata[self.INPUT_FILE_PATH])
+            if metadata[INPUT_FILE_PATH] in filenames:
+                removed_files.append(metadata[INPUT_FILE_PATH])
             else:
                 results_file_data.append(metadata)
 
@@ -182,196 +250,87 @@ class Tester(object):
 
         return removed_files
 
-    def run_tests(self, parser_names=None, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS, nprocs=None):
-        """
 
-        Run tests and compare produced results to expected results.
+class TestCase(object):
 
-        Arguments:
-            parser_name (list):
-                A list of parser names to run tests for. If the list is empty (default),
-                then test cases for all parsers will be run.
-            field_names(list):
-                A restricted list of fields (metadata key values) that should be compared
-                during testing. If the list is empty (default), then all fields, except those in
-                ignore_field_names will be compared.
-        """
-        if not field_names:
-            field_names = []
+    def __init__(self, reporter, parser, expected_results,
+                 field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
+        self._reporter = reporter
+        self.input_file_path = expected_results[INPUT_FILE_PATH]
+        self.filename = os.path.basename(self.input_file_path)
+        self.parser = parser
+        self.parser_source, _, self.parser_name = parser.rpartition(':')
+        self.expected_results = expected_results
+        self._field_names = field_names or []
+        self._ignore_field_names = ignore_field_names or []
 
-        # Determine files to test (this will be a list of JSON files). If no parser name(s) is specified, run
-        # all tests.
-        if not parser_names:
-            parser_names = [None]
-
-        test_case_file_paths = []
-        for parser_name in parser_names:
-            # We want to iterate parsers in case parser_name represents a set of parsers from different sources.
-            found = False
-            for name, source, _ in mwcp.iter_parsers(parser_name):
-                found = True
-                parser_name = '{}:{}'.format(source, name)
-                results_file_path = self.get_results_filepath(parser_name)
-                if os.path.isfile(results_file_path):
-                    test_case_file_paths.append((parser_name, results_file_path))
-                else:
-                    print("Results file not found for {} parser".format(parser_name).encode(**encode_params))
-                    print("File(s) not found = {}".format(results_file_path).encode(**encode_params))
-
-            if not found:
-                print("Parser not found for: {}".format(parser_name).encode(**encode_params))
-
-        cores = mp.cpu_count()
-        procs = nprocs or (3 * cores) // 4
-        pool = multi_proc.TPool(
-            processes=procs, initializer=mwcp.register_parser_directory,
-            initargs=(self.reporter.parserdir,))
-
-        tests = []
-        # Just for nicer formatting...
-        parser_len = 0
-        filename_len = 0
-        # Parse test case/results files, run tests, and compare expected results to produced results
-        for parser_name, results_file_path in test_case_file_paths:
-            results_data = self.parse_results_file(results_file_path)
-
-            for result_data in results_data:
-                parser_len = max(parser_len, len(os.path.basename(parser_name)))
-                filename_len = max(filename_len, len(os.path.basename(result_data[self.INPUT_FILE_PATH])))
-                tests.append((self, result_data, parser_name, field_names, ignore_field_names))
-
-        # While the tests will start in the order they were added, they will be yielded roughly in the
-        # order they complete.
-        test_iter = pool.imap_unordered(multiproc_test_wrapper, tests)
-        pool.close()
-
-        finished_tests = 0
-        digits = len(str(len(tests)))
-
-        try:
-            for results in test_iter:
-                # Add an info dict to the returned results
-                # Built with formatting here since we have knowledge of all test cases
-                finished_tests += 1
-                test_info = {
-                    'finished': str(finished_tests).zfill(digits),
-                    'total': str(len(tests)).zfill(digits),
-                    'parser': os.path.basename(results.parser).ljust(parser_len),
-                    'filename': os.path.basename(results.input_file_path).ljust(filename_len),
-                    'run_time': results.run_time
-                }
-                yield results, test_info
-        except KeyboardInterrupt:
-            pool.terminate()
-            raise
-
-    def async_test(self, result_data, parser_name, field_names, ignore_field_names):
-        """Test running logic, separated into its own function for multi-processing purposes."""
+    def run(self):
+        """Run test case."""
         start_time = default_timer()
-        input_file_path = result_data[self.INPUT_FILE_PATH]
-        new_results = self.gen_results(parser_name, input_file_path)
-        comparer_results = self.compare_results(
-            result_data,
-            new_results,
-            field_names,
-            ignore_field_names=ignore_field_names
-        )
+
+        self._reporter.run_parser(self.parser, self.input_file_path)
+        self._reporter.metadata[INPUT_FILE_PATH] = convert_to_unicode(self.input_file_path)
+        results = self._reporter.metadata
+
+        comparer_results = self._compare_results(self.expected_results, results)
         passed = all(comparer.passed for comparer in comparer_results)
 
         done_time = default_timer()
         run_time = done_time - start_time
-        debug = self.reporter.metadata["debug"] if "debug" in self.reporter.metadata else None
-        test_result = TestResult(
-            parser=parser_name,
-            input_file_path=input_file_path,
+
+        return TestResult(
+            parser=self.parser,
+            input_file_path=self.input_file_path,
             passed=passed,
-            errors=self.reporter.errors,
-            debug=debug,
+            errors=self._reporter.errors,
+            debug=self._reporter.metadata.get('debug', None),
             results=comparer_results,
             run_time=run_time
         )
 
-        return test_result
-
-    def get_test_results(self, parser_name, results_file_path, field_names, ignore_field_names):
-        """
-        Parse test case/results files, run tests, and compare expected results to produced results
-        """
-        results_data = self.parse_results_file(results_file_path)
-
-        test_results = []
-        for result_data in results_data:
-            input_file_path = result_data[self.INPUT_FILE_PATH]
-
-            # Rerun the file to get the most up to date parser results
-            new_results = self.gen_results(parser_name, input_file_path)
-
-            # Compare the newly generated results to previously saved test results
-            comparer_results = self.compare_results(
-                result_data, new_results, field_names, ignore_field_names=ignore_field_names)
-
-            # Determine if any of field comparisons failed
-            passed = all(comparer.passed for comparer in comparer_results)
-
-            # Track the test results
-            debug = self.reporter.metadata["debug"] if "debug" in self.reporter.metadata else None
-            test_result = TestResult(parser=parser_name,
-                                     input_file_path=input_file_path,
-                                     passed=passed,
-                                     errors=self.reporter.errors,
-                                     debug=debug,
-                                     results=comparer_results)
-            test_results.append(test_result)
-
-        return test_results
-
-    def compare_results(self, results_a, results_b, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
+    def _compare_results(self, results_a, results_b):
         """
         Compare two result sets. If the field names list is not empty,
         then only the fields (metadata key values) in the list will be compared.
         ignore_field_names fields are not compared unless included in field_names.
         """
-
         results = []
-        if not field_names:
-            field_names = []
 
         # Cursory check to remove FILE_INPUT_PATH key from results since it is
         # a custom added field for test cases
-        if self.INPUT_FILE_PATH in results_a:
+        if INPUT_FILE_PATH in results_a:
             results_a = dict(results_a)
-            del results_a[self.INPUT_FILE_PATH]
-        if self.INPUT_FILE_PATH in results_b:
+            del results_a[INPUT_FILE_PATH]
+        if INPUT_FILE_PATH in results_b:
             results_b = dict(results_b)
-            del results_b[self.INPUT_FILE_PATH]
+            del results_b[INPUT_FILE_PATH]
 
         # Begin comparing results
-        if len(field_names) > 0:
-            for field_name in field_names:
+        if self._field_names:
+            for field_name in self._field_names:
                 try:
-                    comparer = self.compare_results_field(
-                        results_a, results_b, field_name)
+                    comparer = self._compare_results_field(results_a, results_b, field_name)
                 except:
                     comparer = ResultComparer(field_name)
-                    logger.exception('Failed to compare results.')
+                    self._reporter.error(traceback.format_exc())
                 results.append(comparer)
         else:
-            for ignore_field in ignore_field_names:
+            for ignore_field in self._ignore_field_names:
                 results_a.pop(ignore_field, None)
                 results_b.pop(ignore_field, None)
             all_field_names = set(results_a.keys()).union(list(results_b.keys()))
             for field_name in all_field_names:
                 try:
-                    comparer = self.compare_results_field(
+                    comparer = self._compare_results_field(
                         results_a, results_b, field_name)
                 except:
                     comparer = ResultComparer(field_name)
-                    logger.exception('Failed to compare results.')
+                    self._reporter.error(traceback.format_exc())
                 results.append(comparer)
 
         return results
 
-    def compare_results_field(self, results_a, results_b, field_name):
+    def _compare_results_field(self, results_a, results_b, field_name):
         """
         Compare the values for a single results field in the two passed in results.
 
@@ -388,7 +347,7 @@ class Tester(object):
                 "Failed to convert field name '{}' to unicode.".format(field_name))
 
         try:
-            field_type = self.reporter.fields[field_name_u]['type']
+            field_type = self._reporter.fields[field_name_u]['type']
         except:
             raise Exception(
                 "Key error. Field name '{}' was not identified as a standardized field.".format(field_name))
@@ -418,74 +377,65 @@ class Tester(object):
 
         return comparer
 
-    def print_test_results(self, test_results, failed_tests=True, passed_tests=True, verbose=False, json_format=False):
-        """
-        print(test results based on provided parameters. Expects results format
-        produced by run_tests() function.
-        """
-
-        if json_format:
-            filtered_output = []
-            for test_result in test_results:
-                passed = test_result.passed
-                if (passed and passed_tests) or (not passed and failed_tests):
-                    filtered_output.append(test_result)
-
-            print(json.dumps(filtered_output, indent=4, cls=MyEncoder))
-        else:
-            separator = ""
-
-            for test_result in test_results:
-                filtered_output = ""
-                passed = test_result.passed
-                if passed and passed_tests:
-                    filtered_output += "Parser Name = {}\n".format(
-                        test_result.parser)
-                    filtered_output += "Input Filename = {}\n".format(
-                        test_result.input_file_path)
-                    filtered_output += "Tests Passed = {}\n".format(
-                        test_result.passed)
-                elif not passed and failed_tests:
-                    filtered_output += "Parser Name = {}\n".format(
-                        test_result.parser)
-                    filtered_output += "Input Filename = {}\n".format(
-                        test_result.input_file_path)
-                    filtered_output += "Tests Passed = {}\n".format(
-                        test_result.passed)
-                    filtered_output += "Errors = {}".format(
-                        "\n" if test_result.errors else "None\n")
-                    if test_result.errors:
-                        for entry in test_result.errors:
-                            filtered_output += "\t{0}\n".format(entry)
-                    filtered_output += "Debug Logs = {}".format(
-                        "\n" if test_result.debug else "None\n")
-                    if test_result.debug:
-                        for entry in test_result.debug:
-                            filtered_output += "\t{0}\n".format(entry)
-                    filtered_output += "Results =\n"
-                    for result in test_result.results:
-                        if not result.passed:
-                            filtered_output += "{0}\n".format(result)
-
-                if filtered_output != "":
-                    filtered_output += "{0}\n".format(separator)
-                    print(filtered_output.encode(**encode_params))
-
-
-####################################################
-# Result class simply to store data
-####################################################
 
 class TestResult(object):
 
-    def __init__(self, parser, input_file_path, passed, errors=None, debug=None, results=None, run_time=None):
-        self.parser = parser
-        self.input_file_path = input_file_path
+    def __init__(self, parser, passed,
+                 input_file_path=None, errors=None, debug=None, results=None, run_time=None):
+        self.parser_source, _, self.parser_name = parser.rpartition(':')
+        self.input_file_path = input_file_path or 'N/A'
+        self.filename = os.path.basename(input_file_path) if input_file_path else 'N/A'
         self.passed = passed
-        self.errors = [] if not errors else errors
-        self.debug = [] if not debug else debug
-        self.results = results
-        self.run_time = run_time
+        self.errors = errors or []
+        self.debug = debug or []
+        self.results = results or []
+        self.run_time = run_time or 0
+
+    def print(self, failed_tests=True, passed_tests=True, json_format=False):
+        """
+        print test result based on provided parameters.
+
+        :param bool failed_tests: Whether to show failed tests.
+        :param bool passed_tests: Whether to show passed tests.
+        :param bool json_format: Whether to format results as json.
+        """
+        # TODO: Do we need the json option?
+        if json_format:
+            passed = self.passed
+            if (passed and passed_tests) or (not passed and failed_tests):
+                print(json.dumps(self, indent=4, cls=MyEncoder))
+        else:
+            separator = ""
+
+            filtered_output = ""
+            passed = self.passed
+            if passed and passed_tests:
+                filtered_output += "Parser Name = {}\n".format(self.parser_name)
+                if self.input_file_path and self.input_file_path != 'N/A':
+                    filtered_output += "Input Filename = {}\n".format(self.input_file_path)
+                filtered_output += "Tests Passed = {}\n".format(self.passed)
+            elif not passed and failed_tests:
+                filtered_output += "Parser Name = {}\n".format(self.parser_name)
+                if self.input_file_path and self.input_file_path != 'N/A':
+                    filtered_output += "Input Filename = {}\n".format(self.input_file_path)
+                filtered_output += "Tests Passed = {}\n".format(self.passed)
+                filtered_output += "Errors = {}".format("\n" if self.errors else "None\n")
+                if self.errors:
+                    for entry in self.errors:
+                        filtered_output += "\t{0}\n".format(entry)
+                filtered_output += "Debug Logs = {}".format("\n" if self.debug else "None\n")
+                if self.debug:
+                    for entry in self.debug:
+                        filtered_output += "\t{0}\n".format(entry)
+                if self.results:
+                    filtered_output += "Results =\n"
+                    for result in self.results:
+                        if not result.passed:
+                            filtered_output += "{0}\n".format(result)
+
+            if filtered_output:
+                filtered_output += "{0}\n".format(separator)
+                print(filtered_output.encode(**encode_params))
 
 
 ####################################################
@@ -509,10 +459,7 @@ class ResultComparer(object):
 
         self.field_compare(test_case_results, new_results)
 
-        if self.missing or self.unexpected:
-            self.passed = False
-        else:
-            self.passed = True
+        self.passed = not bool(self.missing or self.unexpected)
 
     def field_compare(self, test_case_results, new_results):
         """Field specific compare function."""
@@ -562,9 +509,6 @@ class ResultComparer(object):
 
 class ListOfStringsComparer(ResultComparer):
 
-    def __init__(self, field):
-        super(ListOfStringsComparer, self).__init__(field)
-
     def field_compare(self, test_case_results, new_results):
         """Compare each string in a list of strings."""
         list_test = [] if not test_case_results else test_case_results
@@ -575,9 +519,6 @@ class ListOfStringsComparer(ResultComparer):
 
 
 class ListOfStringTuplesComparer(ResultComparer):
-
-    def __init__(self, field):
-        super(ListOfStringTuplesComparer, self).__init__(field)
 
     def field_compare(self, test_case_results, new_results):
         """Compare each tuple of strings in a list of tuples."""
@@ -604,9 +545,6 @@ class ListOfStringTuplesComparer(ResultComparer):
 
 
 class DictOfStringsComparer(ResultComparer):
-
-    def __init__(self, field):
-        super(DictOfStringsComparer, self).__init__(field)
 
     def field_compare(self, test_case_results, new_results):
         """Compare each key value pair in a dictionary of strings."""

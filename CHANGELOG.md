@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+### Changed
+- Parsers are now imported on-demand to save initial startup time.
+- Small tweaks to logging level.
+- Refactored testing utility and force a failed test if a test case or parser is missing.
+
 ### Fixed
 - Fixed bug where new parsers in the default directory were not getting registered. ([\#6](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/6))
 
@@ -28,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - Reporter will now modify the output filename on a name collision.
 - Fixed bug with incorrect csv output formatting when input is a directory.
 
+
 ## [1.3.0] - 2018-05-15
 ### Added
 - Added unit testing using tox and pytest.
@@ -41,6 +47,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Fixed "unorderable types" error when outputting to csv
 - Fixed bugs found in  unit tests.
+
 
 ## [1.2.0] - 2018-04-17
 ### Added
@@ -56,6 +63,7 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 - Removed `enstructured` library.
+
 
 ## [1.1.0] - 2018-01-09
 ### Added
