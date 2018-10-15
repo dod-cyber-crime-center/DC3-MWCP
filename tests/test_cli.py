@@ -115,6 +115,9 @@ def test_list_parsers(script_runner):
     assert "bar" in ret.stdout
     assert "foo" in ret.stdout
 
+    from mwcp import parsers
+    directory = os.path.dirname(parsers.__file__).lower()
+
     # Test json out
     ret = script_runner.run('mwcp-tool', '-l', '-j')
     print(ret.stdout)
@@ -122,8 +125,8 @@ def test_list_parsers(script_runner):
     assert ret.success
     output = json.loads(ret.stdout)
     assert output == [
-        ['bar', 'mwcp', 'DC3', 'example parser using the Dispatcher model'],
-        ['foo', 'mwcp', 'DC3', 'example parser that works on any file']
+        ['bar', directory, 'DC3', 'example parser using the Dispatcher model'],
+        ['foo', directory, 'DC3', 'example parser that works on any file']
     ]
 
 

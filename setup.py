@@ -38,10 +38,11 @@ setup(
             'mwcp-server = mwcp.tools.server:main',
             'mwcp-test = mwcp.tools.test:main'
         ],
-        'mwcp.parsers': [
-            'bar = mwcp.parsers.bar:Bar',
-            'foo = mwcp.parsers.foo:Foo'
-        ]
+        # TODO: Register parsers based on parent package instead of individually.
+        # 'mwcp.parsers': [
+        #     'bar = mwcp.parsers.bar:Bar',
+        #     'foo = mwcp.parsers.foo:Foo'
+        # ]
     },
     install_requires=[
         'bottle',

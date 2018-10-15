@@ -163,13 +163,8 @@ class Reporter(object):
         self.__outputfile_prefix = outputfile_prefix or ''
 
         # Register parsers from given directory.
-        # Only register if a custom parserdir was provided or MWCP's entry_points did not get registered because
-        # the project was not installed with setuptools.
-        # NOTE: This is all to keep backwards compatibility. mwcp.register_parser_directory() should be
-        # called outside of this class in the future.
         self.parserdir = parserdir or self.DEFAULT_PARSERDIR
-        if self.parserdir != self.DEFAULT_PARSERDIR or not any(mwcp.iter_parsers(source='mwcp')):
-            mwcp.register_parser_directory(self.parserdir)
+        mwcp.register_parser_directory(self.parserdir)
 
         self._interpreter_path = interpreter_path
         self._disable_output_files = disableoutputfiles

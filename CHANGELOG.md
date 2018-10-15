@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+### Fixed
+- Fixed bug where new parsers in the default directory were not getting registered. ([\#6](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/6))
+
 ## [1.4.0] - 2018-08-07
 ### Added
 - `elffileutils` helper utility that works similar to `pefileutils`, but for ELF files.
