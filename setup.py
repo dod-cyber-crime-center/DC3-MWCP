@@ -37,7 +37,8 @@ setup(
             'mwcp-tool = mwcp.tools.tool:main',
             'mwcp-client = mwcp.tools.client:main',
             'mwcp-server = mwcp.tools.server:main',
-            'mwcp-test = mwcp.tools.test:main'
+            'mwcp-test = mwcp.tools.test:main',
+            'poshdeob = mwcp.utils.poshdeob:main'
         ],
         'mwcp.parsers': [
             'mwcp = mwcp.parsers',
@@ -51,6 +52,7 @@ setup(
         'jinja2',  # For construct.html_hex()
         'pefile',
         'pyelftools',
+        'pyparsing',
         'pyyaml',
         'requests',
         'ruamel.yaml',

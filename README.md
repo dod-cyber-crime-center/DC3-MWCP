@@ -320,3 +320,5 @@ MWCP comes with a few helper utilities (located in `mwcp.utils`) that may become
     - Please follow [this tutorial](docs/construct.ipynb) for migrating from `enstructured` to `construct`.
 - `pecon` - PE file reconstruction utility.
     - Please see docstring in [pecon.py](mwcp/utils/pecon.py) for more information.
+- `poshdeob` - An experimental powershell deobfuscator utility used to deobfuscate code and extract strings.
+ 

@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
     - Parsers can be run using the naming scheme `TA.{decoder_filename}` after placing the parsers 
       in the `mwcp/resources/RATDecoders` directory.
 - `pecon` PE file reconstruction utility.
+- `poshdeob` Powershell deobfuscator utility.
 - Support for relative input paths in test cases.
 
 ### Changed
