@@ -15,25 +15,7 @@ from io import BytesIO
 
 # Allowing for two tabs to accommodate Publisher
 TECHANARCHY_OUTPUT_RE = r"""Key: (.*?)\t{1,2} Value: (.*)"""
-TECHANARCHY_DIRECTORY = 'RATDecoders'
-SCRIPT_CREATION_STRING = """import os
-from mwcp import Parser
-from mwcp import resources
-from mwcp.resources import techanarchy_bridge
 
-class TechAnarchy(Parser):
-    def __init__(self,reporter=None):
-        Parser.__init__(self,
-                description='Techanarchy %s RATdecoder using bridge',
-                author='TA',
-                reporter=reporter
-                )
-
-    def run(self):
-        scriptpath = os.path.join(os.path.dirname(resources.__file__), '%s', '%s' + '.py')
-        techanarchy_bridge.run_decoder(self.reporter, scriptpath)
-
-"""
 """
     New key/fields added that are not current MWCP key pairs should be added to one of the lists
     below. C2 url keys are added to the domain key list.
@@ -353,7 +335,35 @@ def map_ta_to_mwcp_keys(scriptname, data, reporter):
         map_ta_jar_fields(data, reporter)
 
 
-def run_decoder(reporter, script, scriptname=""):
+_interpreter_path = None
+
+def interpreter_path():
+    """
+    Returns the path for python interpreter, assuming it can be found. Because of various
+    factors (including ability to override) this may not be accurate.
+    """
+    global _interpreter_path
+    if not _interpreter_path:
+        # first try sys.executable--this is reliable most of the time but
+        # doesn't work when python is embedded, ex. using wsgi mod for web
+        # server
+        if "python" in os.path.basename(sys.executable):
+            _interpreter_path = sys.executable
+        # second try sys.prefix and common executable names
+        else:
+            possible_path = os.path.join(sys.prefix, "python.exe")
+            if os.path.exists(possible_path):
+                _interpreter_path = possible_path
+            possible_path = os.path.join(sys.prefix, "bin", "python")
+            if os.path.exists(possible_path):
+                _interpreter_path = possible_path
+        # other options to consider:
+        # look at some library paths, such as os.__file__, use system path to find python
+        # executable that uses that library use shell and let it find python. Ex. which python
+    return _interpreter_path
+
+
+def run_decoder(parser, script, scriptname=""):
     """
     Run a RATdecoder and report output
 
@@ -366,16 +376,16 @@ def run_decoder(reporter, script, scriptname=""):
     if not scriptname:
         scriptname = os.path.basename(script)[:-3]
 
-    tempdir = reporter.managed_tempdir()
+    tempdir = parser.reporter.managed_tempdir
     outputfile = os.path.join(tempdir, "techanarchy_output")
 
-    if reporter.interpreter_path():
-        command = [reporter.interpreter_path(), script,
-                   reporter.filename(), outputfile]
+    if interpreter_path():
+        command = [interpreter_path(), script,
+                   parser.file_object.file_path, outputfile]
     else:
-        command = [script, reporter.filename(), outputfile]
+        command = [script, parser.file_object.file_path, outputfile]
 
-    reporter.debug("Running %s using %s" % (scriptname, " ".join(command)))
+    parser.logger.info("Running %s using %s" % (scriptname, " ".join(command)))
 
     popen_object = subprocess.Popen(
         command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -383,14 +393,14 @@ def run_decoder(reporter, script, scriptname=""):
 
     termhandle = BytesIO(stdout)
     for line in termhandle:
-        reporter.debug(line.rstrip())
+        parser.logger.info(line.rstrip())
 
     termhandle = BytesIO(stderr)
     for line in termhandle:
-        reporter.debug(line.rstrip())
+        parser.logger.warning(line.rstrip())
 
     if popen_object.returncode != 0:
-        reporter.debug("Error running script. Return code: %i" %
+        parser.logger.error("Error running script. Return code: %i" %
                        popen_object.returncode)
 
     configlist = []
@@ -398,7 +408,7 @@ def run_decoder(reporter, script, scriptname=""):
         with open(outputfile, "rb") as f:
             configlist = [line.rstrip("\n\r") for line in f]
     except Exception as e:
-        reporter.debug("Error reading script output file: %s" % str(e))
+        parser.logger.error("Error reading script output file: %s" % str(e))
 
     output_re = re.compile(TECHANARCHY_OUTPUT_RE)
     output_data = {}
@@ -408,36 +418,14 @@ def run_decoder(reporter, script, scriptname=""):
         if match:
             key = match.group(1)
             value = match.group(2)
-            reporter.add_metadata("other", {key: value})
+            parser.reporter.add_metadata("other", {key: value})
             if value:
                 if key in output_data:
-                    reporter.debug("collision on output key: %s" % key)
+                    parser.logger.warning("collision on output key: %s" % key)
                 output_data[key] = value
         else:
-            reporter.debug("Could not parse output item: %s" % item)
+            parser.logger.warning("Could not parse output item: %s" % item)
 
     data = output_data
 
-    map_ta_to_mwcp_keys(scriptname, data, reporter)
-
-
-def main():
-    if len(sys.argv) < 2:
-        print("usage: techanarchy_bridge.py NAME ")
-        print("NAME should be decoder basename without .py extension.")
-        print(
-            "when run as a script from the 'parsers' directory, makes an "
-            "DC3-MWCP parser for the specified malware family")
-        exit(1)
-
-    scriptname = sys.argv[1]
-
-    output = SCRIPT_CREATION_STRING % (
-        scriptname, TECHANARCHY_DIRECTORY, scriptname)
-
-    with open(scriptname + "_TA_malwareconfigparser.py", "w") as f:
-        f.write(output)
-
-
-if __name__ == '__main__':
-    main()
+    map_ta_to_mwcp_keys(scriptname, data, parser.reporter)

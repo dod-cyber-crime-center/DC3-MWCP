@@ -117,7 +117,7 @@ def setup_logging(default_level=logging.INFO, queue=None):
         logging.root.setLevel(logging.DEBUG)  # Allow all records to pass through.
     else:
         # Allow setting log configuration using 'MWCP_LOG_CFG' environment variable.
-        log_config = os.getenv('MWCP_LOG_CFG', mwcp_config.log_config)
+        log_config = os.getenv('MWCP_LOG_CFG', mwcp_config.LOG_CONFIG_PATH)
         try:
             with open(log_config, 'rt') as f:
                 config = yaml.safe_load(f.read())

@@ -8,6 +8,14 @@ Below are the guidelines. Keep in mind "a foolish consistency is the hobgoblin o
 - [Misc](#misc)
 
 
+### Guides
+- [Parser Development](ParserDevelopment.md)
+- [Parser Components](ParserComponents.md)
+- [Parser Installation](ParserInstallation.md)
+- [Parser Testing](ParserTesting.md)
+- [Python Style Guide](PythonStyleGuide.md)
+
+
 ## Formatting
 - Do not use tab characters for indentation; use four spaces. Pretty much any non-notepad text editor can do this automatically when you press tab once configured correctly.
 - The standard page width is 110 characters. Obviously, things like long YARA rules will violate this, and that's fine.

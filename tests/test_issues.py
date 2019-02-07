@@ -31,4 +31,14 @@ def test_csv_row_bug(script_runner, tmpdir, test_dir):
         for i, row in enumerate(rows[1:]):
             assert row[0] and row[1]
             # Test entries except the timestamp and full file path.
-            assert row[2:] == ['fooconfigtest.txt', 'example output file', '5eb63bbbe01eeed093cb22bb8f5acdc3', '127.0.0.1', '[+] size of inputfile is 23 bytes\n[+] Output file: fb843efb2ffec987db12e72ca75c9ea2_fooconfigtest.txt\n[+] operating on inputfile test_{}.txt'.format(i), 'http://127.0.0.1']
+            assert row[2:] == [
+                'fooconfigtest.txt',
+                'example output file',
+                '5eb63bbbe01eeed093cb22bb8f5acdc3',
+                '127.0.0.1',
+                ('[+] File test_{0}.txt identified as Foo.\n'
+                '[+] size of inputfile is 23 bytes\n'
+                '[+] Output file: fb843efb2ffec987db12e72ca75c9ea2_fooconfigtest.txt\n'
+                '[+] operating on inputfile test_{0}.txt').format(i),
+                'http://127.0.0.1',
+            ]

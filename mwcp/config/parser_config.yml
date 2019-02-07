@@ -1,0 +1,14 @@
+bar:
+  description: example parser that uses dispatcher components
+  author: DC3
+  parsers:
+    - .Carrier
+    - .Dropper
+    - .Implant
+    - .ImplantV2
+
+foo:
+  description: example parser that works on any file
+  author: DC3
+  parsers:
+    - .Foo

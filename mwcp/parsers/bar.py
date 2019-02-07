@@ -4,11 +4,11 @@ This is an example parser used to show how to use the Dispatcher model to organi
 
 import re
 
-from mwcp import Parser, ComponentParser, Dispatcher, FileObject
+from mwcp import Parser, FileObject
 from mwcp.utils import pefileutils, construct
 
 
-class BarCarrier(ComponentParser):
+class Carrier(Parser):
     """A carrier for the Bar dropper."""
     DESCRIPTION = 'Bar Carrier'
 
@@ -33,7 +33,7 @@ class BarCarrier(ComponentParser):
         self.dispatcher.add_to_queue(FileObject(embed_data, self.reporter))
 
 
-class BarDropper(ComponentParser):
+class Dropper(Parser):
     """A dropper for the Bar implant."""
     DESCRIPTION = 'Bar Dropper'
 
@@ -53,7 +53,7 @@ class BarDropper(ComponentParser):
             self.dispatcher.add_to_queue(FileObject(rsrc.data, self.reporter, file_name=rsrc.idname))
 
 
-class BarImplant(ComponentParser):
+class Implant(Parser):
     """A Bar implant found as a python script."""
     DESCRIPTION = 'Bar Implant'
 
@@ -75,7 +75,7 @@ class BarImplant(ComponentParser):
             self.reporter.add_metadata('c2_socketaddress', (callback, port, 'tcp'))
 
 
-class BarImplantV2(ComponentParser):
+class ImplantV2(Parser):
     """An alternative version of Bar Implant using an exe instead."""
     DESCRIPTION = 'Bar Implant V2'
 
@@ -97,21 +97,3 @@ class BarImplantV2(ComponentParser):
         # Extract the callback and port numbers found in this .exe script.
         for config in self.CALLBACK[:].parse(self.file_object.file_data):
             self.reporter.add_metadata('c2_socketaddress', (config.callback, str(config.port), 'tcp'))
-
-
-class Bar(Dispatcher, Parser):
-
-    def __init__(self, reporter=None):
-        Parser.__init__(self,
-                        description='example parser using the Dispatcher model',
-                        author='DC3',
-                        reporter=reporter
-                        )
-        Dispatcher.__init__(self,
-                            reporter,
-                            parsers=[
-                                BarCarrier,
-                                BarDropper,
-                                BarImplant,
-                                BarImplantV2
-                            ])

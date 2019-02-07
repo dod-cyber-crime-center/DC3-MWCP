@@ -13,9 +13,11 @@ import sys
 import traceback
 from timeit import default_timer
 
-from future.builtins import open, str
-
 logger = logging.getLogger(__name__)
+
+from future.builtins import str
+
+from io import open
 
 import mwcp
 from mwcp.utils.stringutils import convert_to_unicode
@@ -58,7 +60,7 @@ class Tester(object):
 
         :param mwcp.Reporter reporter: MWCP reporter object
         :param str results_dir: Directory of json test cases
-                (defaults to dynamically pulling from a "parsertests" folder next to parser's directory.)
+                (defaults to dynamically pulling from a "tests" folder within parser's directory.)
         :param [str] parser_names:
                 A list of parser names to run tests for. If the list is empty (default),
                 then test cases for all parsers will be run.
@@ -89,9 +91,7 @@ class Tester(object):
         # Run tests in multiprocessing pool (if not already run)
         if not self._processed:
             self._processed = True
-            pool = multi_proc.TPool(
-                processes=self._nprocs, initializer=mwcp.register_parser_directory,
-                initargs=(self.reporter.parserdir,))
+            pool = multi_proc.TPool(processes=self._nprocs)
             test_iter = pool.imap_unordered(
                 multiproc_test_wrapper, [(test_case,) for test_case in self.test_cases])
             pool.close()
@@ -112,22 +112,25 @@ class Tester(object):
             for parser_name in self.parser_names:
                 # We want to iterate parsers in case parser_name represents a set of parsers from different sources.
                 found = False
-                for name, source, _ in mwcp.iter_parsers(parser_name):
+                for source, parser in mwcp.iter_parsers(parser_name):
                     found = True
-                    parser = '{}:{}'.format(source, name)
-                    results_file_path = self.get_results_filepath(parser)
+                    full_parser_name = '{}:{}'.format(source.name, parser.name)
+                    results_file_path = self.get_results_filepath(full_parser_name)
                     if os.path.isfile(results_file_path):
                         for expected_results in self.parse_results_file(results_file_path):
+                            # Add results_file_path for relative paths.
+                            # NOTE: os.path.join will ignore the prefix we add if the second is not relative.
+                            input_file_path = expected_results[INPUT_FILE_PATH]
+                            input_file_path = os.path.join(os.path.dirname(results_file_path), input_file_path)
+                            input_file_path = os.path.abspath(input_file_path)
+                            expected_results[INPUT_FILE_PATH] = input_file_path
+
                             self._test_cases.append(TestCase(
-                                self.reporter, parser, expected_results,
+                                self.reporter, full_parser_name, expected_results,
                                 field_names=self.field_names, ignore_field_names=self.ignore_field_names))
                     else:
-                        # Add a failed result if the test case is missing.
-                        self._results.append(TestResult(
-                            parser=parser,
-                            passed=False,
-                            errors=['Test case file not found: {}'.format(results_file_path)],
-                        ))
+                        # Warn user if they are missing a test file for a parser group.
+                        logger.warning('Test case file not found: {}'.format(results_file_path))
 
                 if not found and parser_name:
                     # Add a failed results if we have an orphan test.
@@ -165,21 +168,20 @@ class Tester(object):
         Returns the results file path based on the parser name provided and the
         previously specified output directory.
         """
-        # TODO: Remove hardcoding "parsertests" folder. Determine better way to handle this.
-        for parser_name, source, klass in mwcp.iter_parsers(name, source=source):
-            file_name = parser_name + FILE_EXTENSION
+        for source, parser in mwcp.iter_parsers(name, source=source):
+            file_name = parser.name + FILE_EXTENSION
             # Use hardcoded results dir if requested.
             if self.results_dir:
                 return os.path.join(self.results_dir, file_name)
 
-            # If source is a directory, assume there is a "parsertests" folder next to it.
-            if os.path.isdir(source):
-                return os.path.normpath(os.path.join(source, '..', 'parsertests', file_name))
+            if source.is_pkg:
+                # Dynamically pull based on parser's top level module.
+                test_dir = pkg_resources.resource_filename(source.path, 'tests')
+            else:
+                # If source is a directory, assume there is a "tests" folder within it.
+                test_dir = os.path.join(source.path, 'tests')
 
-            # Otherwise dynamically pull based on parser's top level module.
-            top_level_module, _, _ = klass.__module__.partition('.')
-            results_dir = pkg_resources.resource_filename(top_level_module, 'parsertests')
-            return os.path.join(results_dir, file_name)
+            return os.path.normpath(os.path.join(test_dir, file_name))
 
         raise ValueError('Invalid parser: {}'.format(name))
 
@@ -196,7 +198,59 @@ class Tester(object):
 
         return data
 
-    def update_test_results(self, results_file_path, results_data, replace=True):
+    def update_tests(self):
+        """
+        Updates existing test cases by rerunning parsers.
+        """
+        orig_level = logging.root.level
+        logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
+        try:
+            for parser_name in self.parser_names:
+                results_file_path = self.get_results_filepath(parser_name)
+                if not os.path.isfile(results_file_path):
+                    logger.warning('No test case file found for parser: {}')
+                    continue
+                for input_file in self.list_test_files(parser_name):
+                    metadata = self.gen_results(parser_name, input_file)
+                    if not metadata:
+                        logger.warning('Empty results for {} in {}, not updating.'.format(input_file, results_file_path))
+                    if not self.reporter.errors:
+                        logger.info('Updating results for {} in {}'.format(input_file, results_file_path))
+                        self._update_test_results(results_file_path, metadata, replace=True)
+        finally:
+            logging.root.setLevel(orig_level)
+
+    def add_test(self, file_path):
+        """Adds test case for given file path."""
+        orig_level = logging.root.level
+        logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
+        try:
+            for parser_name in self.parser_names:
+                results_file_path = self.get_results_filepath(parser_name)
+                metadata = self.gen_results(parser_name, file_path)
+                if not metadata:
+                    logger.warning('Empty results for {} in {}, not adding.'.format(file_path, results_file_path))
+                if not self.reporter.errors:
+                    logger.info('Adding results for {} in {}'.format(file_path, results_file_path))
+                    self._update_test_results(results_file_path, metadata, replace=True)
+        finally:
+            logging.root.setLevel(orig_level)
+
+    def remove_test(self, file_path):
+        """Removes test case for given file path."""
+        for parser_name in self.parser_names:
+            results_file_path = self.get_results_filepath(parser_name)
+            results_file_data = []
+            for metadata in self.parse_results_file(results_file_path):
+                if metadata["inputfilename"] == file_path:
+                    logger.info('Removed results for {} in {}'.format(file_path, results_file_path))
+                else:
+                    results_file_data.append(metadata)
+
+            with open(results_file_path, 'w', encoding='utf8') as results_file:
+                results_file.write(str(json.dumps(results_file_data, results_file, indent=4, sort_keys=True)))
+
+    def _update_test_results(self, results_file_path, results_data, replace=True):
         """
         Update results in the results file with the passed in results data. If the
         file path for the results data matches a file path that is already found in
@@ -312,7 +366,7 @@ class TestCase(object):
                     comparer = self._compare_results_field(results_a, results_b, field_name)
                 except:
                     comparer = ResultComparer(field_name)
-                    self._reporter.error(traceback.format_exc())
+                    logger.error(traceback.format_exc())
                 results.append(comparer)
         else:
             for ignore_field in self._ignore_field_names:
@@ -325,7 +379,7 @@ class TestCase(object):
                         results_a, results_b, field_name)
                 except:
                     comparer = ResultComparer(field_name)
-                    self._reporter.error(traceback.format_exc())
+                    logger.error(traceback.format_exc())
                 results.append(comparer)
 
         return results
@@ -438,6 +492,8 @@ class TestResult(object):
                 print(filtered_output.encode(**encode_params))
 
 
+
+
 ####################################################
 # Comparer classes for various MWCP field types
 ####################################################
@@ -514,8 +570,8 @@ class ListOfStringsComparer(ResultComparer):
         list_test = [] if not test_case_results else test_case_results
         list_new = [] if not new_results else new_results
 
-        self.missing += list(set(list_test) - set(list_new))
-        self.unexpected += list(set(list_new) - set(list_test))
+        self.missing += list(map(repr, set(list_test) - set(list_new)))
+        self.unexpected += list(map(repr, set(list_new) - set(list_test)))
 
 
 class ListOfStringTuplesComparer(ResultComparer):
@@ -534,14 +590,14 @@ class ListOfStringTuplesComparer(ResultComparer):
                 # Append the list entry here instead of the set to preserve the
                 # entries ordering
                 self.missing.append(
-                    test_case_results[set_list_test.index(set_test)])
+                    repr(test_case_results[set_list_test.index(set_test)]))
 
         for set_new in set_list_new:
             if set_new not in set_list_test:
                 # Append the list entry here instead of the set to preserve the
                 # entries ordering
                 self.unexpected.append(
-                    new_results[set_list_new.index(set_new)])
+                    repr(new_results[set_list_new.index(set_new)]))
 
 
 class DictOfStringsComparer(ResultComparer):
@@ -553,15 +609,16 @@ class DictOfStringsComparer(ResultComparer):
 
         for key in dict_test:
             if key not in dict_new:
-                self.missing.append(u"{}: {}".format(key, dict_test[key]))
+                self.missing.append(u"{}: {!r}".format(key, dict_test[key]))
             elif set(dict_test[key]) != set(dict_new[key]):
-                self.missing.append(u"{}: {}".format(key, dict_test[key]))
+                self.missing.append(u"{}: {!r}".format(key, dict_test[key]))
 
         for key in dict_new:
             if key not in dict_test:
-                self.unexpected.append(u"{}: {}".format(key, dict_new[key]))
+                self.unexpected.append(u"{}: {!r}".format(key, dict_new[key]))
             elif set(dict_new[key]) != set(dict_test[key]):
-                self.unexpected.append(u"{}: {}".format(key, dict_new[key]))
+                self.unexpected.append(u"{}: {!r}".format(key, dict_new[key]))
+
 
 
 ####################################################

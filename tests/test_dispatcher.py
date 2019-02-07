@@ -21,7 +21,7 @@ def components():
     file_B = mwcp.FileObject(b'This is file B', reporter, file_name='B_match.txt', output_file=False)
     file_C = mwcp.FileObject(b'This is file C', reporter, file_name='no_match.txt', output_file=False)
 
-    class A(mwcp.ComponentParser):
+    class A(mwcp.Parser):
         DESCRIPTION = 'A Component'
         @classmethod
         def identify(cls, file_object):
@@ -31,13 +31,13 @@ def components():
             self.dispatcher.add_to_queue(file_B)
             self.dispatcher.add_to_queue(file_C)
 
-    class B(mwcp.ComponentParser):
+    class B(mwcp.Parser):
         DESCRIPTION = 'B Component'
         @classmethod
         def identify(cls, file_object):
             return file_object.file_name == 'B_match.txt'
 
-    dispatcher = mwcp.Dispatcher(reporter, [A, B])
+    dispatcher = mwcp.Dispatcher('my_dispatcher', parsers=[A, B])
 
     return locals()
 
@@ -45,9 +45,9 @@ def components():
 def test_identify_file(components):
     """Tests the _identify_file"""
     dispatcher = components['dispatcher']
-    assert list(dispatcher._identify_file(components['file_A'])) == [components['A']]
-    assert list(dispatcher._identify_file(components['file_B'])) == [components['B']]
-    assert list(dispatcher._identify_file(components['file_C'])) == [mwcp.UnidentifiedFile]
+    assert list(dispatcher._iter_parsers(components['file_A'])) == [components['A']]
+    assert list(dispatcher._iter_parsers(components['file_B'])) == [components['B']]
+    assert list(dispatcher._iter_parsers(components['file_C'])) == [mwcp.UnidentifiedFile]
 
 
 @pytest.mark.parametrize("input_file,expected", [
@@ -59,14 +59,13 @@ def test_dispatch(components, input_file, expected):
     """Test dispatching files."""
     dispatcher = components['dispatcher']
     input_file = components[input_file]
-
-    dispatcher.add_to_queue(input_file)
+    reporter = components['reporter']
 
     # sanity check
     for file in ('file_A', 'file_B', 'file_C'):
         assert components[file].description is None
 
-    dispatcher.dispatch()
+    dispatcher.parse(input_file, reporter)
 
     # make sure the correct files have been identified.
     for file, description in sorted(expected.items()):
@@ -81,7 +80,7 @@ def test_file_object(tmpdir):
 
     assert file_object.file_name == 'fb843efb2ffec987db12e72ca75c9ea2.bin'
     assert file_object.file_data == b'This is some test data!'
-    assert codecs.encode(file_object.md5, 'hex') == b'fb843efb2ffec987db12e72ca75c9ea2'
+    assert file_object.md5 == b'fb843efb2ffec987db12e72ca75c9ea2'
     assert file_object.resources is None
     assert file_object.pe is None
     assert file_object.file_path.startswith(os.path.join(output_dir, 'mwcp-managed_tempdir-'))

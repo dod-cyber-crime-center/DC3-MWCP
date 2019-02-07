@@ -5,7 +5,6 @@ To use, run the html_hex with a construct and data:
 """
 from __future__ import print_function
 
-import binascii
 import codecs
 import os
 import construct
@@ -23,35 +22,6 @@ try:
 except ImportError:
     # Python 3
     from itertools import zip_longest as izip_longest
-
-
-# Monkey patch Range so it adds the index in the "path" variable.
-# Okay so this is a little hacky, but it's the only way to reliably get list indexes for children.
-def _parse(self, stream, context, path):
-    min = self.min(context) if callable(self.min) else self.min
-    max = self.max(context) if callable(self.max) else self.max
-    if not 0 <= min <= max <= sys.maxsize:
-        raise construct.RangeError("unsane min %s and max %s" % (min, max))
-    obj = construct.ListContainer()
-    context = construct.Container(_ = context)
-    try:
-        # PATCH: add counter to path, so we know the children's index when viewing results.
-        counter = 0
-        while len(obj) < max:
-            fallback = stream.tell()
-            obj.append(self.subcon._parse(stream, context._, path + '[{}]'.format(counter)))
-            context[len(obj)-1] = obj[-1]
-            counter += 1
-    except StopIteration:
-        pass
-    except construct.ExplicitError:
-        raise
-    except Exception:
-        if len(obj) < min:
-            raise construct.RangeError("expected %d to %d, found %d" % (min, max, len(obj)))
-        stream.seek(fallback)
-    return obj
-construct.Range._parse = _parse
 
 
 COLORPALLETTE = [
@@ -129,16 +99,20 @@ class Member(construct.RawCopy):
         """
         self._member_map = member_map
         super(Member, self).__init__(subcon)
+        # version 2.9 doesn't perpetuate the name past one level anymore.
+        self.name = self.subcon.name
 
     def _generate_value_str(self, value, indent=0):
         tabs = '\t' * indent
         if isinstance(value, construct.ListContainer):
             return '- ' + tabs + ('\n' + '- ' + tabs).join(
-                self._generate_value_str(value_, indent=indent+1).lstrip() for value_ in value)
+                self._generate_value_str(value_, indent=indent+1).lstrip()
+                for value_ in value)
         elif isinstance(value, construct.Container):
             # NOTE: must use items() instead of iteritems() to keep order.
             return tabs + ('\n' + tabs).join(
-                '{}: \n{}'.format(name, self._generate_value_str(value_, indent=indent+1)) for name, value_ in value.items())
+                '{}: \n{}'.format(name, self._generate_value_str(value_, indent=indent+1))
+                for name, value_ in value.items() if not name.startswith('_'))
         elif isinstance(value, bytes):
             # Escape unprintable bytes with "\x" notation.
             # (using codecs necessary to get this to work in both python 2 and 3)
@@ -148,13 +122,18 @@ class Member(construct.RawCopy):
 
     def _parse(self, stream, context, path):
         obj = super(Member, self)._parse(stream, context, path)
+
         # Store offset, data, and size information then return original object like nothing happened...
-        if self.name:
+        if self.name and not self.name.startswith('_'):
             obj.name = self.name
             # Create a string representation of the value.
             obj.value_str = self._generate_value_str(obj.value)
-            # Need path to so we can pull name history.
+            # Need path to so we can pull name history. (Add index if there is one.)
             obj.path = path
+            index = getattr(context, '_index', None)
+            if index is not None:
+                obj.path += '[{}]'.format(index)
+            obj.docs = self.docs
 
             # Map ourselves to every byte we cover.
             for index in range(obj.offset1, obj.offset2):
@@ -185,6 +164,10 @@ class MemberMap(construct.Adapter):
 
     def _wrap_subcon(self, subcon):
         """Recursively wraps all subconstructs with Member."""
+        # Don't wrap the Probes.
+        if isinstance(subcon, construct.Probe):
+            return subcon
+
         # Recursively wrap internals as until we hit an adapter or non-Construct object.
         if isinstance(subcon, construct.Construct) and not isinstance(subcon, construct.Adapter):
             if hasattr(subcon, 'subcon'):
@@ -210,31 +193,31 @@ class MemberMap(construct.Adapter):
         self._member_map.clear()
         return super(MemberMap, self)._parse(stream, context, path)
 
-    def _decode(self, obj, context):
+    def _decode(self, obj, context, path):
         """Returns a copy of the member map."""
         return self._member_map.copy()
 
-    def _encode(self, obj, context):
+    def _encode(self, obj, context, path):
         raise NotImplementedError('Not supported.')
 
 
-def _gen_color_map(member_map, depth=1):
+def _gen_color_map(member_map, depth=1, member_callback=None):
     """
     Generates a color map that maps beginning offsets to a member.
 
     :param member_map: A dictionary map, mapping byte offsets to members.
     :param depth: The number of levels deep to display in table (defaults to all levels)
+    :param member_callback: Optional callback that can be used to tweak the member name or value before setting.
     :return:
     """
     if depth is not None and depth <= 0:
         raise ValueError('Invalid depth. Must be >= 1 or None.')
-    color_map = {}
-    color_generator = itertools.cycle(FORMAT_COLORS)
 
     # Contains set of parent members that are not allowed to be present.
     # (This helps to prevent a parent being displayed when a child contains a unnamed member (e.g. Padding))
     blacklist = set()
 
+    visible_members = {}
     curr_member = None
     for offset, members in sorted(member_map.items()):
         members = list(reversed(members))  # Members are generated in reverse with most depth being first.
@@ -252,13 +235,26 @@ def _gen_color_map(member_map, depth=1):
             # Rename member to contain parent names.
             # ([1:] to remove the "parsing" name)
             member.name = ' / '.join(member.path.split(' -> ')[1:] + [member.name])
-            color_map[offset] = (next(color_generator), member)
+            if member_callback:
+                results = member_callback(member.name, member.value_str)
+                if results:
+                    member.name, member.value_str = results
+            visible_members[offset] = member
             curr_member = member
+
+    # Remove any blacklisted members that slipped by.
+    # (This happens when the first entry in a construct is empty.)
+    visible_members = {offset: member
+                       for offset, member in visible_members.items() if id(member) not in blacklist}
+
+    # Assign colors.
+    color_generator = itertools.cycle(FORMAT_COLORS)
+    color_map = {offset: (next(color_generator), member) for offset, member in sorted(visible_members.items())}
 
     return color_map
 
 
-def html_hex(struct, data, width=16, depth=None):
+def html_hex(struct, data, width=16, depth=None, member_callback=None):
     """
     Uses construct to parse data and creates a user-friendly html hex dump.
 
@@ -266,11 +262,25 @@ def html_hex(struct, data, width=16, depth=None):
     :param data: Data to dump.
     :param width: The number of bytes displayed for each line.
     :param depth: The number of levels deep to display in table (defaults to all levels)
+    :param member_callback:
+        Optional callback function that can be used to tweak the
+        member name or value in the variable table.
+        Function must accept two parameters (name, value) and return a tuple of
+        the (name, value) or None to make no change.
+        e.g.
+        def edit_member(name, value):
+            if name == 'data':
+                return name, value.encode('hex')
+
+
+    :rtype str: returns unicode string of html data.
 
     :raises ConstructError: If given struct fails to parse given data.
     """
+    if width <= 0:
+        raise ValueError("Width must be a positive number.")
     member_map = MemberMap(struct).parse(data)
-    color_map = _gen_color_map(member_map, depth=depth)
+    color_map = _gen_color_map(member_map, depth=depth, member_callback=member_callback)
 
     hex_dump = []
     for line_number, line in enumerate(grouper(width, _iter_colors(data, color_map), fillvalue=(None, None))):
@@ -321,11 +331,14 @@ def html_hex(struct, data, width=16, depth=None):
         trim_blocks=True, lstrip_blocks=True)
     template = env.get_template('construct_template.html')
 
-    return template.render(hex_dump=hex_dump, color_map=color_map)
+    return template.render(hex_dump=hex_dump, color_map=color_map, width=width)
+
 
 if __name__ == '__main__':
     # Run an example if called directly.
-    from .helpers import IP4Address, HexString
+    from mwcp.utils.construct import version28 as construct
+    from mwcp.utils.construct.network import IP4Address
+    from mwcp.utils.construct.helpers import HexString
     from construct import this
 
     EMBED_SPEC = construct.Struct(
@@ -373,5 +386,5 @@ if __name__ == '__main__':
             b'-== Love AV ==-:\x00\x01\x00\x00\x00d\n\x00\x00\xc4\x07\x00\x00'
             b'Linux 3.13.0-93-generic\x001:G2.40\x00')
 
-    print(html_hex(PACKET, data, depth=1))
+    print(html_hex(PACKET, data, depth=2))
 

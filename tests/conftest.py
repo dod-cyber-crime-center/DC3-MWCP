@@ -28,12 +28,22 @@ def test_dir(tmpdir):
 TEST_PARSER = '''
 from mwcp import Parser
 
-class TestParser(Parser):
-    def __init__(self, reporter):
-        Parser.__init__(self, description="A test parser", author="Mr. Tester", reporter=reporter)
+class Downloader(Parser):
+    DESCRIPTION = "TestParser Downloader"
 
-    def run(self):
-        pass
+        
+class Implant(Parser):
+    DESCRIPTION = "TestParser Implant"
+    
+'''
+
+TEST_PARSER_CONFIG = '''
+test_parser:
+    description: A test parser
+    author: Mr. Tester
+    parsers:
+        - .Downloader
+        - .Implant
 '''
 
 
@@ -43,4 +53,13 @@ def test_parser(tmpdir):
     file_path = os.path.join(str(tmpdir), 'test_parser.py')
     with open(file_path, 'w') as f:
         f.write(TEST_PARSER)
-    return file_path
+
+    # Parser directories must have an __init__.py
+    with open(os.path.join(str(tmpdir), '__init__.py'), 'w') as _:
+        pass
+        
+    config_path = os.path.join(str(tmpdir), 'parser_config.yml')
+    with open(config_path, 'w') as f:
+        f.write(TEST_PARSER_CONFIG)
+        
+    return file_path, config_path

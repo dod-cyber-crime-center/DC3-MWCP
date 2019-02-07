@@ -18,10 +18,10 @@ import re
 import shutil
 import sys
 import tempfile
-import warnings
 
 import mwcp
-from mwcp import resources
+import mwcp.parsers
+from mwcp import config
 from mwcp.utils.stringutils import convert_to_unicode
 from mwcp.utils import logutil
 
@@ -76,19 +76,11 @@ class Reporter(object):
     is not recommended
 
     Attributes:
-        parserdir:
-            Optional extra directory where parsers reside.
         tempdir:
             directory where temporary files should be created. Files created in this directory should
             be deleted by parser. See managed_tempdir for mwcp managed directory
         input_file:
             the original parsed file. (instance of mwcp.FileObject)
-        data:
-            byte string data of the input_file (DEPRECATED)
-        handle:
-            file handle (BytesIO) of the input_file (DEPRECATED)
-        pe:
-            a pefile.PE object of the input_file (if applicable) (DEPRECATED)
         metadata:
             Dictionary containing the metadata extracted from the malware by the parser
         outputfiles:
@@ -104,30 +96,25 @@ class Reporter(object):
             use debug instead
 
     """
-
-    DEFAULT_PARSERDIR = os.path.dirname(mwcp.parsers.__file__)
+    URL_RE = re.compile(r"[a-z\.-]{1,40}://(?P<address>\[?[^/]+\]?)(?P<path>/[^?]+)?")
+    PORT_RE = re.compile(r"[0-9]{1,5}")
+    SHA1_RE = re.compile('[0-9a-fA-F]{40}')
 
     URL_RE = re.compile(r"[a-z\.-]{1,40}://(?P<address>\[?[^/]+\]?)(?P<path>/[^?]+)?")
     PORT_RE = re.compile(r"[0-9]{1,5}")
     SHA1_RE = re.compile('[0-9a-fA-F]{40}')
 
     def __init__(self,
-                 parserdir=None,
                  outputdir=None,
                  tempdir=None,
                  outputfile_prefix=None,
-                 interpreter_path=None,
-                 disableoutputfiles=False,
-                 disabletempcleanup=False,
-                 disableautosubfieldparsing=False,
-                 disablevaluededup=False,
-                 disablemodulesearch=False,
-                 base64outputfiles=False,
+                 disable_output_files=False,
+                 disable_temp_cleanup=False,
+                 base64_output_files=False,
                  ):
         """
         Initializes the Reporter object
 
-        :param str parserdir: sets parser directory (defaults to parsers found in mwcp/parsers)
         :param str tempdir: sets path to temporary directory
         :param str outputdir:
             sets directory for output_file(). Should not be written to (or read from) by parsers
@@ -135,212 +122,54 @@ class Reporter(object):
         :param str outputfile_prefix:
             sets prefix for output files written to outputdir. Special value "md5" causes prefix
             by md5 of the input file.
-        :param str interpreter_path: overrides value returned by interpreter_path()
-        :param bool disableoutputfiles: disable writing if files to filesystem
-        :param bool disabletempcleanup: disable cleanup (deletion) of temp files
-        :param bool disableautosubfieldparsing: disable parsing of metadata item of subfields
-        :param bool disablevaluededup: disable deduplication of metadata items
-        :param bool disablemodulesearch: disable search of modules for parsers, only look in parsers directory
+        :param bool disable_output_files: disable writing if files to filesystem
+        :param bool disable_temp_cleanup: disable cleanup (deletion) of temp files
         """
 
         # defaults
         self.tempdir = tempdir or tempfile.gettempdir()
         self.outputfiles = {}
-        self._handle = None
         self._log_handler = None
         self.fields = {"debug": {"description": "debug", "type": "listofstrings"}}
         self.metadata = {}
         self.errors = []
         self.input_file = None
 
-        # Continue to allow use of deprecated resourcedir.
-        # TODO: Remove this in a new release version.
-        self._resourcedir = None
-        self.resourcedir = os.path.dirname(resources.__file__)
+        self._managed_tempdir = None
+        self._output_dir = outputdir or ''
+        self._output_file_prefix = outputfile_prefix or ''
 
-        self.__managed_tempdir = None
-        self.__outputdir = outputdir or ''
-        self.__outputfile_prefix = outputfile_prefix or ''
+        self._disable_output_files = disable_output_files
+        self._disable_temp_cleanup = disable_temp_cleanup
+        self._base64_output_files = base64_output_files
 
-        # Register parsers from given directory.
-        self.parserdir = parserdir or self.DEFAULT_PARSERDIR
-        mwcp.register_parser_directory(self.parserdir)
-
-        self._interpreter_path = interpreter_path
-        self._disable_output_files = disableoutputfiles
-        self._disable_temp_cleanup = disabletempcleanup
-        self._disable_auto_subfield_parsing = disableautosubfieldparsing
-        self._disable_value_dedup = disablevaluededup
-        self._disable_module_search = disablemodulesearch
-        self._base64_output_files = base64outputfiles
-
-        # TODO: Move fields.json to shared data or config folder.
-        fieldspath = os.path.join(os.path.dirname(mwcp.resources.__file__), "fields.json")
-
-        with open(fieldspath, 'rb') as f:
+        with open(config.FIELDS_PATH, 'rb') as f:
             self.fields = json.load(f)
 
-    # Allow user to still use resourcedir feature, but warn about deprecation.
     @property
-    def resourcedir(self):
-        warnings.warn(
-            'resourcedir feature has been deprecated. Dependencies should be properly installed and managed by the parser developer.', DeprecationWarning, 1)
-        return self._resourcedir
-
-    @resourcedir.setter
-    def resourcedir(self, resourcedir):
-        warnings.warn(
-            'resourcedir feature has been deprecated. Dependencies should be properly installed and managed by the parser developer.', DeprecationWarning, 1)
-        self._resourcedir = resourcedir
-        if resourcedir not in sys.path:
-            sys.path.append(resourcedir)
-
-        # we put resourcedir in PYTHONPATH in case we shell out or children
-        # processes need this
-        if PY3:
-            if 'PYTHONPATH' in os.environ:
-                if resourcedir not in os.environ['PYTHONPATH']:
-                    os.environ['PYTHONPATH'] = os.environ['PYTHONPATH'] + os.pathsep + resourcedir
-            else:
-                os.environ['PYTHONPATH'] = resourcedir
-        else:
-            # Windows environment variables must be ascii encoded byte strings.
-            if not isinstance(resourcedir, bytes):
-                resourcedir = resourcedir.encode('ascii')
-            if b'PYTHONPATH' in os.environ:
-                if resourcedir not in os.environ[b'PYTHONPATH']:
-                    os.environ[b'PYTHONPATH'] = os.environ[b'PYTHONPATH'] + os.pathsep + resourcedir
-            else:
-                os.environ[b'PYTHONPATH'] = resourcedir
-
-    @property
-    def data(self):
-        warnings.warn(
-            'data attribute has been deprecated, please access the data through input_file.file_data',
-            DeprecationWarning
-        )
-        return self.input_file.file_data
-
-    @property
-    def pe(self):
-        warnings.warn(
-            'pe attribute has been deprecated, please access the pe through input_file.pe',
-            DeprecationWarning
-        )
-        return self.input_file.pe
-
-    @property
-    def handle(self):
-        warnings.warn(
-            'handle attribute has been deprecated, please use input_file in a "with" context instead',
-            DeprecationWarning
-        )
-        return self._handle
-
-    @property
-    def data(self):
-        warnings.warn(
-            'data attribute has been deprecated, please access the data through input_file.file_data',
-            DeprecationWarning
-        )
-        return self.input_file.file_data
-
-    @property
-    def pe(self):
-        warnings.warn(
-            'pe attribute has been deprecated, please access the pe through input_file.pe',
-            DeprecationWarning
-        )
-        return self.input_file.pe
-
-    @property
-    def handle(self):
-        warnings.warn(
-            'handle attribute has been deprecated, please use input_file in a "with" context instead',
-            DeprecationWarning
-        )
-        return self._handle
-
-    def filename(self):
-        """
-        Returns the filename of the input file. If input was not a filesystem object, we create a
-        temp file that is cleaned up after parser is finished (unless tempcleanup is disabled)
-        """
-        warnings.warn(
-            'filename() function has been deprecated, please access the filename through input_file.file_path',
-            DeprecationWarning
-        )
-        # NOTE: "filename" is misleading. This function actually returns the full file path.
-        return self.input_file.file_path
-
     def managed_tempdir(self):
         """
         Returns the filename of a managed temporary directory. This directory will be deleted when
         parser is finished, unless tempcleanup is disabled.
         """
 
-        if not self.__managed_tempdir:
-            self.__managed_tempdir = tempfile.mkdtemp(
+        if not self._managed_tempdir:
+            self._managed_tempdir = tempfile.mkdtemp(
                 dir=self.tempdir, prefix="mwcp-managed_tempdir-")
 
             if self._disable_temp_cleanup:
-                logger.info("Using managed temp dir: {}".format(self.__managed_tempdir))
+                logger.info("Using managed temp dir: {}".format(self._managed_tempdir))
 
-        return self.__managed_tempdir
-
-    def interpreter_path(self):
-        """
-        Returns the path for python interpreter, assuming it can be found. Because of various
-        factors (including ability to override) this may not be accurate.
-
-        """
-        if not self._interpreter_path:
-            # first try sys.executable--this is reliable most of the time but
-            # doesn't work when python is embedded, ex. using wsgi mod for web
-            # server
-            if "python" in os.path.basename(sys.executable):
-                self._interpreter_path = sys.executable
-            # second try sys.prefix and common executable names
-            else:
-                possible_path = os.path.join(sys.prefix, "python.exe")
-                if os.path.exists(possible_path):
-                    self._interpreter_path = possible_path
-                possible_path = os.path.join(sys.prefix, "bin", "python")
-                if os.path.exists(possible_path):
-                    self._interpreter_path = possible_path
-            # other options to consider:
-            # look at some library paths, such as os.__file__, use system path to find python
-            # executable that uses that library use shell and let it find python. Ex. which python
-        return self._interpreter_path
-
-    def error(self, message):
-        """
-        Record an error message--typically only framework reports error and parsers report via debug
-        """
-        warnings.warn('This function is deprecated. Please use Python\'s built in logging framework '
-                      'to log messages.', DeprecationWarning, 2)
-        logger.error(message)
-
-    def debug(self, message):
-        """
-        Record a debug message
-        """
-        warnings.warn('This function is deprecated. Please use Python\'s built in logging framework '
-                      'to log messages.', DeprecationWarning, 2)
-        # Even though reporter uses the name "debug".. This really is an INFO level debug message.
-        logger.info(message)
+        return self._managed_tempdir
 
     def _add_metatadata_listofstrings(self, key, value):
         if not value:
-            logger.error("no values provided for {}, skipping".format(key))
+            logger.info("no values provided for {}, skipping".format(key))
             return
         value = convert_to_unicode(value)
         obj = self.metadata.setdefault(key, [])
-        if self._disable_value_dedup or key == 'debug' or value not in obj:
+        if key == 'debug' or value not in obj:
             obj.append(value)
-
-        if self._disable_auto_subfield_parsing:
-            return
 
         if key == "filepath":
             # use ntpath instead of os.path so we are consistent across platforms. ntpath
@@ -419,11 +248,8 @@ class Reporter(object):
         values = list(map(convert_to_unicode, values))
 
         obj = self.metadata.setdefault(key, [])
-        if self._disable_value_dedup or values not in obj:
+        if values not in obj:
             obj.append(values)
-
-        if self._disable_auto_subfield_parsing:
-            return
 
         # Add subfield components.
         subfield_map = {
@@ -437,7 +263,7 @@ class Reporter(object):
                 if _value:
                     self.add_metadata(subfield, _value)
             if len(values) != len(subfields):
-                logger.error("Expected {} values in type {}, received {}".format(len(subfields), key, len(values)))
+                logger.warn("Expected {} values in type {}, received {}".format(len(subfields), key, len(values)))
 
         # Special case validation.
         if key == "c2_socketaddress":
@@ -450,33 +276,33 @@ class Reporter(object):
 
         if key == "socketaddress":
             if len(values) != 3:
-                logger.error(
+                logger.warn(
                     "Expected three values in type socketaddress, received %i" % len(values))
             self.add_metadata("address", values[0])
             self.add_metadata("port", values[1:])
 
         if key in ("port", "listenport"):
             if len(values) != 2:
-                logger.error("Expected two values in type %s, received %i" % (
+                logger.warn("Expected two values in type %s, received %i" % (
                     key, len(values)))
             # check for integer number and valid proto?
             match = self.PORT_RE.search(values[0])
             if match:
                 portnum = int(values[0])
                 if portnum < 0 or portnum > 65535:
-                    logger.error(
+                    logger.warn(
                         "Expected port to be number between 0 and 65535")
             else:
-                logger.error(
+                logger.warn(
                     "Expected port to be number between 0 and 65535")
             if len(values) >= 2:
                 if values[1] not in ["tcp", "udp", "icmp"]:
-                    logger.error(
+                    logger.warn(
                         "Expected port type to be tcp or udp (or icmp)")
 
         if key == "proxy":
             if len(values) != 5:
-                logger.error("Expected 5 values in type %s, received %i" % (key, len(values)))
+                logger.warn("Expected 5 values in type %s, received %i" % (key, len(values)))
             self.add_metadata("credential", values[:2])
             if len(values[2:]) == 1:
                 self.add_metadata("proxy_address", values[2])
@@ -485,18 +311,18 @@ class Reporter(object):
 
         if key == "ftp":
             if len(values) != 3:
-                logger.error("Expected 3 values in type %s, received %i" % (key, len(values)))
+                logger.warn("Expected 3 values in type %s, received %i" % (key, len(values)))
             self.add_metadata("credential", values[:2])
             if len(values) >= 3:
                 self.add_metadata("url", values[2])
 
         if key == "rsa_public_key":
             if len(values) != 2:
-                logger.error("Expected 3 values in type %s, received %i" % (key, len(values)))
+                logger.warn("Expected 3 values in type %s, received %i" % (key, len(values)))
 
         if key == "rsa_private_key":
             if len(values) != 8:
-                logger.error("Expected 8 values in type %s, received %i" % (key, len(values)))
+                logger.warn("Expected 8 values in type %s, received %i" % (key, len(values)))
 
     def _add_metadata_dictofstrings(self, key, value):
         # check for type of other?
@@ -519,7 +345,7 @@ class Reporter(object):
                     obj[subkey] = subvalue
             else:
                 # TODO: support inserts of lists (assuming members are strings)?
-                logger.error("Could not add object of %s to metadata under other using key %s" % (
+                logger.warn("Could not add object of %s to metadata under other using key %s" % (
                     str(type(subvalue[subkey])), subkey))
 
     def add_metadata(self, key, value):
@@ -565,6 +391,8 @@ class Reporter(object):
         """
         self.__reset()
 
+        # TODO: Remove all traces of the input file in the reporter!!
+        #  (kept around for now because tool.py uses it for pulling file info)
         if file_path:
             with open(file_path, 'rb') as f:
                 self.input_file = mwcp.FileObject(
@@ -576,20 +404,13 @@ class Reporter(object):
         try:
             with self.__redirect_stdout():
                 found = False
-                for parser_name, source, parser_class in mwcp.iter_parsers(name):
+                for source, parser in mwcp.iter_parsers(name):
                     found = True
-                    with self.input_file as fo:
-                        self._handle = fo
-                        try:
-                            parser = parser_class(reporter=self)
-                            parser.run(**kwargs)
-                        except (Exception, SystemExit) as e:
-                            if file_path:
-                                identifier = file_path
-                            else:
-                                identifier = hashlib.md5(data).hexdigest()
-                            logger.exception("Error running parser {}:{} on {}".format(
-                                source, parser_name, identifier))
+                    try:
+                        parser.parse(self.input_file, self)
+                    except (Exception, SystemExit):
+                        logger.exception("Error running parser {}:{} on {}".format(
+                            source.name, parser.name, file_path or self.input_file.md5))
 
                 if not found:
                     logger.error('Could not find parsers with name: {}'.format(name))
@@ -636,15 +457,15 @@ class Reporter(object):
         if self._disable_output_files:
             return
 
-        if self.__outputfile_prefix:
-            if self.__outputfile_prefix == "md5":
-                fullpath = os.path.join(self.__outputdir, "%s_%s" % (
-                    binascii.hexlify(self.input_file.md5).decode('utf8'), basename))
+        if self._output_file_prefix:
+            if self._output_file_prefix == "md5":
+                fullpath = os.path.join(self._output_dir, "%s_%s" % (
+                    self.input_file.md5, basename))
             else:
-                fullpath = os.path.join(self.__outputdir, "%s_%s" % (
-                    self.__outputfile_prefix, basename))
+                fullpath = os.path.join(self._output_dir, "%s_%s" % (
+                    self._output_file_prefix, basename))
         else:
-            fullpath = os.path.join(self.__outputdir, basename)
+            fullpath = os.path.join(self._output_dir, basename)
 
         try:
             with open(fullpath, "wb") as f:
@@ -654,6 +475,7 @@ class Reporter(object):
         except Exception as e:
             logger.error("Failed to write output file: %s, %s" % (fullpath, str(e)))
 
+    # TODO: Deprecate this function, we should be interfacing with FileObject instead.
     def report_tempfile(self, filename, description=''):
         """
         load filename from filesystem and report using output_file
@@ -742,6 +564,7 @@ class Reporter(object):
                 output += self.get_printable_key_value(
                     key, self.metadata["other"][key])
 
+        # TODO: Should we still be showing these debug logs?
         if "debug" in self.metadata:
             output += "\n----Debug----\n\n"
             for item in self.metadata["debug"]:
@@ -760,6 +583,7 @@ class Reporter(object):
 
         return output
 
+    # TODO: remove stdout redirection
     @contextlib.contextmanager
     def __redirect_stdout(self):
         """Redirects stdout temporarily to the logger."""
@@ -781,9 +605,8 @@ class Reporter(object):
 
         Goal is to make the reporter safe to use for multiple run_parser instances
         """
-        self.__managed_tempdir = None
+        self._managed_tempdir = None
         self.input_file = None
-        self._handle = None
 
         self.metadata = {}
         self.outputfiles = {}
@@ -809,15 +632,14 @@ class Reporter(object):
 
         # Delete temporary directory.
         if not self._disable_temp_cleanup:
-            if self.__managed_tempdir:
+            if self._managed_tempdir:
                 try:
-                    shutil.rmtree(self.__managed_tempdir, ignore_errors=True)
+                    shutil.rmtree(self._managed_tempdir, ignore_errors=True)
                 except Exception as e:
                     logger.error("Failed to purge temp dir: %s, %s" %
-                               (self.__managed_tempdir, str(e)))
-                self.__managed_tempdir = ''
-
-        self.__managed_tempdir = None
+                                 (self._managed_tempdir, str(e)))
+                self._managed_tempdir = ''
+        self._managed_tempdir = None
 
     def __del__(self):
         self.__cleanup()

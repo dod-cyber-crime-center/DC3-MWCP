@@ -1,28 +1,127 @@
-# Parser Installation
+# Parser Installation Guide
 
-To make a parser available for use, place it in a directory with the name `<name>.py` Where `<name>` is a unique name you provide. Usually the name of the malware family.
-Then pass the directory containing your parsers to the DC3-MWCP tool being used.
-```
-mwcp-tool --parserdir=C:\my_parsers -p <name> <input_file>
+- [Adding a Directory](#adding-a-directory)
+- [Grouping Parsers](#grouping-parsers)
+- [Formal Parser Packaging](#format-parser-packaging)
+- [Parser Contribution](#parser-contribution)
+
+
+### Guides
+- [Parser Development](ParserDevelopment.md)
+- [Parser Components](ParserComponents.md)
+- [Parser Installation](ParserInstallation.md)
+- [Parser Testing](ParserTesting.md)
+- [Python Style Guide](PythonStyleGuide.md)
+
+
+## Adding a Directory
+To install your own custom parser, please follow these steps:
+
+1. Place all your parsers into a directory. If you would like to use sub directories
+make sure to include `__init__.py` files so Python can see them as packages.
+*(Files starting with `_` will be ignored.)*
+
+1. Then pass the directory containing your parsers to the DC3-MWCP tool being used.
+
+```console
+> mwcp --parser-dir=C:\my_parsers parse <name> <input_file>
 # OR
-mwcp-server --parserdir=C:\my_parsers
+> mwcp-server --parserdir=C:\my_parsers
 ```
 
-You should then find your parser available alongside the default parsers that come with MWCP.
-```
-mwcp-tool --parserdir=C:\my_parsers -l
+You should then find your parsers available alongside the default parsers that come with MWCP using
+the `mwcp list` command.
+
+```console
+> mwcp --parser-dir=C:\my_parsers list --all
+NAME            SOURCE         AUTHOR    DESCRIPTION
+--------------  -------------  --------  -------------------------------------
+bar             mwcp           DC3       Example parser
+foo             mwcp           DC3       Example parser that works on any file
+Foo.Implant     c:\my_parsers            Foo Implant
+Foo.Downloader  c:\my_parsers            Foo Downloader
 ```
 
-```
-NAME                      SOURCE                     AUTHOR          DESCRIPTION
--------------------------------------------------------------------------------------------------------------------
-bar                       mwcp                       DC3             exmaple parser using the Dispatcher model
-baz                       C:\my_parsers              ACME            my baz parser
-foo                       C:\my_parsers              ACME            my foo parser
-foo                       mwcp                       DC3             example parser that works on any file
+If you don't include the `--all` flag, you will notice that your parsers are not listed.
+This is because, by default, DC3-MWCP will only list parser groups defined in a parser configuration file.
+To create a parser group, please see the next section.
+
+For more persistence, you can add the environment variable `MWCP_PARSER_DIR` which points 
+to your parser directory. This will cause `--parser-dir` to automatically apply if not supplied. 
+
+```console
+> set MWCP_PARSER_DIR="C:\my_parsers"
+> mwcp parse Foo.Implant ./malware.bin
+> mwcp list --all
 ```
 
-*DC3-MWCP will ignore any files starting with `_` in the parser directory.*
+
+## Grouping Parsers
+DC3-MWCP has the ability to chain multiple parsers together into a group to create a larger
+parser. This was originally referred to as the "Dispatcher model".
+A parser group is comprised of a name, description, author, and list of parsers (or other parser groups) to run (in that order).
+
+Creating a group allows you to chain
+the processing of possible components the parser's could extract.
+For example, if you have a malware family that comprises of a downloader, loader, implant, and could
+possibly be UPX packed.
+
+Parser groups are defined using a YAML configuration file with the following structure:
+
+```yaml
+GroupName:
+    description: Description of parser group
+    author: ACME
+    parsers:  # List of parsers/parser groups to run (in order)
+        - Foo.Downloader
+        - Foo.Implant
+```
+
+This YAML file must be declared as the `config` attribute in the root `__init__.py` of your parser package.
+
+```python
+# file: mwcp-acme/parsers/__init__.py
+
+import os
+
+
+config = os.path.join(os.path.dirname(__file__), '.parser_config.yml')
+```
+
+
+You may omit the top level name if it matches the name of the group:
+
+```yaml
+Foo:
+    description: A Foo parser
+    author: ACME
+    parsers:
+        - .Downloader  # equivelent to "Foo.Downloader"
+        - .Implant
+```
+
+You may also reference other parser groups as a parser.
+
+```yaml
+
+Decoy:
+    description: Decoy Files
+    author: ACME
+    parsers:
+        - .DOC
+        - .DOCX
+        - .PDF
+        - .RTF
+        - .JPG
+
+Foo:
+    description: A Foo parser
+    author: ACME
+    parsers:
+        - Decoy
+        - .Downloader
+        - .Implant
+```
 
 
 ## Formal Parser Packaging
@@ -31,14 +130,16 @@ DC3-MWCP supports the use of setuptool's entry_points to register parsers from w
 your own python package.
 
 This allows for a number of benefits:
-- Provides a way to encapsulate your parsers as a proper python package.
+- Provides a way to encapsulate your parsers as a proper python project.
 - Gives users an easy way to install MWCP and your parsers at the same time. (pip installable)
 - Allows you to specify what versions of MWCP your parsers support.
 - Allows you to easily specify and install extra dependencies your parsers require.
 - Allows you to maintain versions of your parsers.
 - Provides a way to distribute and maintain extra helper/utility modules that are used by your parsers.
 
-To set this up, structure your parsers into a package and include a `setup.py` file to declare it as a python package. It should look something like this:
+To set this up, structure your parsers into a package and include a `setup.py` file to declare it as a python project.
+
+It should look something like this:
 ```
 some_root_dir/
 |- README.md
@@ -47,15 +148,23 @@ some_root_dir/
 |   |- __init__.py
 |   |- parsers/
 |   |   |- __init__.py
-|   |   |- baz.py     # filenames do not need to end in _malwareconfigparser when doing it this way.
+|   |   |- .parser_config.yml
+|   |   |- baz.py
 |   |   |- foo.py
-|   |- parsertests/  # Tests should be found as a top level directory within your package.
-|   |   |- baz.json
-|   |   |- foo.json
+|   |   |- tests/  # Tests should be found within the root of your parsers package with the name "tests"
+|   |   |   |- baz.json
+|   |   |   |- foo.json
 ```
 
-Then, within your `setup.py` file, declare your parsers as entry_points to "mwcp.parsers" pointing
-to your mwcp.Parser classes. (NOTE: The name set before the "=" will be the name of the parser when using the tool.)
+If you have a parser configuration file (`.parser_config.yml`). Make sure you include
+the path to the file as the variable `config` in the `__init__.py` in the root parsers folder.
+
+
+Then, within your `setup.py` file, declare an entry_point for "mwcp.parsers" pointing
+to the package containing your parsers. The name set before the "=" will be the source name for
+the parsers contained within. *(Your project may create multiple entry points provided they
+have unique source names)*
+
 ```python
 # in setup.py
 
@@ -70,8 +179,7 @@ setup(
     include_package_data=True,
     entry_points={
         'mwcp.parsers': [
-            'baz = mwcp_acme.parsers.baz:BazParser',
-            'foo = mwcp_acme.parsers.foo:FooParser',
+            'ACME = mwcp_acme.parsers',
         ]
     },
     install_requires=[
@@ -81,37 +189,54 @@ setup(
 )
 ```
 
+
 *(More information about setuptools can be found here: [https://setuptools.readthedocs.io]())*
 
 Then, install your package.
-```
-cd some_root_dir
-pip install .
+```console
+> cd some_root_dir
+> pip install .
 ```
 
 Your parsers should now be available alongside the default parsers MWCP and any other mwcp packages.
-```
-mwcp-tool -l
-```
-
-```
-NAME                      SOURCE                     AUTHOR          DESCRIPTION
--------------------------------------------------------------------------------------------------------------------
-bar                       mwcp                       DC3             exmaple parser using the Dispatcher model
-baz                       mwcp-acme                  ACME            example parser made by ACME
-baz                       mwcp-intech                INTEC           example parser made by INTECH
-foo                       mwcp                       DC3             example parser that works on any file
-foo                       mwcp-acme                  ACME            example parser made by ACME
+```console
+> mwcp list
+NAME            SOURCE         AUTHOR    DESCRIPTION
+--------------  -------------  --------  -------------------------------------
+bar             mwcp           DC3       Example parser
+foo             mwcp           DC3       Example parser that works on any file
+foo             ACME           ACME      Example parser made by ACME
+baz             ACME           ACME      Example parser made by ACME
 ```
 
-NOTE: If multiple mwcp packages contain parsers with the same name (case-sensitive), then all parsers with that name will be run back-to-back. (With results merged together.)
-```
-mwcp-tool -p baz   # Will run the "baz" parser from both mwcp-acme and mwcp-intech
+
+NOTE: If multiple mwcp projects contain parsers with the same name (case-sensitive), then all parsers with that name will be run back-to-back. (With results merged together.)
+```console
+> mwcp parse foo <input>   # Will run the "foo" parser group from both mwcp and ACME.
 ```
 
-To specify a particular parser, you can provide the source name (name in the "()") using ":" notation.
+To specify a particular parser, you can provide the source name using ":" notation.
+```console
+> mwcp parse ACME:foo <input>  # Will run the "foo" parser from ACME only.
 ```
-mwcp-tool -p mwcp-acme:baz   # Will run the "baz" parser from mwcp-acme only.
+
+
+### Setting parser source
+If you would like to use the MWCP tools solely with your parsers only, you can provide
+the `--parser-source` flag to limit parsers to a single source.
+
+```console
+> mwcp --parser-source ACME list
+> mwcp --parser-source ACME parse foo <input>
+```
+
+For more persistence, you can add the environment variable `MWCP_PARSER_SOURCE` which points 
+to your parser source. This will cause `--parser-source` to automatically apply if not supplied. 
+
+```console
+> set MWCP_PARSER_SOURCE="ACME"
+> mwcp parse Foo.Implant ./malware.bin
+> mwcp list --all
 ```
 
 
@@ -121,16 +246,9 @@ We will be happy to accept any new contributions to DC3-MWCP, including new and 
 If you would like to contribute a parser to DC3-MWCP's default parser set, please do the following:
 1. Fork our repo into your own github account.
 1. [Install](../README.md#install) in development mode using your forked repo.
-1. Add your parser and parser tests to the "mwcp/parsers" and "mwcp/parsertests" directories respectively.
+1. Add your parser and parser tests to the "mwcp/parsers" and "mwcp/parsers/tests" directories respectively.
     - Please read the [Parser Development Guide](ParserDevelopmentGuide.md) and [Testing Guide](Testing.md) for help
     creating your parser.
-1. Update the "mwcp.parsers" entry point in `setup.py` to add your new parser.
-    ```python
-    'mwcp.parsers': [
-        # ...
-        'MyParser = mwcp.parsers.my_parser:MyParser'
-    ]
-    ```
 1. If your parser requires a new python dependency, you may define the dependency in the `install_requires` list in the same `setup.py` file.
 1. Add a short description of your contribution to the "Unreleased" section of the [CHANGELOG.md](../CHANGELOG.md) file. (You may need to create the section if this is the first contribution since the last release.)
     - Make sure you give yourself credit!

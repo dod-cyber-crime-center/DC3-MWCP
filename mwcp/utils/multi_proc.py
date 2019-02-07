@@ -8,8 +8,14 @@ import multiprocessing.pool
 
 logger = logging.getLogger(__name__)
 
+from mwcp import registry
 from mwcp.utils import logutil
 
+
+def initializer(parser_sources, default_source):
+    """Initializer function that runs at the beginning of each process creation."""
+    registry._sources = parser_sources  # Propagate registered parser information.
+    registry._default_source = default_source
 
 
 class TProcess(mp.Process):
@@ -35,3 +41,9 @@ class TPool(mp.pool.Pool):
     Version of :class:`multiprocessing.pool.Pool` that uses :class:`TProcess`.
     """
     Process = TProcess
+
+    def __init__(self, processes=None, maxtasksperchild=None):
+        """Overwrite to add initializer."""
+        super(TPool, self).__init__(
+            processes=processes, maxtasksperchild=maxtasksperchild,
+            initializer=initializer, initargs=(registry._sources, registry._default_source))

@@ -11,6 +11,9 @@ import datetime
 import logging
 import os
 import sys
+import timeit
+import warnings
+
 # pkg_resources is optional, to keep backwards compatibility.
 import timeit
 
@@ -20,6 +23,7 @@ except ImportError:
     pkg_resources = None
 
 import mwcp
+import mwcp.parsers
 
 from mwcp.tester import DEFAULT_EXCLUDE_FIELDS
 # DC3-MWCP framework imports
@@ -69,13 +73,24 @@ $ mwcp-test -p parser -i file_paths_file -d     Delete test cases for a parser
                         type=str,
                         dest="test_case_dir",
                         help="Directory containing JSON test case files. "
-                             "(defaults to a 'parsertests' directory located in the root of the "
-                             "parser's home module)")
+                             "(defaults to a 'tests' directory located within the root of the "
+                             "parsers directory)")
     parser.add_argument("--parserdir",
                         metavar="DIR",
                         default=None,
                         dest="parserdir",
                         help="Parsers directory")
+    parser.add_argument("--parserconfig",
+                        metavar="FILE",
+                        default=None,
+                        dest="parserconfig",
+                        help="Parsers configuration file (must be provided if using parserdir)")
+    parser.add_argument("--parsersource",
+                        metavar="SOURCE_NAME",
+                        default=None,
+                        dest="parsersource",
+                        help="Set a default parser source to use. "
+                             "If not provided parsers from all sources will be available.")
 
     # Arguments used to run test cases
     parser.add_argument("-t",
@@ -147,13 +162,15 @@ $ mwcp-test -p parser -i file_paths_file -d     Delete test cases for a parser
                         default=0,
                         action="count",
                         dest="verbose",
-                        help="Level of log messages to display. 1 for INFO, 2 for DEBUG")
+                        help="Level of log messages to display. 1 for WARNING, 2 for INFO, 3 for DEBUG")
 
     return parser
 
 
 def main():
     """Run tool."""
+
+    warnings.warn("WARNING: mwcp-test is deprecated. Please use \"mwcp test\" instead.")
 
     print('')
 
@@ -163,15 +180,25 @@ def main():
 
     # Setup logging
     mwcp.setup_logging()
-    logging.root.setLevel(logging.WARNING - (args.verbose * 10))
+    logging.root.setLevel(logging.ERROR - (args.verbose * 10))
 
     if args.all_tests or not args.parser_name:
         parsers = [None]
     else:
         parsers = [args.parser_name]
 
+    if args.parserdir and args.parserconfig:
+        mwcp.register_parser_directory(args.parserdir, args.parserconfig)
+    elif args.parserdir or args.parserconfig:
+        raise ValueError('Both --parserdir and --parserconfig must be specified.')
+    else:
+        mwcp.register_entry_points()
+
+    if args.parsersource:
+        mwcp.set_default_source(args.parsersource)
+
     # Configure reporter based on args
-    reporter = mwcp.Reporter(disableoutputfiles=True, parserdir=args.parserdir)
+    reporter = mwcp.Reporter(disable_output_files=True)
 
     # Configure test object
     tester = Tester(
@@ -184,14 +211,38 @@ def main():
     if args.input_file:
         input_files = read_input_list(input_files[0])
 
+    # Delete files from test cases
+    if args.delete:
+        removed_files = tester.remove_test_results(
+            args.parser_name, input_files)
+        for filename in removed_files:
+            print(u"Removing results for {} in {}".format(
+                filename, tester.get_results_filepath(args.parser_name)))
+
+    # Update previously existing test cases
+    elif args.update and args.parser_name:
+        print("Updating test cases. May take a while...")
+        results_file_path = tester.get_results_filepath(args.parser_name)
+        if os.path.isfile(results_file_path):
+            input_files = tester.list_test_files(args.parser_name)
+        else:
+            sys.exit(u"No test case file found for parser '{}'. "
+                     u"No update could be made.".format(args.parser_name))
+        update_tests(tester, input_files, args.parser_name)
+
+    # Add/update test cases for specified input files and specified parser
+    elif args.parser_name and not args.delete and input_files:
+        update_tests(tester, input_files, args.parser_name)
+
     # Run test cases
-    if args.run_tests:
+    else:
         print("Running test cases. May take a while...")
 
         start_time = timeit.default_timer()
         test_results = []
         all_passed = True
         total = tester.total
+        failed = []
 
         # Generate format string.
         digits = len(str(total))
@@ -208,6 +259,9 @@ def main():
         # Run tests and output progress results.
         for count, test_result in enumerate(tester, start=1):
             all_passed &= test_result.passed
+            if not test_result.passed:
+                failed.append((count, test_result.parser_name, test_result.filename))
+
             if test_result.run_time:  # Ignore missing tests from stat summary.
                 test_results.append(test_result)
 
@@ -223,7 +277,8 @@ def main():
                 sys.stdout.write(message + '\n')
                 sys.stdout.flush()
                 test_result.print(
-                    failed_tests=True, passed_tests=not args.only_failed_tests, json_format=args.json)
+                    failed_tests=True, passed_tests=not args.only_failed_tests, json_format=args.json
+                )
 
         end_time = timeit.default_timer()
 
@@ -264,34 +319,16 @@ def main():
             print()
 
         print("Total Running Time: {}".format(datetime.timedelta(seconds=end_time - start_time)))
+
+        if failed:
+            print()
+            print("Failed tests:")
+            for test_info in failed:
+                print("#{} - {}\t{}".format(*test_info))
+            print()
+
         print("All Passed = {0}\n".format(all_passed))
         exit(0 if all_passed else 1)
-
-    # Delete files from test cases
-    elif args.delete:
-        removed_files = tester.remove_test_results(
-            args.parser_name, input_files)
-        for filename in removed_files:
-            print(u"Removing results for {} in {}".format(
-                filename, tester.get_results_filepath(args.parser_name)))
-
-    # Update previously existing test cases
-    elif args.update and args.parser_name:
-        print("Updating test cases. May take a while...")
-        results_file_path = tester.get_results_filepath(args.parser_name)
-        if os.path.isfile(results_file_path):
-            input_files = tester.list_test_files(args.parser_name)
-        else:
-            sys.exit(u"No test case file found for parser '{}'. "
-                     u"No update could be made.".format(args.parser_name))
-        update_tests(tester, input_files, args.parser_name)
-
-    # Add/update test cases for specified input files and specified parser
-    elif args.parser_name and not args.delete and input_files:
-        update_tests(tester, input_files, args.parser_name)
-
-    else:
-        argparser.print_help()
 
 
 def update_tests(tester, input_files, parser_name):
@@ -306,9 +343,9 @@ def update_tests(tester, input_files, parser_name):
             # or move warning messages to debug.
             if not tester.reporter.errors:
                 print(u"Updating results for {} in {}".format(input_file, results_file_path))
-                tester.update_test_results(results_file_path=results_file_path,
-                                           results_data=metadata,
-                                           replace=True)
+                tester._update_test_results(results_file_path=results_file_path,
+                                            results_data=metadata,
+                                            replace=True)
             else:
                 sys.exit(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path))
         else:

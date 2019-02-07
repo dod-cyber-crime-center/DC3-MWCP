@@ -1,70 +1,27 @@
 """This modules contains helper functions for the construct library."""
 
-from __future__ import division
+from __future__ import division, absolute_import
 
-import base64
-import os
-import io
 import re
 import string
-import sys
 import uuid
-import datetime
-import time
 import zlib
-import warnings
-
-import construct
-from construct import *
-from construct.core import globalstringencoding, _write_stream, _read_stream, int2byte, byte2int, singleton
-from construct.lib import py3compat
 
 from mwcp.utils import custombase64, elffileutils, pefileutils
 
+
+# Patch with version 2.8 changes.
+from mwcp.utils.construct import version28 as construct
+from .version28 import *
+
+
 PY3 = sys.version_info.major == 3
 
-
-# Visible interface. Add the classes and functions you would like to be available for users of construct
-# library here.
-__all__ = ['BYTE', 'WORD', 'DWORD', 'QWORD', 'ULONG', 'ULONGLONG', 'TerminatedString',
-           'CString', 'String', 'String16', 'String32', 'MACAddressAdapter', 'MacAddress', 'IP4Address', 'SkipNull',
-           'HexString', 'Base64', 'ZLIB', 'UUID', 'ELFPointer', 'PEPhysicalAddress', 'PEPointer', 'PEPointer64',
-           'Regex', 'find_constructs', 'Boolean', 'Delimited', 'Printable', 'DateTimeDateData', 'ErrorMessage',
-           'Compressed', 'Iter', 'DotNetUInt', 'DotNetNullString', 'DotNetSigToken', 'Backwards', 'EpochTime',
-           'FocusLast']
 
 BYTE = Byte
 WORD = Int16ul
 DWORD = ULONG = Int32ul
 QWORD = ULONGLONG = Int64ul
-
-# The pop in construct doesn't properly work. It will raise a ValueError even
-# if you provide a default value.
-# Therefore we are going to monkey patch a correct implementation.
-orig_pop = Container.pop
-
-
-def pop(self, key, *default):
-    try:
-        return orig_pop(self, key, *default)
-    except ValueError:
-        if default:
-            return default[0]
-        else:
-            raise KeyError
-
-
-Container.pop = pop
-
-
-def _get_param(context, name):
-    """Retrieves the parameter the user passed in initially to the context."""
-    while '_' in context:
-        context = context['_']
-    try:
-        return context[name]
-    except IndexError:
-        raise ValueError('Missing {} parameter.'.format(name))
 
 
 def chunk(seq, size):
@@ -98,74 +55,8 @@ class Boolean(Adapter):
     False
     """
 
-    def _decode(self, obj, context):
+    def _decode(self, obj, context, path):
         return bool(obj)
-
-
-class Compressed(Adapter):
-    r"""
-    Replaces the original Compressed construct to improve functionality:
-        - supports providing a custom encoding module or object.
-            - (provide any object that has a "decompress" and "compress" function in the lib parameter.)
-        - produces a ConstructError if compressed/decompression fails.
-            - (You can turn this off by setting wrap_exception=False)
-        - uses Adapter instead of Tunnel in order to allow it be embedded within other constructs.
-            - (Original one read entire stream, no matter the subcon you provide.)
-
-    e.g.
-    >>> import zlib
-    >>> Compressed(GreedyBytes, zlib).build('hello world')
-    'x\x9c\xcbH\xcd\xc9\xc9W(\xcf/\xcaI\x01\x00\x1a\x0b\x04]'
-    >>> Compressed(GreedyBytes, zlib).parse(_)
-    'hello world'
-
-    Now that this is an Adapter, it can be become part of a larger struct.
-    >>> spec = Struct(
-    ...     'magic' / Const('YUP'),
-    ...     'data' / Compressed(Bytes(19), zlib),
-    ...     'trailer' / Int32ul,
-    ... )
-    >>> spec.parse('YUPx\x9c\xcbH\xcd\xc9\xc9W(\xcf/\xcaI\x01\x00\x1a\x0b\x04]\x03\x00\x00\x00')
-    Container(magic='YUP')(data='hello world')(trailer=3)
-    >>> spec.build(_)
-    'YUPx\x9c\xcbH\xcd\xc9\xc9W(\xcf/\xcaI\x01\x00\x1a\x0b\x04]\x03\x00\x00\x00'
-    """
-    __slots__ = ["lib", "wrap_exception"]
-
-    def __init__(self, subcon, lib, wrap_exception=True):
-        super(Compressed, self).__init__(subcon)
-        self.wrap_exception = wrap_exception
-        if hasattr(lib, "compress") and hasattr(lib, "decompress"):
-            self.lib = lib
-        elif lib == "zlib":
-            import zlib
-            self.lib = zlib
-        elif lib == "gzip":
-            import gzip
-            self.lib = gzip
-        elif lib == "bzip2":
-            import bz2
-            self.lib = bz2
-        else:
-            raise ValueError('Invalid lib parameter: {}'.format(lib))
-
-    def _decode(self, data, context):
-        try:
-            return self.lib.decompress(data)
-        except Exception as e:
-            if self.wrap_exception:
-                raise ConstructError('Decompression failed with error: {}'.format(e))
-            else:
-                raise
-
-    def _encode(self, data, context):
-        try:
-            return self.lib.compress(data)
-        except Exception as e:
-            if self.wrap_exception:
-                raise ConstructError('Compression failed with error: {}'.format(e))
-            else:
-                raise
 
 
 class ErrorMessage(Construct):
@@ -186,184 +77,14 @@ class ErrorMessage(Construct):
     def __init__(self, message="Error field was activated."):
         super(self.__class__, self).__init__()
         self.message = message
+
     def _parse(self, stream, context, path):
         message = self.message(context) if callable(self.message) else self.message
         raise ExplicitError(message)
+
     def _build(self, obj, stream, context, path):
         message = self.message(context) if callable(self.message) else self.message
         raise ExplicitError(message)
-
-
-class TerminatedString(construct.StringEncoded):
-    r"""Construct adapter that can be used on a string construct to strip away the garbage
-    characters after the first instance of the terminator.
-    (If the terminator is not found, the whole string is returned back.)
-
-    If used to build, the adapter resorts to the default build instructions.
-
-    e.g.
-    >>> TerminatedString(String(10)).build(b'hello')
-    'hello\x00\x00\x00\x00\x00'
-    >>> TerminatedString(PascalString(Byte)).build(b'hello')
-    '\x05hello'
-    >>> TerminatedString(String(10)).parse(b'hello\x00\x02\x04FA')
-    'hello'
-    >>> TerminatedString(String(10)).parse(b'helloworld')
-    'helloworld'
-    >>> TerminatedString(GreedyString()).parse(b'this is a valid string\x00\x00 GARBAGE!')
-    'this is a valid string'
-    >>> TerminatedString(PascalString(Byte)).parse(b'\x0Ahello\x00\x01\x03\x04F')
-    'hello'
-    """
-    __slots__ = ["encoding", "terminator"]
-
-    def __init__(self, subcon, encoding=None, terminator='\x00'):
-        warnings.warn(
-            "TerminatedString is deprecated, please use Padded with CString instead.", DeprecationWarning)
-        super(TerminatedString, self).__init__(subcon, encoding)
-        if not isinstance(terminator, str):
-            raise ValueError('Terminator must be str and not bytes.')
-        self.terminator = terminator
-
-    def _decode(self, obj, context):
-        obj = super(TerminatedString, self)._decode(obj, context)
-        if isinstance(obj, bytes):
-            # Sometimes obj will be bytes if an encoding wasn't specified.
-            terminator = self.terminator.encode()
-        else:
-            terminator = self.terminator
-        # Strip everything after terminator.
-        obj, _, _ = obj.partition(terminator)
-        return obj
-
-
-def CString(terminator=b"\x00", encoding=None):
-    r"""
-    This is an alternative of implementation of construct.CString() that fixes the issues with
-    working with utf-16 or utf-32 encoded strings (github.com/construct/construct/issues/388)
-
-    >>> CString().parse(b'hello\x00')
-    'hello'
-    >>> CString(encoding='utf-16').parse(b'\xff\xfeh\x00e\x00l\x00l\x00o\x00\x00\x00')  # FFFE is BOM for utf-16-le
-    u'hello'
-    >>> CString(encoding='utf-16').parse(b'h\x00e\x00l\x00l\x00o\x00\x00\x00')
-    u'hello'
-    >>> CString(encoding='utf-16').build(u'hello')
-    '\xff\xfeh\x00e\x00l\x00l\x00o\x00\x00\x00'
-    >>> CString(encoding='utf-32').build(u'hello')
-    '\xff\xfe\x00\x00h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00\x00\x00\x00\x00'
-
-    Make sure to specify 'le' or 'be' in the encoding if you don't want BOM markers when building.
-    >>> CString(encoding='utf-32-le').build(u'hello')
-    'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00\x00\x00\x00\x00'
-    >>> CString(encoding='utf-32-be').build(u'hello')
-    '\x00\x00\x00h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00\x00'
-    """
-    # Revert to original if not utf-16 or utf-32.
-    if not encoding or not ('16' in encoding or '32' in encoding):
-        return construct.CString(terminators=terminator, encoding=encoding)
-
-    size = 4 if '32' in encoding else 2
-    if len(terminator) == 1:
-        terminator = terminator * size
-    assert len(terminator) == size
-
-    return construct.StringEncoded(
-        construct.ExprAdapter(
-            RepeatUntil(lambda obj, lst, ctx: obj == terminator, Bytes(size)),
-            encoder=lambda obj, ctx: list(map(b''.join, chunk(py3compat.iteratebytes(obj), size))) + [terminator],
-            decoder=lambda obj, ctx: b''.join(obj[:-1])),
-        encoding)
-
-def String(length, encoding=None, padchar=b"\x00", paddir="right", trimdir="right"):
-    r"""
-    A configurable, fixed-length or variable-length string field.
-
-    This is a modified version of the original construct.String that properly handles multi-byte encodings
-    (utf-16, utf-32).
-
-    NOTE: When using this to build a multi-byte encoded string you need to be aware of the extra space that can be taken
-    up by BOM markings when specifying the length.
-    If you don't want BOM. Make sure to explicitly specify "le" or "be" at the end of your encoding.
-    >>> u'hi'.encode('utf-16')
-    '\xff\xfeh\x00i\x00'
-    >>> u'hi'.encode('utf-16-le')
-    'h\x00i\x00'
-
-    :param length: length in bytes (not unicode characters), as int or context function
-    :param encoding: encoding (e.g. "utf8") or None for bytes
-    :param padchar: b-string character to pad out strings (by default b"\x00")
-    :param paddir: direction to pad out strings (one of: right left both)
-    :param trimdir: direction to trim strings (one of: right left)
-
-    e.g.
-    >>> construct.StringEncoded(Bytes(10), 'utf-16').parse(b'h\x00e\x00l\x00l\x00o\x00')
-    u'hello'
-    >>> String(10, encoding='utf-16').parse(b'h\x00e\x00l\x00l\x00o\x00')
-    u'hello'
-    >>> String(12, encoding='utf-16').build(u'hello')
-    '\xff\xfeh\x00e\x00l\x00l\x00o\x00'
-    >>> String(10, encoding='utf-16le').build(u'hello')
-    'h\x00e\x00l\x00l\x00o\x00'
-    >>> String(16, encoding='utf-16le').build(u'hello')
-    'h\x00e\x00l\x00l\x00o\x00\x00\x00\x00\x00\x00\x00'
-    >>> String(16, encoding='utf-16').parse(b'h\x00e\x00l\x00l\x00o\x00\x00\x00\x00\x00\x00\x00')
-    u'hello'
-
-    Works with utf-32 in the same way.
-    >>> String(20, encoding='utf-32-le').build(u'hello')
-    'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00'
-    >>> String(20, encoding='utf-32').parse(b'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00')
-    u'hello'
-
-    Also, still works with regular single byte encodings.
-    >>> String(5).build('hello')
-    'hello'
-    >>> String(5).parse(b'hello')
-    'hello'
-    """
-    if not encoding or not ('16' in encoding or '32' in encoding):
-        return construct.String(length, encoding=encoding, padchar=padchar, paddir=paddir, trimdir=trimdir)
-
-    if '32' in encoding:
-        byte_size = 4
-    elif '16' in encoding:
-        byte_size = 2
-    else:
-        byte_size = 1
-
-    # Determine if we need to account for BOM markings.
-    bom_bytes = len(u'\x00'.encode(encoding)) - byte_size
-
-    if callable(length):
-        decoded_length = lambda ctx: (length(ctx) - bom_bytes) // byte_size
-    else:
-        decoded_length = (length - bom_bytes) // byte_size
-
-    # Fake the StringPaddedTrimmed so that it can be used with non-byte padchar.
-    class _StringPaddedTrimmed(construct.StringPaddedTrimmed):
-        """Overwritten to allow padchar to be a str type."""
-        def __init__(self, length, subcon, padchar=b"\x00", paddir="right", trimdir="right"):
-            # Fake the padchar as a byte the switch it back.
-            orig_padchar = padchar
-            super(_StringPaddedTrimmed, self).__init__(
-                length, subcon, padchar=b'\x00', paddir=paddir, trimdir=trimdir)
-            self.padchar = orig_padchar
-
-    # Decode padchar to str string to match StringEncoded.
-    encoding = encoding or globalstringencoding
-    if encoding and isinstance(padchar, bytes):
-        padchar = padchar.decode()
-
-    # We flipped StringPaddedTrimmed and StringEncoded from what the original was doing so our string gets
-    # decoded before the null characters get stripped.
-    return _StringPaddedTrimmed(
-        decoded_length,
-        construct.StringEncoded(Bytes(length), encoding),
-        padchar=padchar,
-        paddir=paddir,
-        trimdir=trimdir
-    )
 
 
 def String16(length):
@@ -399,67 +120,120 @@ class Printable(Validator):
     NOTE: A ValidationError is a type of ConstructError and will be cause if catching ConstructError.
 
     >>> Printable(String(5)).parse(b'hello')
-    'hello'
+    u'hello'
     >>> Printable(String(5)).parse(b'he\x11o!')
     Traceback (most recent call last):
         ...
-    ValidationError: ('object failed validation', 'he\x11o!')
+    ValidationError: object failed validation: heo!
     >>> Printable(Bytes(3)).parse(b'\x01NO')
     Traceback (most recent call last):
         ...
-    ValidationError: ('object failed validation', '\x01NO')
+    ValidationError: object failed validation: NO
     >>> Printable(Bytes(3)).parse(b'YES')
     'YES'
     """
 
-    def _validate(self, obj, context):
+    def _validate(self, obj, context, path):
         if PY3 and isinstance(obj, bytes):
             return all(chr(byte) in string.printable for byte in obj)
-        return isinstance(obj, py3compat.stringtypes) and all(char in string.printable for char in obj)
+        return isinstance(obj, stringtypes) and all(char in string.printable for char in obj)
 
-
-class MACAddressAdapter(Adapter):
-    r"""
-    Adapter used to format a MAC address from a list of 6 bytes
-
-    e.g.
-    >>> MACAddressAdapter(Byte[6]).parse(b'\x00\x0c\x29\xd3\x91\xbc')
-    '00-0c-29-d3-91-bc'
-    """
-    def _encode(self, obj, context):
-        return list(map(chr, obj.split("-")))
-
-    def _decode(self, obj, context):
-        return '{:02x}-{:02x}-{:02x}-{:02x}-{:02x}-{:02x}'.format(*obj)
-
-
-# A MacAddress parsed from single bytes.
-MacAddress = MACAddressAdapter(Byte[6])
-
-
-class IP4AddressAdapter(Adapter):
-    r"""
-    Adapter used to format a IP address from a list of four ints.
-
-    e.g.
-    >>> IP4AddressAdapter(Byte[4]).parse(b'\x01\x02\x03\x04')
-    '1.2.3.4'
-    >>> IP4AddressAdapter(Int16ul[4]).parse(b'\x01\x00\x02\x00\x03\x00\x04\x00')
-    '1.2.3.4'
-    """
-
-    def _encode(self, obj, context):
-        return list(map(int, obj.split('.')))
-
-    def _decode(self, obj, context):
-        return '{0}.{1}.{2}.{3}'.format(*obj)
-
-
-# An IP4Address parsed from single bytes.
-IP4Address = IP4AddressAdapter(Byte[4])
 
 # Continuously parses until it hits the first non-zero byte.
 SkipNull = Const(b'\x00')[:]
+
+# Continuously parses until it hits the first zero byte (consumed).
+# Use this instead of CString() if you can't guarantee it won't fail to decode.
+CBytes = NullTerminated(GreedyBytes)
+
+
+# TODO: Make a LStripped?
+class Stripped(Adapter):
+    r"""
+    An adapter that strips characters/bytes from the right of the parsed results.
+
+    NOTE: While this may look similar to Padded() this is different because this
+    doesn't take a length and instead strips out the nulls from within the already parsed subconstruct.
+
+    :param subcon: The sub-construct to wrap.
+    :param pad: The character/bytes to use for stripping. Defaults to null character.
+
+    >>> Stripped(GreedyBytes).parse(b'hello\x00\x00\x00')
+    'hello'
+    >>> Stripped(Bytes(10)).parse(b'hello\x00\x00\x00\x00\x00')
+    'hello'
+    >>> Stripped(Bytes(14), pad=b'PAD').parse(b'helloPADPADPAD')
+    'hello'
+    >>> Stripped(Bytes(14), pad=b'PAD').build(b'hello')
+    'helloPADPADPAD'
+    >>> Stripped(CString(), pad=u'PAD').parse(b'helloPADPAD\x00')
+    u'hello'
+    >>> Stripped(String(14), pad=u'PAD').parse(b'helloPADPAD\x00\x00\x00')
+    u'hello'
+
+    # WARNING: If padding doesn't fit in the perscribed data it will not strip it!
+    >>> Stripped(Bytes(13), pad=b'PAD').parse(b'helloPADPADPA')
+    'helloPADPADPA'
+    >>> Stripped(Bytes(13), pad=b'PAD').build(b'hello')
+    Traceback (most recent call last):
+        ...
+    StreamError: bytes object of wrong length, expected 13, found 5
+
+    # If the wrapped subconstruct's size can't be determine, if defaults to not providing a pad.
+    >>> Stripped(CString(), pad=u'PAD').build(u'hello')
+    'hello\x00'
+    """
+
+    def __init__(self, subcon, pad=None):
+        super(Stripped, self).__init__(subcon)
+        self.pad = pad
+
+    def _decode(self, obj, context, path):
+        pad = self.pad
+
+        if pad is None:
+            pad = u'\0' if isinstance(obj, unicodestringtype) else b'\x00'
+
+        if not isinstance(pad, type(obj)):
+            raise PaddingError("NullStripped pad must be of the same type: {} vs {}".format(type(pad), type(obj)))
+
+        unit = len(pad)
+        if unit < 1:
+            raise PaddingError("NullStripped pad must be at least 1 byte")
+
+        obj = obj
+        if unit == 1:
+            obj = obj.rstrip(pad)
+        else:
+            tailunit = len(obj) % unit
+            end = len(obj)
+            if tailunit and obj[-tailunit:] == pad[:tailunit]:
+                end -= tailunit
+            while end-unit >= 0 and obj[end-unit:end] == pad:
+                end -= unit
+            obj = obj[:end]
+
+        return obj
+
+    def _encode(self, obj, context, path):
+        pad = self.pad
+
+        if pad is None:
+            pad = u'\0' if isinstance(self.subcon, StringEncoded) else b'\x00'
+
+        try:
+            size = self.subcon._sizeof(context, path)
+        except SizeofError:
+            return obj  # Don't pad if we can't figure out size.
+
+        unit = len(pad)
+        if unit == 1:
+            obj = obj.ljust(size, pad)
+        # Only pad if it fits in nicely.
+        elif (size - len(obj)) % unit == 0:
+            obj = (obj + (pad * (size - len(obj))))[:size]
+
+        return obj
 
 
 class HexString(Adapter):
@@ -477,59 +251,21 @@ class HexString(Adapter):
     '0x101010101010101010101010101010101010101'
     """
 
-    def _encode(self, obj, context):
+    def _encode(self, obj, context, path):
         return int(obj, 16)
 
-    def _decode(self, obj, context):
+    def _decode(self, obj, context, path):
         hex_string = hex(obj)
         if hex_string.endswith('L'):
             hex_string = hex_string[:-1]
         return hex_string
 
 
-# TODO: Implement _encode.
-class DateTimeDateDataAdapter(Adapter):
-    r"""
-    Adapter for a C# DateTime.dateData object to DateTime format. Obtain the DateTime.Ticks and the DateTime.Kind
-    property to format datetime.
-
-
-    >>> DateTimeDateDataAdapter(Int64sl).parse('\x80\xb4N3\xd1\xd4\xd1H')
-    '2014-11-23 01:09:01 UTC'
-    """
-    def _decode(self, obj, context):
-        ticks = obj & 0x3fffffffffffffff
-        kind = (obj >> 62) & 0x03
-        converted_ticks = datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds=ticks / 10)
-        if kind == 0:
-            return converted_ticks.strftime("%Y-%m-%d %H:%M:%S")
-        elif kind == 1:
-            return converted_ticks.strftime("%Y-%m-%d %H:%M:%S UTC")
-        elif kind == 2:
-            return converted_ticks.strftime("%Y-%m-%d %H:%M:%S Local")
-
-
-DateTimeDateData = DateTimeDateDataAdapter(Int64sl)
-
-
-# TODO: Implement _encode
-class _EpochTimeAdapter(construct.Adapter):
-    r"""
-    Adapter to convert time_t, EpochTime, to an isoformat
-
-    >>> _EpochTimeAdapter(construct.Int32ul).parse('\xff\x93\x37\x57')
-    '2016-05-14T17:09:19'
-    """
-    def _decode(self, obj, context):
-        return datetime.datetime.fromtimestamp(obj).isoformat()
-
-# Hide the adapter
-EpochTime = _EpochTimeAdapter(construct.Int32ul)
-
-
 class Base64(Adapter):
     r"""
     Adapter used to Base64 encoded/decode a value.
+
+    WARNING: This adapter must be used on a unicode string value.
 
     :param subcon: the construct to wrap
     :param str custom_alpha: optional custom alphabet to use
@@ -545,14 +281,14 @@ class Base64(Adapter):
     '\x01\x02\x03\x04'
 
     NOTE: String size is based on the encoded version.
-    >>> Base64(String(16)).build(b'hello world')
+    >>> Base64(String(16)).build(u'hello world')
     'aGVsbG8gd29ybGQ='
     >>> Base64(String(16)).parse(b'aGVsbG8gd29ybGQ=')
     'hello world'
 
     Supplying a custom alphabet is also supported.
     >>> spec = Base64(String(16), custom_alpha='EFGHQRSTUVWefghijklmnopIJKLMNOPABCDqrstuvwxyXYZabcdz0123456789+/=')
-    >>> spec.build(b'hello world')
+    >>> spec.build(u'hello world')
     'LSoXMS8BO29dMSj='
     >>> spec.parse(b'LSoXMS8BO29dMSj=')
     'hello world'
@@ -563,10 +299,16 @@ class Base64(Adapter):
         super(Base64, self).__init__(subcon)
         self.custom_alpha = custom_alpha
 
-    def _encode(self, obj, context):
-        return custombase64.b64encode(obj, alphabet=self.custom_alpha)
+    def _encode(self, obj, context, path):
+        obj = custombase64.b64encode(obj, alphabet=self.custom_alpha)
+        # Convert to unicode if wrapped subcon expects it.
+        if isinstance(self.subcon, StringEncoded):
+            obj = obj.decode(self.subcon.encoding)
+        return obj
 
-    def _decode(self, obj, context):
+    def _decode(self, obj, context, path):
+        if isinstance(obj, str):
+            obj = obj.encode('utf-8')
         return custombase64.b64decode(obj, alphabet=self.custom_alpha)
 
 
@@ -594,13 +336,13 @@ class ZLIB(Adapter):
         self.bufsize = bufsize
         self.level = level
 
-    def _encode(self, obj, context):
+    def _encode(self, obj, context, path):
         level = self.level(context) if callable(self.level) else self.level
         if level is not None:
             return zlib.compress(obj, level)
         return zlib.compress(obj)
 
-    def _decode(self, obj, context):
+    def _decode(self, obj, context, path):
         """
         ZLIB decompress a buffer, cannot use bufsize if wbits is not set
 
@@ -637,14 +379,14 @@ class UUIDAdapter(Adapter):
         super(UUIDAdapter, self).__init__(subcon)
         self.le = le
 
-    def _encode(self, obj, context):
+    def _encode(self, obj, context, path):
         obj = uuid.UUID(obj)
         if self.le:
             return obj.bytes_le
         else:
             return obj.bytes
 
-    def _decode(self, obj, context):
+    def _decode(self, obj, context, path):
         if self.le:
             _uuid = uuid.UUID(bytes_le=obj)
         else:
@@ -685,7 +427,7 @@ def ELFPointer(mem_off, subcon, elf=None):
         (if not supplied here, this must be supplied during parse()/build()
     """
     def _obtain_physical_offset(ctx):
-        _elf = elf or _get_param(ctx, 'elf')
+        _elf = elf or ctx._params.elf
         _mem_off = mem_off(ctx) if callable(mem_off) else mem_off
         phy_off = elffileutils.obtain_physical_offset(_mem_off, elf=_elf)
         if phy_off is None:
@@ -711,7 +453,7 @@ class PEPhysicalAddress(Adapter):
 
     e.g.
     >> with open(r'C:\32bit_exe', 'rb') as fo:
-    ...    file_data = fo.read()
+    ...     file_data = fo.read()
     >> pe = pefileutils.obtain_pe(file_data)
     >> PEPhysicalAddress(Int32ul, pe=pe).build(100)
     'd\x00@\x00'
@@ -730,15 +472,15 @@ class PEPhysicalAddress(Adapter):
         super(PEPhysicalAddress, self).__init__(subcon)
         self._pe = pe
 
-    def _encode(self, obj, context):
-        pe = self._pe or _get_param(context, 'pe')
+    def _encode(self, obj, context, path):
+        pe = self._pe or context._params.pe
         address = pefileutils.obtain_memory_offset(obj, pe=pe)
         if address is None:
             raise ConstructError('Unable to encode physical address.')
         return address
 
-    def _decode(self, obj, context):
-        pe = self._pe or _get_param(context, 'pe')
+    def _decode(self, obj, context, path):
+        pe = self._pe or context._params.pe
         address = pefileutils.obtain_physical_offset(obj, pe=pe)
         if address is None:
             raise ConstructError('Unable to decode virtual address.')
@@ -767,7 +509,7 @@ def PEPointer(mem_off, subcon, pe=None):
     :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
     """
     def _obtain_physical_offset(ctx):
-        _pe = pe or _get_param(ctx, 'pe')
+        _pe = pe or ctx._params.pe
         _mem_off = mem_off(ctx) if callable(mem_off) else mem_off
         phy_off = pefileutils.obtain_physical_offset(_mem_off, pe=_pe)
         if phy_off is None:
@@ -806,7 +548,7 @@ def PEPointer64(mem_off, inst_end, subcon, pe=None):
     :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
     """
     def _obtain_physical_offset(ctx):
-        _pe = pe or _get_param(ctx, 'pe')
+        _pe = pe or ctx._params.pe
         _mem_off = mem_off(ctx) if callable(mem_off) else mem_off
         _inst_end = inst_end(ctx) if callable(inst_end) else inst_end
         phy_off = pefileutils.obtain_physical_offset_x64(_mem_off, _inst_end, pe=_pe)
@@ -831,8 +573,8 @@ class Delimited(Construct):
     ...     'fourth' / Byte
     ... )
     >>> spec.parse(b'Hello\x00\x00|\x01\x00\x00\x00|world!!\x01\x02|\xff')
-    Container(first='Hello')(second=1)(third='world!!\x01\x02')(fourth=255)
-    >>> spec.build(dict(first=b'Hello', second=1, third=b'world!!\x01\x02', fourth=255))
+    Container(first=u'Hello', second=1, third=b'world!!\x01\x02', fourth=255)
+    >>> spec.build(dict(first=u'Hello', second=1, third=b'world!!\x01\x02', fourth=255))
     'Hello\x00|\x01\x00\x00\x00|world!!\x01\x02|\xff'
 
     If you don't care about a particular element, you can leave it nameless just like in Structs.
@@ -844,7 +586,7 @@ class Delimited(Construct):
     ...     'fourth' / Byte
     ... )
     >>> spec.parse(b'Hello\x00\x00|\x01\x00\x00\x00|world!!\x01\x02|\xff')
-    Container(first='Hello')(second=1)(fourth=255)
+    Container(first=u'Hello', second=1, fourth=255)
 
     It may also be useful to use Pass or Optional for fields that may not exist.
     >>> spec = Delimited(b'|',
@@ -853,9 +595,9 @@ class Delimited(Construct):
     ...     'third' / Optional(Int32ul)
     ... )
     >>> spec.parse(b'Hello\x00\x00|dont care|\x01\x00\x00\x00')
-    Container(first='Hello')(second=None)(third=1)
+    Container(first=u'Hello', second=None, third=1)
     >>> spec.parse(b'Hello\x00\x00||')
-    Container(first='Hello')(second=None)(third=None)
+    Container(first=u'Hello', second=None, third=None)
 
     delimiters may have a length > 1
     >>> spec = Delimited(b'YOYO',
@@ -866,8 +608,8 @@ class Delimited(Construct):
     ...     'fourth' / Byte
     ... )
     >>> spec.parse(b'Hello\x00\x00YOYO\x01\x00\x00\x00YOYOworld!!YO!!\x01\x02YOYO\xff')
-    Container(first='Hello')(second=1)(third='world!!YO!!\x01\x02')(fourth=255)
-    >>> spec.build(dict(first=b'Hello', second=1, third=b'world!!YO!!\x01\x02', fourth=255))
+    Container(first=u'Hello', second=1, third=b'world!!YO!!\x01\x02', fourth=255)
+    >>> spec.build(dict(first=u'Hello', second=1, third=b'world!!YO!!\x01\x02', fourth=255))
     'Hello\x00YOYO\x01\x00\x00\x00YOYOworld!!YO!!\x01\x02YOYO\xff'
 
     # TODO: Add support for using a single construct for parsing an unknown number of times
@@ -922,7 +664,7 @@ class Delimited(Construct):
 
     def _parse_subcon(self, subcon, stream, obj, context, path):
         """Parses and fills obj and context."""
-        subobj = subcon._parse(stream, context, path)
+        subobj = subcon._parsereport(stream, context, path)
         if subcon.flagembedded:
             if subobj is not None:
                 obj.update(subobj.items())
@@ -934,7 +676,7 @@ class Delimited(Construct):
 
     def _parse(self, stream, context, path):
         delimiter = self.delimiter(context) if callable(self.delimiter) else self.delimiter
-        if not isinstance(delimiter, bytes) or not delimiter:
+        if not isinstance(delimiter, bytestringtype) or not delimiter:
             raise ValueError('Invalid delimiter.')
 
         obj = Container()
@@ -944,7 +686,7 @@ class Delimited(Construct):
         for sc in self.subcons[:-1]:
             # Don't count probes as an element.
             if isinstance(sc, Probe):
-                sc._parse(stream, context, path)
+                sc._parsereport(stream, context, path)
                 continue
 
             delimiter_offset = self._find_delimiter(stream, delimiter)
@@ -974,7 +716,7 @@ class Delimited(Construct):
 
     def _build(self, obj, stream, context, path):
         delimiter = self.delimiter(context) if callable(self.delimiter) else self.delimiter
-        if not isinstance(delimiter, bytes) or not delimiter:
+        if not isinstance(delimiter, bytestringtype) or not delimiter:
             raise ValueError('Invalid delimiter.')
 
         context = Container(_=context)
@@ -1017,38 +759,40 @@ class Regex(Construct):
     >>> regex = re.compile('\x01\x02(?P<size>.{4})\x03\x04(?P<path>[A-Za-z].*\x00)', re.DOTALL)
     >>> data = 'GARBAGE!\x01\x02\x0A\x00\x00\x00\x03\x04C:\Windows\x00MORE GARBAGE!'
     >>> Regex(regex, size=Int32ul, path=CString()).parse(data)
-    Container(path='C:\\Windows')(size=10)
+    Container(path=u'C:\\Windows', size=10)
     >>> Regex(regex).parse(data)
-    Container(path='C:\\Windows\x00')(size='\n\x00\x00\x00')
+    Container(path=b'C:\\Windows\x00', size=b'\n\x00\x00\x00')
     >>> Struct(
     ...     're' / Regex(regex, size=Int32ul, path=CString()),
     ...     'after_re' / Tell,
     ...     'garbage' / GreedyBytes
     ... ).parse(data)
-    Container(re=Container(path='C:\\Windows')(size=10))(after_re=27L)(garbage='MORE GARBAGE!')
-    >>> Struct(
-    ...     Embedded(Regex(regex, size=Int32ul, path=CString())),
-    ...     'after_re' / Tell,
-    ...     'garbage' / GreedyBytes
-    ... ).parse(data)
-    Container(path='C:\\Windows')(size=10)(after_re=27L)(garbage='MORE GARBAGE!')
+    Container(re=Container(path=u'C:\\Windows', size=10), after_re=27L, garbage=b'MORE GARBAGE!')
+
+    # TODO: Unfortunately Embedded() no longer works with the update to 2.9
+    # >>> Struct(
+    # ...     Embedded(Regex(regex, size=Int32ul, path=CString())),
+    # ...     'after_re' / Tell,
+    # ...     'garbage' / GreedyBytes
+    # ... ).parse(data)
+    # Container(path=u'C:\\Windows', size=10, after_re=27L, garbage=b'MORE GARBAGE!')
 
     You can use Regex as a trigger to find a particular piece of data before you start parsing.
     >>> Struct(
     ...     Regex('TRIGGER'),
     ...     'greeting' / CString()
     ... ).parse('\x01\x02\x04GARBAGE\x05TRIGGERhello world\x00')
-    Container(greeting='hello world')
+    Container(greeting=u'hello world')
 
     If no data is captured, the associated subcon will received a stream with the position set at the location
     of that captured group. Thus, allowing you to use it as an anchor point.
     >>> Regex('hello (?P<anchor>)world(?P<extra_data>.*)', anchor=Tell).parse('hello world!!!!')
-    Container(extra_data='!!!!')(anchor=6L)
+    Container(extra_data=b'!!!!', anchor=6L)
 
     If no named capture groups are used, you can instead parse the entire matched string by supplying
     a subconstruct as a positional argument. (If no subcon is provided, the raw bytes are returned instead.
     >>> Regex('hello world\x00', CString()).parse('GARBAGE\x01\x03hello world\x00\x04')
-    'hello world'
+    u'hello world'
     >>> Regex('hello world\x00').parse('GARBAGE\x01\x03hello world\x00\x04')
     'hello world\x00'
 
@@ -1061,7 +805,7 @@ class Regex(Construct):
     >>> Regex('hello', _match=True).parse(b'bogus hello world')
     Traceback (most recent call last):
         ...
-    ConstructError: regex did not match
+    ConstructError: [(parsing)] regex did not match
     """
 
     __slots__ = ['regex', 'subcon', 'group_subcons', 'match']
@@ -1085,7 +829,7 @@ class Regex(Construct):
         super(Regex, self).__init__()
         if PY3 and isinstance(regex, str):
             regex = regex.encode()  # force byte strings
-        if isinstance(regex, bytes):
+        if isinstance(regex, bytestringtype):
             regex = re.compile(regex, re.DOTALL)
         self.regex = regex
         # TODO: This feature seems backwards, perhaps make a _search keyword instead and default to match functionality.
@@ -1107,7 +851,7 @@ class Regex(Construct):
         else:
             match = self.regex.search(stream.read())
         if not match:
-            raise ConstructError('regex did not match')
+            raise ConstructError('[{}] regex did not match'.format(path))
 
         try:
             group_dict = match.groupdict()
@@ -1116,13 +860,18 @@ class Regex(Construct):
             if not group_dict:
                 if self.subcon:
                     sub_stream = io.BytesIO(match.group())
-                    return self.subcon._parse(sub_stream, context, path)
+                    return self.subcon._parsereport(sub_stream, context, path)
                 else:
                     return match.group()
 
             # Otherwise, we are going to parse each named capture group.
             obj = Container()
-            context = Container(_=context)
+            obj._io = stream
+
+            context = Container(_=context, _params=context._params, _root=None, _parsing=context._parsing,
+                                _building=context._building, _sizing=context._sizing, _subcons=self.group_subcons,
+                                _io=stream, _index=context.get("_index", None))
+            context._root = context._.get("_root", context)
 
             # Default to displaying matched data as pure bytes.
             obj.update(group_dict)
@@ -1143,9 +892,10 @@ class Regex(Construct):
                     sub_stream = io.BytesIO(data)
 
                 try:
-                    subobj = subcon._parse(sub_stream, context, path)
+                    subobj = subcon._parsereport(sub_stream, context, path)
                 except ConstructError as e:
                     # Raise a more useful error message.
+                    # TODO: Remove when path is provided in exception messages.
                     raise ConstructError('Failed to parse {} capture group with error: {}'.format(name, e))
                 obj[name] = subobj
                 context[name] = subobj
@@ -1155,17 +905,30 @@ class Regex(Construct):
             # Reset position to right after the matched regex.
             stream.seek(start + match.end())
 
+    def _build(self, obj, stream, context, path):
+        raise ConstructError('Building for Regex is not supported.')
+
+    def _sizeof(self, context, path):
+        raise SizeofError('sizeof() for Regex is not supported.')
+
+    def _emitparse(self, code):
+        raise NotImplementedError
+
+    def _emitseq(self, ksy, bitwise):
+        raise NotImplementedError
+
 
 class IterError(ConstructError):
     pass
 
 
+# TODO: Should this be renamed to Map?
 class Iter(Construct):
     r"""
     Class that allows iterating over an object and acting on each item.
 
     e.g.
-    >>> struct = Struct(
+    >>> spec = Struct(
     ...     'types' / Byte[3],
     ...     'entries' / Iter(this.types, {
     ...        1: construct.Int32ul,
@@ -1174,50 +937,70 @@ class Iter(Construct):
     ...     default=construct.Pass
     ...     )
     ... )
-    >>> struct.parse('\x01\x02\x09\x03\x03\x03\x03\x06\x06')
-    Container(types=[1, 2, 9])(entries=[50529027, 1542, None])
+    >>> spec.parse('\x01\x02\x09\x03\x03\x03\x03\x06\x06')
+    Container(types=ListContainer([1, 2, 9]), entries=ListContainer([50529027, 1542, None]))
     >>> C = _
-    >>> struct.build(C)
+    >>> spec.build(C)
     '\x01\x02\t\x03\x03\x03\x03\x06\x06'
-    >>> struct.sizeof(C)
+    >>> spec.sizeof(**C)
     9
 
+    >>> spec = Struct(
+    ...     'sizes' / Int16ul[4],
+    ...     'entries' / Iter(this.sizes, Bytes)  # equivalent to Iter(this.sizes, lambda size: Bytes(size))
+    ... )
+    >>> spec.parse('\x01\x00\x03\x00\x00\x00\x05\x00abbbddddd')
+    Container(sizes=ListContainer([1, 3, 0, 5]), entries=ListContainer(['a', 'bbb', '', 'ddddd']))
+    >>> C = _
+    >>> spec.build(C)
+    '\x01\x00\x03\x00\x00\x00\x05\x00abbbddddd'
+    >>> Iter(this.sizes, Bytes).sizeof(sizes=[1,2,3,0])
+    6
+    >>> spec.sizeof(**C)
+    17
+
     :param iterable: iterable items to act upon
-    :param cases: A dictionary of cases
-    :param default: The default case
+    :param cases: A dictionary of cases or a function that takes takes a key and returns a construct spec.
+    :param default: The default case (only if cases is a dict)
     """
     __slots__ = ['iterable', 'cases', 'default']
-
-    def __init__(self, iterable, cases, default=Switch.NoDefault):
+    
+    def __init__(self, iterable, cases, default=None):
         super(Iter, self).__init__()
         self.iterable = iterable
         self.cases = cases
-        self.default = default
-        self.flagbuildnone = all(sc.flagbuildnone for sc in cases.values())
-        self.flagembedded = all(sc.flagembedded for sc in cases.values())
-
+        self.default = default or Pass
+        if not callable(cases):
+            self.flagbuildnone = all(sc.flagbuildnone for sc in cases.values())
+            self.flagembedded = all(sc.flagembedded for sc in cases.values())
+        
     def _parse(self, stream, context, path):
         iterator = iter(self.iterable(context)) if callable(self.iterable) else iter(self.iterable)
-        try:
-            return ListContainer([self.cases.get(i, self.default)._parse(stream, context, path) for i in iterator])
-        except SwitchError as err:
-            raise IterError(err)
-
+        if callable(self.cases):
+            return ListContainer([self.cases(key)._parsereport(stream, context, path) for key in iterator])
+        else:
+            return ListContainer([self.cases.get(key, self.default)._parsereport(stream, context, path) for key in iterator])
+        
     def _build(self, obj, stream, context, path):
         iterator = iter(self.iterable(context)) if callable(self.iterable) else iter(self.iterable)
-        try:
-            for sub_obj, key in zip(obj, iterator):
+        for sub_obj, key in zip(obj, iterator):
+            if callable(self.cases):
+                self.cases(key)._build(sub_obj, stream, context, path)
+            else:
                 self.cases.get(key, self.default)._build(sub_obj, stream, context, path)
-        except SwitchError as err:
-            raise IterError(err)
-
+            
     def _sizeof(self, context, path):
-        try:
-            iterator = iter(self.iterable(context)) if callable(self.iterable) else iter(self.iterable)
-            return sum(self.cases.get(key, self.default)._sizeof(context, path) for key in iterator)
-        except (KeyError, AttributeError):
-            raise SizeofError("cannot calculate size, key not found in context")
-
+        iterator = iter(evaluate(self.iterable, context))
+        size = 0
+        for key in iterator:
+            try:
+                if callable(self.cases):
+                    size += self.cases(key)._sizeof(context, path)
+                else:
+                    size += self.cases.get(key, self.default)._sizeof(context, path)
+            except (KeyError, AttributeError):
+                raise SizeofError("cannot calculate size, {!r} key not found in context".format(key))
+        return size
 
 
 def find_constructs(struct, data):
@@ -1236,7 +1019,7 @@ def find_constructs(struct, data):
     ...     'int' / Int16ul,
     ...     'string' / CString())
     >>> list(find_constructs(struct, b'\x01\x02\x03MZ\x0A\x00hello\x00\x03\x04MZ\x0B\x00world\x00\x00'))
-    [(3L, Container(int=10)(string='hello')), (15L, Container(int=11)(string='world'))]
+    [(3L, Container(int=10, string=u'hello')), (15L, Container(int=11, string=u'world'))]
     >>> list(find_constructs(struct, b'nope'))
     []
 
@@ -1263,111 +1046,6 @@ def find_constructs(struct, data):
             break
 
 
-@singleton
-class DotNetUInt(Construct):
-    r"""
-    DotNet encoded unsigned 32-bit integer, where first byte indicates the length of the integer.
-
-    Example:
-
-        >>> DotNetUInt.build(16)
-        b'\x10'
-        >>> DotNetUInt.parse(_)
-        16
-        >>> DotNetUInt.build(256)
-        b'\x81\x00'
-        >>> DotNetUInt.parse(_)
-        256
-        >>> DotNetUInt.build(0xffff)
-        b'\xc0\x00\xff\xff'
-        >>> DotNetUInt.parse(_)
-        65535
-    """
-    def _parse(self, stream, context, path):
-        b = byte2int(_read_stream(stream, 1))
-        if b & 0x80 == 0:
-            num = b
-        elif b & 0xc0 == 0x80:
-            num = ((b & 0x3f) << 8) + byte2int(_read_stream(stream, 1))
-        elif b & 0xe0 == 0xc0:
-            num = (b & 0x1f) << 24
-            num += byte2int(_read_stream(stream, 1)) << 16
-            num += byte2int(_read_stream(stream, 1)) << 8
-            num += byte2int(_read_stream(stream, 1))
-        else:
-            raise ConstructError('DotNetUInt encountered an invalid string')
-        return num
-
-    def _build(self, obj, stream, context, path):
-        if obj < 0:
-            raise ConstructError("DotNetUInt cannot build from negative number")
-        if obj > 0x1fffffff:
-            raise ConstructError("DotNetUInt encountered too large a number")
-        if obj < 0x80:
-            _write_stream(stream, 1, int2byte(obj))
-        elif obj < 0x3fff:
-            _write_stream(stream, 1, int2byte((obj >> 8) | 0x80))
-            _write_stream(stream, 1, int2byte(obj & 0xff))
-        else:
-            _write_stream(stream, 1, int2byte((obj >> 24) | 0xc0))
-            _write_stream(stream, 1, int2byte((obj >> 16) & 0xff))
-            _write_stream(stream, 1, int2byte((obj >> 8) & 0xff))
-            _write_stream(stream, 1, int2byte(obj & 0xff))
-
-
-@singleton
-class DotNetNullString(Construct):
-    r"""
-    DotNet null string, different from an empty zero-byte string, encoded as a single 0xff byte.
-
-    Example:
-
-        >>> DotNetNullString.parse('\xff')
-        None
-        >>> DotNetNullString.build()
-        '\xff'
-    """
-    def _parse(self, stream, context, path):
-        if _read_stream(stream, 1) != '\xff':
-            raise ConstructError('DotNetNullString encounted an invalid byte.')
-        return None
-
-    def _build(self, obj, stream, context, path):
-        _write_stream(stream, 1, '\xff')
-
-    def _sizeof(self, context, path):
-        return 1
-
-
-class _DotNetSigToken(Adapter):
-    r"""
-    Adapter used to create or read a compressed token used in signatures. The token must be a typedef,
-    typeref, or typespec token.
-
-    >>> _DotNetSigToken(DotNetUInt).parse('\x81\x42')
-    452984912
-    >>> _DotNetSigToken(DotNetUInt).build(0x01000002)
-    '\t'
-    """
-    TOKEN_ENCODE = {
-        0x02: 0,
-        0x01: 1,
-        0x1b: 2,
-    }
-    def _encode(self, obj, context):
-        encoded = self.TOKEN_ENCODE.get(obj >> 24, 3)
-        if encoded is None:
-            raise ConstructError('DotNetSigToken encountered a token other than typedef, typeref, or typespec')
-        return ((obj & 0x00ffffff) << 2) | encoded
-
-    def _decode(self, obj, context):
-        if obj & 3 == 3 or obj & 0xfc00000000:
-            raise ConstructError('DotNetSigToken encountered an invalid typedef, typeref, or typespec token')
-        return (obj >> 2) | [0x02000000, 0x01000000, 0x1b000000][obj & 3]
-
-DotNetSigToken = _DotNetSigToken(DotNetUInt)
-
-
 class Backwards(Subconstruct):
     r"""
     Subconstruct used to parse a given subconstruct backwards in the stream.
@@ -1381,32 +1059,31 @@ class Backwards(Subconstruct):
 
     e.g.
     >>> (Bytes(14) >> Backwards(Int32ul) >> Tell).parse(b'junk stuff\x01\x02\x00\x00')
-    ['junk stuff\x01\x02\x00\x00', 513, 10L]
+    ListContainer(['junk stuff\x01\x02\x00\x00', 513, 10L])
     >>> spec = Struct(Seek(0, os.SEEK_END), 'name' / Backwards(String(9)), 'number' / Backwards(Int32ul))
     >>> spec.parse(b'A BUNCH OF JUNK DATA\x01\x00\x00\x00joe shmoe')
-    Container(name='joe shmoe')(number=1)
+    Container(name=u'joe shmoe', number=1)
 
     WARNING: This will break if the subcon doesn't have a valid sizeof.
     >>> spec = Struct(Seek(0, os.SEEK_END), 'name' / Backwards(CString()), 'number' / Backwards(Int32ul))
     >>> spec.parse(b'A BUNCH OF JUNK DATA\x01\x00\x00\x00joe shmoe\x00')
     Traceback (most recent call last):
       ...
-    SizeofError: cannot calculate size
-        parsing -> name
+    SizeofError
 
     However, GreedyBytes and GreedyString are allowed.
     >>> spec = Struct(Seek(0, os.SEEK_END), 'name' / Backwards(String(9)), 'rest' / Backwards(GreedyBytes))
     >>> spec.parse(b'A BUNCH OF JUNK DATA\x01\x00\x00\x00joe shmoe')
-    Container(name='joe shmoe')(rest='A BUNCH OF JUNK DATA\x01\x00\x00\x00')
+    Container(name=u'joe shmoe', rest=b'A BUNCH OF JUNK DATA\x01\x00\x00\x00')
     >>> spec = Struct(Seek(0, os.SEEK_END), 'name' / Backwards(String(9)), 'rest' / Backwards(GreedyString(encoding='utf-16-le')))
     >>> spec.parse(b'h\x00e\x00l\x00l\x00o\x00joe shmoe')
-    Container(name='joe shmoe')(rest=u'hello')
+    Container(name=u'joe shmoe', rest=u'hello')
 
     WARNING: This will also break if you read more data that is behind the current position.
     >>> (Seek(0, os.SEEK_END) >> Backwards(String(10))).parse('yo')
     Traceback (most recent call last):
       ...
-    FieldError: could not read enough bytes, expected 10, found 2
+    FormatFieldError: could not read enough bytes, expected 10, found 2
     """
     __slots__ = ['greedy']
 
@@ -1423,45 +1100,62 @@ class Backwards(Subconstruct):
             start_pos = stream.seek(0)
             size = orig_pos - start_pos
             try:
-                sub_stream = io.BytesIO(_read_stream(stream, size))
-                return self.subcon._parse(sub_stream, context, path)
+                sub_stream = io.BytesIO(stream_read(stream, size))
+                return self.subcon._parsereport(sub_stream, context, path)
             finally:
                 stream.seek(start_pos)
         else:
-            size = self.subcon.sizeof(context)
+            size = self.subcon._sizeof(context, path)
             start_pos = stream.seek(size * -1, os.SEEK_CUR)
             # Determine if we fell off the front.
             if orig_pos - start_pos < size:
-                raise FieldError("could not read enough bytes, expected %d, found %d" % (size, orig_pos - start_pos))
+                raise FormatFieldError("could not read enough bytes, expected %d, found %d" % (size, orig_pos - start_pos))
             try:
-                return self.subcon._parse(stream, context, path)
+                return self.subcon._parsereport(stream, context, path)
             finally:
                 stream.seek(start_pos)
 
     def _build(self, obj, stream, context, path):
+        # TODO: Add support for building.
         raise NotImplementedError('Building is not supported.')
 
 
 # Monkey patch RawCopy so that it can handle when we read the stream backwards.
 def _parse(self, stream, context, path):
     offset1 = stream.tell()
-    obj = self.subcon._parse(stream, context, path)
+    obj = self.subcon._parsereport(stream, context, path)
     offset2 = stream.tell()
     # Swap if subcon read backwards.
     if offset1 > offset2:
         offset1, offset2 = offset2, offset1
     fallback = stream.tell()
-    stream.seek(offset1)
-    data = _read_stream(stream, offset2-offset1)
+    stream_seek(stream, offset1)
+    data = stream_read(stream, offset2-offset1)
     stream.seek(fallback)
     return Container(data=data, value=obj, offset1=offset1, offset2=offset2, length=(offset2-offset1))
+
+
 construct.RawCopy._parse = _parse
 
 
 def FocusLast(*subcons, **kw):
-    """
+    r"""
     A helper for performing the common technique of using FocusedSeq to
     parse a bunch of subconstructs and then grab the last element.
+
+    >>> FocusLast(Byte, Byte, String(2)).parse(b'\x01\x02hi')
+    u'hi'
+
+    >>> spec = FocusLast(
+    ...     'a' / Byte,
+    ...     'b' / Byte,
+    ...     String(this.a + this.b),
+    ... )
+    >>> spec.parse(b'\x01\x02hi!')
+    u'hi!'
+    >>> spec.build(u'hi!', a=1, b=2)
+    '\x01\x02hi!'
+
 
     e.g.:
         # Simplifies this:

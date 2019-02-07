@@ -5,8 +5,8 @@
         ], 
         "debug": [
             "size of inputfile is 9190 bytes", 
-            "operating on inputfile c:\\users\\brett~1.boy\\appdata\\local\\temp\\mwcp-managed_tempdir-0t6wtc\\mwcp-inputfile-lw8iyg"
-        ], 
+            "operating on inputfile README.md"
+        ],
         "outputfile": [
             [
                 "fooconfigtest.txt", 
@@ -14,7 +14,7 @@
                 "5eb63bbbe01eeed093cb22bb8f5acdc3"
             ]
         ], 
-        "inputfilename": "\\\\ia.lan\\shares\\MalwareRepo\\!MwcpTestRepo\\0d0c\\0d0c7d8c152c1b32066a82532181c27d", 
+        "inputfilename": "..\\..\\..\\README.md",
         "address": [
             "127.0.0.1"
         ]

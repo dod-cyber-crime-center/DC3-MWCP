@@ -33,27 +33,29 @@ setup(
     ],
     entry_points={
         'console_scripts': [
+            'mwcp = mwcp.cli:main',
             'mwcp-tool = mwcp.tools.tool:main',
             'mwcp-client = mwcp.tools.client:main',
             'mwcp-server = mwcp.tools.server:main',
             'mwcp-test = mwcp.tools.test:main'
         ],
-        # TODO: Register parsers based on parent package instead of individually.
-        # 'mwcp.parsers': [
-        #     'bar = mwcp.parsers.bar:Bar',
-        #     'foo = mwcp.parsers.foo:Foo'
-        # ]
+        'mwcp.parsers': [
+            'mwcp = mwcp.parsers',
+        ]
     },
     install_requires=[
+        'click',
         'bottle',
-        'construct==2.8.12',  # pin version, since we patch this library
+        'construct==2.9.45',  # pin because parsers are very dependent on this.
         'future',
         'jinja2',  # For construct.html_hex()
         'pefile',
         'pyelftools',
         'pyyaml',
         'requests',
+        'ruamel.yaml',
         'six',
+        'tabulate',
 
         # Testing
         'pytest',

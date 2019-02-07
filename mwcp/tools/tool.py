@@ -15,13 +15,16 @@ import json
 import logging
 import os
 import sys
+import tabulate
 import tempfile
 import time
 import traceback
+import warnings
 
 from six import iteritems
 
 import mwcp
+import mwcp.parsers
 from mwcp.utils.stringutils import convert_to_unicode
 
 
@@ -108,22 +111,18 @@ def _write_csv(input_files, results, csv_path, base64_outputfiles=False):
             dw.writerow({k: _format_metadata_value(v) for k, v in metadata.items()})
 
 
-def _print_parsers(json_output=False):
+def _print_parsers(json_output=False, config_only=True):
     """
     Prints a table of registered parsers to stdout.
 
     :param json_output: Print json
+    :param config_only: Whether to only print parsers listed in configuration file.
     """
-    descriptions = mwcp.get_parser_descriptions()
+    descriptions = mwcp.get_parser_descriptions(config_only=config_only)
     if json_output:
         print(json.dumps(descriptions, indent=4))
     else:
-        # TODO: Use a library like tabulate to print this.
-        format = '%-25s %-50s %-15s %s'
-        print(format % ('NAME', 'SOURCE', 'AUTHOR', 'DESCRIPTION'))
-        print('-' * 150)
-        for name, source, author, description in descriptions:
-            print(format % (name, source, author, description))
+        print(tabulate.tabulate(descriptions, headers=['NAME', 'SOURCE', 'AUTHOR', 'DESCRIPTION']))
 
 
 def _print_fields(json_output=False):
@@ -170,34 +169,33 @@ def _get_file_paths(input_args, is_filelist=True):
         return file_paths
 
 
-def _parse_file(reporter, file_path, parser, options=None, include_filename=False):
+def _parse_file(reporter, file_path, parser, include_filename=False):
     """
     Parses given file_path with given parser.
 
     :param reporter: Reporter to use for parsing.
     :param file_path: File path to parse or "-" for stdin
     :param parser: Name of parser to run (can use ":" notation)
-    :param options: Extra arguments to pass along to parser.
     :param include_filename: Whether to include input file metadata in the results.
     :return: Dictionary of results.
     """
-    options = options or {}
     if file_path == "-":
-        reporter.run_parser(parser, data=sys.stdin.read(), **options)
+        reporter.run_parser(parser, data=sys.stdin.read())
     else:
-        reporter.run_parser(parser, file_path, **options)
+        reporter.run_parser(parser, file_path)
 
     result = reporter.metadata
+    input_file = reporter.input_file
 
     if include_filename:
         result['inputfilename'] = file_path
-        result['md5'] = hashlib.md5(reporter.data).hexdigest()
-        result['sha1'] = hashlib.sha1(reporter.data).hexdigest()
-        result['sha256'] = hashlib.sha256(reporter.data).hexdigest()
+        result['md5'] = input_file.md5
+        result['sha1'] = input_file.sha1
+        result['sha256'] = input_file.sha256
         result['parser'] = parser
-        if reporter.pe:
+        if input_file.pe:
             result['compiletime'] = datetime.datetime.fromtimestamp(
-                reporter.pe.FILE_HEADER.TimeDateStamp).isoformat()
+                reporter.input_file.pe.FILE_HEADER.TimeDateStamp).isoformat()
 
     if reporter.errors:
         result["errors"] = reporter.errors
@@ -229,20 +227,31 @@ def get_arg_parser():
                         dest="parser",
                         help="Malware config parser to call. (use ':' notation to specify source if necessary e.g. 'mwcp-acme:Foo')")
     parser.add_argument("-l", "--parsers",
-                        action="store_true",
-                        default=False,
+                        default=0,
+                        action="count",
                         dest="list",
-                        help="list all malware config parsers.")
+                        help="list all malware config parsers. (use -ll to also list component parsers)")
     parser.add_argument("-k", "--fields",
                         action="store_true",
                         default=False,
                         dest="fields",
                         help="List all standardized fields and examples. See resources/fields.json")
-    parser.add_argument("-a", "--parserdir",
+    parser.add_argument("--parserdir",
                         metavar="DIR",
                         default=None,
                         dest="parserdir",
                         help="Optional extra parser directory")
+    parser.add_argument("--parserconfig",
+                        metavar="FILE",
+                        default=None,
+                        dest="parserconfig",
+                        help="Optional parser configuration file to use with extra parser directory.")
+    parser.add_argument("--parsersource",
+                        metavar="SOURCE_NAME",
+                        default=None,
+                        dest="parsersource",
+                        help="Set a default parser source to use. "
+                             "If not provided parsers from all sources will be available.")
     parser.add_argument("-o", "--outputdir",
                         metavar="DIR",
                         default="",
@@ -313,18 +322,13 @@ def get_arg_parser():
                         default=False,
                         dest="base64outputfiles",
                         help="Base64 encode output files and include in metadata.")
-    parser.add_argument("-w", "--kwargs",
-                        metavar="JSON",
-                        default="",
-                        dest="kwargs_raw",
-                        help="Module keyword arguments as json encoded dictionary " +
-                             "if values in the dictionary use the special paradigm 'b64file(filename)', then " +
-                             "filename is read, base64 encoded, and used as the value)")
 
     return parser
 
 
 def main(args=None):
+    warnings.warn("WARNING: mwcp-tool is deprecated. Please use \"mwcp parse\" instead.")
+
     argparser = get_arg_parser()
     args, input_files = argparser.parse_known_args(args)
 
@@ -342,14 +346,20 @@ def main(args=None):
     elif args.filelistindirection or len(input_files) > 1 or any([os.path.isdir(x) for x in input_files]):
         args.outputfile_prefix = 'md5'
 
-    if args.list:
-        if args.parserdir:
-            mwcp.register_parser_directory(args.parserdir)
-        _print_parsers(json_output=args.jsonoutput)
-        sys.exit(0)
-
     if args.fields:
         _print_fields(json_output=args.jsonoutput)
+        sys.exit(0)
+
+    # Register parsers
+    mwcp.register_entry_points()
+    if args.parserdir:
+        mwcp.register_parser_directory(args.parserdir, config_file_path=args.parserconfig)
+
+    if args.parsersource:
+        mwcp.set_default_source(args.parsersource)
+
+    if args.list:
+        _print_parsers(json_output=args.jsonoutput, config_only=args.list < 2)
         sys.exit(0)
 
     if not input_files or not args.parser:
@@ -358,28 +368,19 @@ def main(args=None):
 
     file_paths = _get_file_paths(input_files, is_filelist=args.filelistindirection)
 
-    kwargs = {}
-    if args.kwargs_raw:
-        kwargs = dict(json.loads(args.kwargs_raw))
-        for key, value in list(kwargs.items()):
-            if value and value.startswith('b64file(') and value.endswith(')'):
-                tmp_filename = value[len('b64file('):-1]
-                with open(tmp_filename, 'rb') as f:
-                    kwargs[key] = base64.b64encode(f.read())
-
     # Run MWCP
     try:
-        reporter = mwcp.Reporter(parserdir=args.parserdir,
-                            outputdir=args.outputdir,
-                            outputfile_prefix=args.outputfile_prefix,
-                            tempdir=args.tempdir,
-                            disableoutputfiles=args.disableoutputfiles,
-                            disabletempcleanup=args.disabletempcleanup,
-                            base64outputfiles=args.base64outputfiles)
+        reporter = mwcp.Reporter(
+            outputdir=args.outputdir,
+            outputfile_prefix=args.outputfile_prefix,
+            tempdir=args.tempdir,
+            disable_output_files=args.disableoutputfiles,
+            disable_temp_cleanup=args.disabletempcleanup,
+            base64_output_files=args.base64outputfiles)
         results = []
         for file_path in file_paths:
             result = _parse_file(
-                reporter, file_path, args.parser, options=kwargs, include_filename=args.includefilename)
+                reporter, file_path, args.parser, include_filename=args.includefilename)
             results.append(result)
             if not args.jsonoutput:
                 reporter.print_report()

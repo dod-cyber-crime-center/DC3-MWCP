@@ -11,7 +11,7 @@ import mwcp
 
 def test_managed_tempdir(tmpdir):
     reporter = mwcp.Reporter(tempdir=str(tmpdir))
-    managed_tempdir = reporter.managed_tempdir()
+    managed_tempdir = reporter.managed_tempdir
     assert os.path.exists(managed_tempdir)
     assert managed_tempdir.startswith(os.path.join(str(tmpdir), 'mwcp-managed_tempdir-'))
 

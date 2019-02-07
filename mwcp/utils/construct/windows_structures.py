@@ -3,24 +3,20 @@ A central location to store common windows enumerations.
 This module will be imported along with 'from mwcp.utils import construct'
 """
 
+from __future__ import absolute_import
+
 import datetime
 
-import construct
-from construct import this
-from mwcp.utils.construct import helpers
-from mwcp.utils.construct import windows_enums
+from .version28 import this, len_
 
-# Visible interface. Add the classes and functions you would like to be available for users of construct
-# library here.
-__all__ = [
-    'IMAGE_DOS_HEADER', 'IMAGE_FILE_HEADER', 'IMAGE_OPTIONAL_HEADER', 'IMAGE_NT_HEADERS', 'PEFILE_HEADER',
-    'SOCKADDR_IN', 'PUBLICKEYSTRUC', 'PUBLICKEYBLOB', 'PRIVATEKEYBLOB', 'SYSTEMTIME', 'SystemTime'
-]
+from mwcp.utils.construct import windows_enums, datetime_, version28 as construct, network
+from .windows_constants import *
+
 
 """PEFILE STRUCTURES"""
 
 IMAGE_DOS_HEADER = construct.Struct(
-    "e_magic" / construct.String(2),
+    "e_magic" / construct.Default(construct.Bytes(2), "MZ"),
     "e_cblp" / construct.Int16ul,
     "e_cp" / construct.Int16ul,
     "e_crlc" / construct.Int16ul,
@@ -41,18 +37,87 @@ IMAGE_DOS_HEADER = construct.Struct(
     "e_lfanew" / construct.Int32ul
 )
 
-IMAGE_FILE_HEADER = construct.Struct(
-    "Machine" / construct.Int16ul,
-    "NumberOfSections" / construct.Int16ul,
+
+IMAGE_SECTION_HEADER = construct.Struct(
+    "Name" / construct.String(8),
+    "VirtualSize" / construct.Int32ul,  # alias "PhysicalAddress"
+    "VirtualAddress" / construct.Int32ul,
+    "SizeOfRawData" / construct.Int32ul,
+    "PointerToRawData" / construct.Int32ul,
+    "PointerToRelocations" / construct.Default(construct.Int32ul, 0),
+    "PointerToLinenumbers" / construct.Default(construct.Int32ul, 0),
+    "NumberOfRelocations" / construct.Default(construct.Int16ul, 0),
+    "NumberOfLinenumbers" / construct.Default(construct.Int16ul, 0),
+    "Characteristics" / construct.FlagsEnum(
+        construct.Int32ul,
+        IMAGE_SCN_TYPE_NO_PAD=0x00000008,
+        IMAGE_SCN_CNT_CODE=0x00000020,
+        IMAGE_SCN_CNT_INITIALIZED_DATA=0x00000040,
+        IMAGE_SCN_CNT_UNINITIALIZED_DATA=0x00000080,
+        IMAGE_SCN_LNK_OTHER=0x00000100,
+        IMAGE_SCN_LNK_INFO=0x00000200,
+        IMAGE_SCN_LNK_REMOVE=0x00000800,
+        IMAGE_SCN_LNK_COMDAT=0x00001000,
+        IMAGE_SCN_NO_DEFER_SPEC_EXC=0x00004000,
+        IMAGE_SCN_GPREL=0x00008000,
+        IMAGE_SCN_MEM_PURGEABLE=0x00020000,
+        IMAGE_SCN_MEM_LOCKED=0x00040000,
+        IMAGE_SCN_MEM_PRELOAD=0x00080000,
+        IMAGE_SCN_ALIGN_1BYTES=0x00100000,
+        IMAGE_SCN_ALIGN_2BYTES=0x00200000,
+        IMAGE_SCN_ALIGN_4BYTES=0x00300000,
+        IMAGE_SCN_ALIGN_8BYTES=0x00400000,
+        IMAGE_SCN_ALIGN_16BYTES=0x00500000,
+        IMAGE_SCN_ALIGN_32BYTES=0x00600000,
+        IMAGE_SCN_ALIGN_64BYTES=0x00700000,
+        IMAGE_SCN_ALIGN_128BYTES=0x00800000,
+        IMAGE_SCN_ALIGN_256BYTES=0x00900000,
+        IMAGE_SCN_ALIGN_512BYTES=0x00A00000,
+        IMAGE_SCN_ALIGN_1024BYTES=0x00B00000,
+        IMAGE_SCN_ALIGN_2048BYTES=0x00C00000,
+        IMAGE_SCN_ALIGN_4096BYTES=0x00D00000,
+        IMAGE_SCN_ALIGN_8192BYTES=0x00E00000,
+        IMAGE_SCN_LNK_NRELOC_OVFL=0x01000000,
+        IMAGE_SCN_MEM_DISCARDABLE=0x02000000,
+        IMAGE_SCN_MEM_NOT_CACHED=0x04000000,
+        IMAGE_SCN_MEM_NOT_PAGED=0x08000000,
+        IMAGE_SCN_MEM_SHARED=0x10000000,
+        IMAGE_SCN_MEM_EXECUTE=0x20000000,
+        IMAGE_SCN_MEM_READ=0x40000000,
+        IMAGE_SCN_MEM_WRITE=0x80000000,
+    )
+)
+
+IMAGE_DATA_DIRECTORY = construct.Struct(
+    "VirtualAddress" / construct.Int32ul,
+    "Size" / construct.Int32ul,
+)
+
+IMAGE_EXPORT_DIRECTORY = construct.Struct(
+    "Characteristics" / construct.Default(construct.Int32ul, 0),
+    "TimeDateStamp" / datetime_.EpochTime,
+    "MajorVersion" / construct.Int16ul,
+    "MinorVersion" / construct.Int16ul,
+    "Name" / construct.Int32ul,  # rva pointer to the name
+    "Base" / construct.Int32ul,
+    "NumberOfFunctions" / construct.Int32ul,
+    "NumberOfNames" / construct.Int32ul,
+    "AddressOfFunctions" / construct.Int32ul,
+    "AddressOfNames" / construct.Int32ul,
+    "AddressOfNameOrdinals" / construct.Int32ul,
+)
+
+IMAGE_IMPORT_DESCRIPTOR = construct.Struct(
+    "Chracteristics" / construct.Int32ul,
     "TimeDateStamp" / construct.Int32ul,
-    "PointerToSymbolTable" / construct.Int32ul,
-    "NumberOfSymbols" / construct.Int32ul,
-    "SizeOfOptionalHeader" / construct.Int16ul,
-    "Characteristics" / construct.Int32ul
+    "ForwarderChain" / construct.Int32ul,
+    "Name" / construct.Int32ul,  # rva pointer to the name
+    "FirstThunk" / construct.Int32ul,
 )
 
 IMAGE_OPTIONAL_HEADER = construct.Struct(
-    "Magic" / construct.Int16ul,
+    "Magic" / construct.OneOf(construct.Int16ul, [
+        IMAGE_NT_OPTIONAL_HDR32_MAGIC, IMAGE_NT_OPTIONAL_HDR64_MAGIC, IMAGE_ROM_OPTIONAL_HDR_MAGIC]),
     "MajorLinkerVersion" / construct.Byte,
     "MinorLinkerVersion" / construct.Byte,
     "SizeOfCode" / construct.Int32ul,
@@ -70,30 +135,86 @@ IMAGE_OPTIONAL_HEADER = construct.Struct(
     "MinorImageVersion" / construct.Int16ul,
     "MajorSubsystemVersion" / construct.Int16ul,
     "MinorSubsystemVersion" / construct.Int16ul,
-    "Win32VersionValue" / construct.Int32ul,
+    "Win32VersionValue" / construct.Default(construct.Int32ul, 0),  # must be 0
     "SizeOfImage" / construct.Int32ul,
     "SizeOfHeaders" / construct.Int32ul,
     "CheckSum" / construct.Int32ul,
-    "Subsystem" / construct.Int16ul,
-    "DllCharacteristics" / construct.Int16ul,
+    # TODO: Use enums instead?
+    "Subsystem" / construct.OneOf(construct.Int16ul, [
+        IMAGE_SUBSYSTEM_UNKNOWN,
+        IMAGE_SUBSYSTEM_NATIVE,
+        IMAGE_SUBSYSTEM_WINDOWS_GUI,
+        IMAGE_SUBSYSTEM_WINDOWS_CUI,
+        IMAGE_SUBSYSTEM_OS2_CUI,
+        IMAGE_SUBSYSTEM_POSIX_CUI,
+        IMAGE_SUBSYSTEM_WINDOWS_CE_GUI,
+        IMAGE_SUBSYSTEM_EFI_APPLICATION,
+        IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER,
+        IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER,
+        IMAGE_SUBSYSTEM_EFI_ROM,
+        IMAGE_SUBSYSTEM_XBOX,
+        IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION,
+    ]),
+    "DllCharacteristics" / construct.FlagsEnum(
+        construct.Int16ul,
+        IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE=0x0040,
+        IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY=0x0080,
+        IMAGE_DLLCHARACTERISTICS_NX_COMPAT=0x0100,
+        IMAGE_DLLCHARACTERISTICS_NO_ISOLATION=0x0200,
+        IMAGE_DLLCHARACTERISTICS_NO_SEH=0x0400,
+        IMAGE_DLLCHARACTERISTICS_NO_BIND=0x0800,
+        IMAGE_DLLCHARACTERISTICS_WDM_DRIVER=0x2000,
+        IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE=0x8000,
+    ),
     "SizeOfStackReserve" / construct.Int32ul,
     "SizeOfStackCommit" / construct.Int32ul,
     "SizeOfHeapReserve" / construct.Int32ul,
     "SizeOfHeapCommit" / construct.Int32ul,
     "LoaderFlags" / construct.Int32ul,
-    "NumberOfRvaAndSizes" / construct.Int32ul,
+    "NumberOfRvaAndSizes" / construct.Rebuild(construct.Int32ul, len_(this.DataDirectory)),
+    "DataDirectory" / construct.Default(IMAGE_DATA_DIRECTORY[this.NumberOfRvaAndSizes], DEFAULT_DATA_DIRECTORIES[:]),
+)
+
+IMAGE_FILE_HEADER = construct.Struct(
+    "Machine" / construct.Int16ul,  # IMAGE_FILE_MACHINE_*
+    "NumberOfSections" / construct.Int16ul,
+    "TimeDateStamp" / construct.Int32ul,
+    "PointerToSymbolTable" / construct.Default(construct.Int32ul, 0),
+    "NumberOfSymbols" / construct.Default(construct.Int32ul, 0),
+    "SizeOfOptionalHeader" / construct.Default(
+        construct.Int16ul, IMAGE_OPTIONAL_HEADER.sizeof(NumberOfRvaAndSizes=16)),
+    "Characteristics" / construct.FlagsEnum(
+        construct.Int16ul,
+        IMAGE_FILE_RELOCS_STRIPPED=0x0001,
+        IMAGE_FILE_EXECUTABLE_IMAGE=0x0002,
+        IMAGE_FILE_LINE_NUMS_STRIPPED=0x0004,
+        IMAGE_FILE_LOCAL_SYMS_STRIPPED=0x0008,
+        IMAGE_FILE_AGGRESIVE_WS_TRIM=0x0010,
+        IMAGE_FILE_LARGE_ADDRESS_AWARE=0x0020,
+        IMAGE_FILE_BYTES_REVERSED_LO=0x0080,
+        IMAGE_FILE_32BIT_MACHINE=0x0100,
+        IMAGE_FILE_DEBUG_STRIPPED=0x0200,
+        IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP=0x0400,
+        IMAGE_FILE_NET_RUN_FROM_SWAP=0x0800,
+        IMAGE_FILE_SYSTEM=0x1000,
+        IMAGE_FILE_DLL=0x2000,
+        IMAGE_FILE_UP_SYSTEM_ONLY=0x4000,
+        IMAGE_FILE_BYTES_REVERSED_HI=0x8000,
+    ),
 )
 
 IMAGE_NT_HEADERS = construct.Struct(
-    "Signature" / construct.Int32ul,
+    "Signature" / construct.Default(construct.Int32ul, 0x4550),  # b'PE\x00\x00'
     "FileHeader" / IMAGE_FILE_HEADER,
     "OptionalHeader" / IMAGE_OPTIONAL_HEADER
 )
 
 PEFILE_HEADER = construct.Struct(
     "DosHeader" / IMAGE_DOS_HEADER,
-    construct.Seek(this.DosHeader.e_lfanew),
-    "NTHeaders" / IMAGE_NT_HEADERS
+    # TODO: Use construct.FixedSized() if we ever update construct.
+    "DosStub" / construct.Bytes(this.DosHeader.e_lfanew - IMAGE_DOS_HEADER.sizeof()),
+    "NTHeaders" / IMAGE_NT_HEADERS,
+    "SectionTable" / IMAGE_SECTION_HEADER[this.NTHeaders.FileHeader.NumberOfSections],
 )
 
 """WINSOCK STRUCTURES"""
@@ -101,7 +222,7 @@ PEFILE_HEADER = construct.Struct(
 SOCKADDR_IN = construct.Struct(
     "sin_family" / construct.Int16ul,
     "sin_port" / construct.Int16ub,
-    "sin_addr" / helpers.IP4Address,
+    "sin_addr" / network.IP4Address,
     "sin_zero" / construct.Bytes(8)
 )
 
@@ -166,10 +287,30 @@ class _SystemTimeAdapter(construct.Adapter):
     >>> _SystemTimeAdapter(SYSTEMTIME).parse('\xdd\x07\t\x00\x03\x00\x12\x00\t\x00.\x00\x15\x00\xf2\x02')
     '2013-09-18T09:46:21.754000'
     """
-    def _decode(self, obj, context):
+    def _decode(self, obj, context, path):
         return datetime.datetime(
             obj.wYear, obj.wMonth, obj.wDay, obj.wHour, obj.wMinute, obj.wSecond, obj.wMilliseconds * 1000
         ).isoformat()
 
 # Hide the adapter
 SystemTime = _SystemTimeAdapter(SYSTEMTIME)
+
+
+EPOCH_AS_FILETIME = 116444736000000000
+HUNDREDS_OF_NANOSECONDS = 10000000
+
+
+# TODO: Implement _encode
+class _FileTimeAdapter(construct.Adapter):
+    r"""
+    Adapter to convert FILETIME structured data to datetime.datetime ISO format.
+    Technically FILETIME is two 32-bit integers as dwLowDateTime and dwHighDateTime, but there is no need to do that
+
+    >>> _FileTimeAdapter(construct.Int64ul).parse('\x00\x93\xcc\x11\xa7\x88\xd0\x01')
+    '2015-05-07T05:20:33'
+    """
+    def _decode(self, obj, context, path):
+        return datetime.datetime.fromtimestamp((obj - EPOCH_AS_FILETIME) / HUNDREDS_OF_NANOSECONDS).isoformat()
+
+# Hide the adapter
+FileTime = _FileTimeAdapter(construct.Int64ul)

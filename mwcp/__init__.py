@@ -6,10 +6,12 @@ import logging
 logging.getLogger().addHandler(logging.NullHandler())
 
 
-from mwcp import config
 from mwcp.parser import Parser
-from mwcp.parsers import register_parser_directory, iter_parsers, get_parser_descriptions
+from mwcp.file_object import FileObject
+from mwcp.registry import (
+    register_entry_points, register_parser_directory, register_parser_package,
+    iter_parsers, get_parser_descriptions, set_default_source, clear_default_source)
 from mwcp.reporter import Reporter
 from mwcp.resources import techanarchy_bridge
-from mwcp.resources.dispatcher import Dispatcher, ComponentParser, FileObject, UnableToParse, UnidentifiedFile
+from mwcp.dispatcher import Dispatcher, UnableToParse, UnidentifiedFile
 from mwcp.utils.logutil import setup_logging

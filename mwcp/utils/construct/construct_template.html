@@ -80,24 +80,28 @@ div.WordSection1
 </head>
 <body lang=EN-US>
 <div class=WordSection1>
-    {# TODO: Fix headers to be dynamically generated based on width #}
-<p class=MsoNormal style='background:#FFFFFF'><span style='font-size:8.0pt;
-font-family:"Courier New"'>&nbsp;offset&nbsp;|&nbsp;&nbsp;0&nbsp;&nbsp;1&nbsp;&nbsp;2&nbsp;&nbsp;3&nbsp;&nbsp;4&nbsp;&nbsp;5&nbsp;&nbsp;6&nbsp;&nbsp;7&nbsp;&nbsp;8&nbsp;&nbsp;9&nbsp;&nbsp;a&nbsp;&nbsp;b&nbsp;&nbsp;c&nbsp;&nbsp;d&nbsp;&nbsp;e&nbsp;&nbsp;f&nbsp;|&nbsp;0123456789abcdef</span></p>
-<p class=MsoNormal style='background:#FFFFFF'><span style='font-size:8.0pt;
-font-family:"Courier New"'>&nbsp;------ |  -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --  |  ----------------</span></p>
 
-{# Display hex dump #}
-{% for offset, hex_line, ascii_line in hex_dump %}
-    <p class=MsoNormal style="background:#FFFFFF">
-        <span style="font-size:8.0pt;font-family:'Courier New'">
-            &nbsp;{{offset}}&nbsp;|&nbsp;{{hex_line}}&nbsp;|&nbsp;{{ascii_line}}
-        </span>
-    </p>
-{% endfor %}
+<!-- Hex Dump -->
+<p class=MsoNormal style='background:#FFFFFF'>
+    <span style='font-size:8.0pt;font-family:"Courier New"'>
+        &nbsp;offset&nbsp;|
+        {%- for i in range(width) -%}
+            &nbsp;{% if i < 16 %}&nbsp;{% endif %}{{'%x'|format(i)}}
+        {%- endfor -%}
+        &nbsp;|&nbsp;
+        {%- for _ in range(width) -%}
+            {{'%x'|format(loop.cycle(*range(16)))}}  {#- We only have enough space for the first digit -#}
+        {%- endfor -%}
+        <br/>
+        &nbsp;------ |  {{'-- ' * width}} | {{'-' * width}}
+        {% for offset, hex_line, ascii_line in hex_dump %}
+        <br/>&nbsp;{{offset}}&nbsp;|&nbsp;{{hex_line}}&nbsp;|&nbsp;{{ascii_line}}
+        {% endfor %}
+    </span>
+</p>
 
+<!-- Variable Table -->
 <p class=MsoNormal>&nbsp;</p>
-
-{# Display variable table #}
     <table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
      style='margin-left:5.4pt;border-collapse:collapse;border:none'>
      <tr>
@@ -118,7 +122,7 @@ font-family:"Courier New"'>&nbsp;------ |  -- -- -- -- -- -- -- -- -- -- -- -- -
       </td>
      </tr>
 
-    {% for offset, (colors, member) in color_map.items()|sort %}
+    {% for offset, (colors, member) in color_map.iteritems()|sort %}
         <tr>
             {# Offset #}
             <td width=175 valign=top style="width:131.05pt;border:solid windowtext 1.0pt;  border-top:none;padding:0in 5.4pt 0in 5.4pt">
