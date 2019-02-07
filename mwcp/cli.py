@@ -148,7 +148,7 @@ def _write_csv(input_files, results, csv_path=None):
     # Sort columns, but with PREFIX_COLUMNS showing up first.
     column_names = set(itertools.chain(*(metadata.keys() for metadata in results)))
     column_names = sorted(
-        column_names, key=lambda x: str(_STD_CSV_COLUMNS.index(x)) if x in _STD_CSV_COLUMNS else x)
+        column_names, key=lambda x: str(_STD_CSV_COLUMNS.index(x)) if x in _STD_CSV_COLUMNS else str(x))
 
     # Reformat metadata and write to CSV
     if csv_path is None:
@@ -238,7 +238,7 @@ def parse(parser, input, format, output_dir, output_files, cleanup, include_file
                 new_input.append(path)
         input = new_input
 
-    input_files = filter(os.path.isfile, input)
+    input_files = list(filter(os.path.isfile, input))
 
     # Run MWCP
     try:

@@ -2,10 +2,14 @@
 
 import doctest
 import os
+import sys
+
+import pytest
 
 from mwcp.utils import construct
 
 
+@pytest.mark.skipif(sys.version_info[0] != 2, reason="Doctests designed for Python 2")
 def test_helpers():
     """Tests that the doctests for the helpers work."""
     helper_modules = [

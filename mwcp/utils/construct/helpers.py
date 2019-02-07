@@ -758,16 +758,19 @@ class Regex(Construct):
 
     >>> regex = re.compile('\x01\x02(?P<size>.{4})\x03\x04(?P<path>[A-Za-z].*\x00)', re.DOTALL)
     >>> data = 'GARBAGE!\x01\x02\x0A\x00\x00\x00\x03\x04C:\Windows\x00MORE GARBAGE!'
-    >>> Regex(regex, size=Int32ul, path=CString()).parse(data)
-    Container(path=u'C:\\Windows', size=10)
-    >>> Regex(regex).parse(data)
-    Container(path=b'C:\\Windows\x00', size=b'\n\x00\x00\x00')
-    >>> Struct(
+    >>> r = Regex(regex, size=Int32ul, path=CString()).parse(data)
+    >>> r == Container(path=u'C:\\Windows', size=10)
+    True
+    >>> r = Regex(regex).parse(data)
+    >>> r == Container(path=b'C:\\Windows\x00', size=b'\n\x00\x00\x00')
+    True
+    >>> r = Struct(
     ...     're' / Regex(regex, size=Int32ul, path=CString()),
     ...     'after_re' / Tell,
     ...     'garbage' / GreedyBytes
     ... ).parse(data)
-    Container(re=Container(path=u'C:\\Windows', size=10), after_re=27L, garbage=b'MORE GARBAGE!')
+    >>> r == Container(re=Container(path=u'C:\\Windows', size=10), after_re=27L, garbage=b'MORE GARBAGE!')
+    True
 
     # TODO: Unfortunately Embedded() no longer works with the update to 2.9
     # >>> Struct(
@@ -786,8 +789,9 @@ class Regex(Construct):
 
     If no data is captured, the associated subcon will received a stream with the position set at the location
     of that captured group. Thus, allowing you to use it as an anchor point.
-    >>> Regex('hello (?P<anchor>)world(?P<extra_data>.*)', anchor=Tell).parse('hello world!!!!')
-    Container(extra_data=b'!!!!', anchor=6L)
+    >>> r = Regex('hello (?P<anchor>)world(?P<extra_data>.*)', anchor=Tell).parse('hello world!!!!')
+    >>> r == Container(extra_data=b'!!!!', anchor=6L)
+    True
 
     If no named capture groups are used, you can instead parse the entire matched string by supplying
     a subconstruct as a positional argument. (If no subcon is provided, the raw bytes are returned instead.

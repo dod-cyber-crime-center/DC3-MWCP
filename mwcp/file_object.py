@@ -70,7 +70,7 @@ class FileObject(object):
             self._file_name = file_name
         else:
             self._file_name = pefileutils.obtain_original_filename(
-                def_stub or self.md5.decode('utf8'), pe=self.pe, use_arch=use_arch, ext=ext)
+                def_stub or self.md5, pe=self.pe, use_arch=use_arch, ext=ext)
         self._file_name = convert_to_unicode(self._file_name)
 
     def __enter__(self):

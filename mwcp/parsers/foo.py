@@ -20,7 +20,7 @@ class Foo(Parser):
         input_file = self.file_object
 
         # standardized metadata
-        self.reporter.add_metadata("url", "http://127.0.0.1")
+        self.reporter.add_metadata("url", u"http://127.0.0.1")
 
         # demonstrate access to sample
         logger.info("size of inputfile is {} bytes".format(len(input_file.file_data)))

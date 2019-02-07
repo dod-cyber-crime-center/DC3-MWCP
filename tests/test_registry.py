@@ -78,7 +78,7 @@ def test_iter_parsers(monkeypatch, test_parser):
     assert parser.DESCRIPTION == 'A test parser'
 
 
-    parsers = sorted(mwcp.iter_parsers(config_only=False), key=lambda (_, parser): parser.DESCRIPTION)
+    parsers = sorted(mwcp.iter_parsers(config_only=False), key=lambda x: x[1].DESCRIPTION)
     assert len(parsers) == 3
 
     _source, parser = parsers[0]

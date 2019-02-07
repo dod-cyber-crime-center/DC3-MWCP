@@ -154,7 +154,7 @@ def register_parser_package(package, config_file_path=None, source_name=None):
 def _create_package(directory):
     """Creates a Python package object from given directory."""
     # Create a dummy package for the directory.
-    package_name = hashlib.md5(directory).hexdigest()
+    package_name = hashlib.md5(directory.encode('utf8')).hexdigest()
     package_init = os.path.join(directory, '__init__.py')
     # Create __init__.py if it doesn't exist.
     if not os.path.exists(package_init):

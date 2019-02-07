@@ -238,7 +238,7 @@ PUBLICKEYSTRUC = construct.Struct(
 PUBLICKEYBLOB = construct.Struct(
     "publickeystruc" / PUBLICKEYSTRUC,
     construct.Check(this.publickeystruc.algid == "CALG_RSA_KEYX"),
-    construct.Const("RSA1"),
+    construct.Const(b"RSA1"),
     "bitlen" / construct.Int32ul,
     construct.Check((this.bitlen % 8) == 0),
     "pubexponent" / construct.Int32ul,
@@ -248,7 +248,7 @@ PUBLICKEYBLOB = construct.Struct(
 PRIVATEKEYBLOB = construct.Struct(
     "publickeystruc" / PUBLICKEYSTRUC,
     construct.Check(this.publickeystruc.algid == "CALG_RSA_KEYX"),
-    construct.Const("RSA2"),
+    construct.Const(b"RSA2"),
     "bitlen" / construct.Int32ul,
     construct.Check((this.bitlen % 8) == 0),
     "pubexponent" / construct.Int32ul,

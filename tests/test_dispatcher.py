@@ -78,9 +78,9 @@ def test_file_object(tmpdir):
     reporter = mwcp.Reporter(tempdir=output_dir, outputdir=output_dir)
     file_object = mwcp.FileObject(b'This is some test data!', reporter)
 
-    assert file_object.file_name == 'fb843efb2ffec987db12e72ca75c9ea2.bin'
+    assert file_object.file_name == u'fb843efb2ffec987db12e72ca75c9ea2.bin'
     assert file_object.file_data == b'This is some test data!'
-    assert file_object.md5 == b'fb843efb2ffec987db12e72ca75c9ea2'
+    assert file_object.md5 == u'fb843efb2ffec987db12e72ca75c9ea2'
     assert file_object.resources is None
     assert file_object.pe is None
     assert file_object.file_path.startswith(os.path.join(output_dir, 'mwcp-managed_tempdir-'))
