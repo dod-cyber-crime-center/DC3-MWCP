@@ -1,7 +1,5 @@
 """Tests the mwcp.Reporter object."""
 
-from __future__ import unicode_literals
-
 import os
 
 import pytest

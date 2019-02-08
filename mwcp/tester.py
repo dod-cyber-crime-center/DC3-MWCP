@@ -2,7 +2,7 @@
 Test case support for DC3-MWCP. Parser output is stored in a json file per parser. To run test cases,
 parser is re-run and compared to previous results.
 """
-from __future__ import print_function, unicode_literals
+from __future__ import print_function
 
 # Standard imports
 import json

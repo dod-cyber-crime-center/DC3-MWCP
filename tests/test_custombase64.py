@@ -1,7 +1,5 @@
 """Tests mwcp.utils.custombase64"""
 
-from __future__ import unicode_literals
-
 from mwcp.utils import custombase64
 
 

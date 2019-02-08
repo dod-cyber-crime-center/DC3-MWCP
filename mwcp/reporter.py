@@ -1,7 +1,7 @@
 """
     DC3-MWCP framework primary object used for execution of parsers and collection of metadata
 """
-from __future__ import print_function, unicode_literals
+from __future__ import print_function
 
 import contextlib
 

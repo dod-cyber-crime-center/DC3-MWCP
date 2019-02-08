@@ -2,7 +2,7 @@
 """
 DC3-MWCP cli tool--makes available functionality of DC3-MWCP framework
 """
-from __future__ import print_function, unicode_literals
+from __future__ import print_function
 from future.builtins import str, zip, open
 
 import argparse

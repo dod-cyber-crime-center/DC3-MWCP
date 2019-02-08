@@ -4,8 +4,6 @@ more robust file identification, reporting, and objectifying
 content to ease maintenance.
 """
 
-from __future__ import unicode_literals
-
 import logging
 from collections import deque
 

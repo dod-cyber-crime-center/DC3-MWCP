@@ -1,7 +1,5 @@
 """Tests parser registration functionality."""
 
-from __future__ import unicode_literals
-
 import collections
 import os
 
