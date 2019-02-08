@@ -25,10 +25,10 @@ All notable changes to this project will be documented in this file.
 - Changed `Reporter.managed_tempdir` to a property.
 - Updated `construct` helpers to support construct version **2.9.45**.
     - Please see their [transision to 2.9](https://construct.readthedocs.io/en/latest/transision29.html) to see what has changed.
-- Reintroduced back some `construct` 2.8 features that were removed from 2.8, such as `[:]` syntax and default encodings
+- Reintroduced back some construct 2.8 features that were removed from 2.8, such as `[:]` syntax and default encodings
 for String constructs. 
     - These changes will be patched in when using `mwcp.utils.construct` instead of `construct` by itself.
-    - Please see the docstring found in [version28.py](mwcp/utils/version28.py) for a full list of changes.
+    - Please see the docstring found in [version28.py](mwcp/utils/construct/version28.py) for a full list of changes.
 - Added/Updated new `construct` helpers:
     - `ELFPointer` support for ARM. See `mwcp.utils.construct.ARM.ELFPointer`
     - Expanded windows structures.
