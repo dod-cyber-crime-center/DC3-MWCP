@@ -25,14 +25,14 @@ It contains the following attributes:
 - `file_name` - Name of the file (or a auto generated stub)
 - `file_path` - A full path to the file which can be used for external utilities that require it.
 - `md5`, `sha1`, `sha256` - Hashes of the given file.
-- `pe` - A PEFile object of the file or None if file is not a PE.
+- `pe` - A `PEFile` object of the file or `None` if file is not a PE.
 - `resources` - List of PE resources (if a PE)
-- `elf` - An ELFFile object of the file or None if the file is not an ELF.
+- `elf` - An `ELFFile` object of the file or None if the file is not an ELF.
 - `parser_history` - A history of all the parser classes that have processed this file.
 - `parent` - The `mwcp.FileObject` object that this file was extracted from or None if this is the original input file.
 
 
-You can also access a file pointer (a `io.BytesIO` object) if you wrap the object using a `with` statement.
+You can also access a file-like object (a `io.BytesIO` object) if you wrap the object using a `with` statement.
 
 ```python
 for self.file_object as fo:
