@@ -1,12 +1,13 @@
 # Parser Components
 
-All control is accessible from the attributes of the `mwcp.Parser` object that you inherit from when creating a parser.
+Parsers are created by inheriting from the `mwcp.Parser` class. An instance of this class comes with 4 major
+components to assist in parsing a file:
 
+- [self.file_object](#fileobject) - The file currently being parsed.
+- [self.reporter](#reporter) - Used to report on parsed configuration data.
+- [self.dispatcher](#dispatcher) - Used to add new embedded files to the processing queue.
+- [self.logger](#logger) - Used to log debugging, informational, and error messages.
 
-- [FileObject](#fileobject)
-- [Reporter](#reporter)
-- [Dispatcher](#dispatcher)
-- [Logger](#logger)
 
 ### Guides
 - [Parser Development](ParserDevelopment.md)
@@ -16,9 +17,8 @@ All control is accessible from the attributes of the `mwcp.Parser` object that y
 - [Python Style Guide](PythonStyleGuide.md)
 
 ## FileObject
-You can access the file you are currently processing from `self.file_object` which is an instance
-of a `mwcp.FileObject` class. This class is used to access every aspect of the file you are
-parsing.
+The file being processed by a parser is accessible via `self.file_object`, which is an instance of the 
+`mwcp.FileObject` class. This class contains a variety of useful attributes describing the file.
 
 It contains the following attributes:
 - `file_data` - The raw data of the file.
@@ -32,7 +32,7 @@ It contains the following attributes:
 - `parent` - The `mwcp.FileObject` object that this file was extracted from or None if this is the original input file.
 
 
-You can also access a file pointer if you wrap the object using a `with` statement.
+You can also access a file pointer (a `io.BytesIO` object) if you wrap the object using a `with` statement.
 
 ```python
 for self.file_object as fo:
@@ -55,8 +55,9 @@ You can add metadata via the `add_metadata(key, value)` function
     key = self._extract_rc4_key(self.file_object.file_data)
     if key:
         # Report key.
-        self.reporter.add_metadata('key', key.encode('hex'))
-        self.reporter.add_metadata('other', {'rc4_key': key.encode('hex'))
+        hex_key = binascii.hexlify(key)
+        self.reporter.add_metadata('key', hex_key)
+        self.reporter.add_metadata('other', {'rc4_key': hex_key})
 ```
 
 ### Guidance on standardized fields
@@ -110,7 +111,8 @@ However, the receiving parser should not assume that the other parser ran and sh
 where it cannot get the information.
 
 *NOTE: If you are trying to decrypt an embedded file. It's better to perform the decryption within
-the first parser that contains the embedded file and then dispatch the decrypted file. You should not dispatch the encrypted file and pass the key through the knowledge base if you can prevent it.*
+the first parser that contains the embedded file and then dispatch the decrypted file. 
+You should not dispatch the encrypted file and pass the key through the knowledge base if you can prevent it.*
 
 ```python
 # First parser

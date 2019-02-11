@@ -7,9 +7,9 @@ All notable changes to this project will be documented in this file.
 - `sha1` and `sha256` attributes in FileObject class.
 - Created a new command line tool called `mwcp` which encompasses parsing and testing in one tool.
     - This tool simplifies and cleans up the old CLI flags and uses subcommands for better organization.
-- `--parser-config` flag to specify location of parser configuration file for custom parser directory.
+- `--parser-config` flag to specify location of a parser configuration file for a custom parser directory.
 - Ability to set a parser source with `--parser-source` flag.
-- Streamlined the wrapper for [Techanarchy](http://techanarchy.net/2014/04/rat-decoders/) parsers.
+- Streamlined the wrapper for [TechAnarchy](http://techanarchy.net/2014/04/rat-decoders/) parsers.
     - Parsers can be run using the naming scheme `TA.{decoder_filename}` after placing the parsers 
       in the `mwcp/resources/RATDecoders` directory.
 - `pecon` PE file reconstruction utility.
@@ -18,10 +18,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Parsers are now declared using a YAML configuration file.
-    - (Please see the [Parser Installation](docs/ParserInstallation.md) and [Parser Developemnt](docs/ParserDevelopment.md) documentation for more info)
+    - Please see the [Parser Installation](docs/ParserInstallation.md) and [Parser Developemnt](docs/ParserDevelopment.md) documentation for more info.
 - `FileObject.md5` now produces a hex string instead of raw bytes.
-- Rearranged the location of some modules (imports do not change however)
-- "parserstests" folder has been moved to within the "parsers" folder and renamed "tests"
+- Rearranged the location of some modules (imports do not change however).
+- "parserstests" folder has been moved to within the "parsers" folder and renamed "tests".
 - Changed `Reporter.managed_tempdir` to a property.
 - Updated `construct` helpers to support construct version **2.9.45**.
     - Please see their [transision to 2.9](https://construct.readthedocs.io/en/latest/transision29.html) to see what has changed.
@@ -32,7 +32,7 @@ for String constructs.
 - Added/Updated new `construct` helpers:
     - `ELFPointer` support for ARM. See `mwcp.utils.construct.ARM.ELFPointer`
     - Expanded windows structures.
-    - Added support for supplying a callable instead of a dictionary for `Iter` 
+    - Added support for supplying a callable instead of a dictionary for `Iter`.
 
 ### Deprecated
 - The `mwcp-tool` and `mwcp-test` tools are deprecated in exchange for using the new `mwcp` tool and
