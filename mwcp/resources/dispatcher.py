@@ -202,13 +202,14 @@ class FileObject(object):
                 data=self.file_data, filename=self.file_name or '', description=self.description or '')
             self._outputted_file = True
 
-    def run_kordesii_decoder(self, decoder_name, warn_no_strings=True):
+    def run_kordesii_decoder(self, decoder_name, warn_no_strings=True, decoderdir=None):
         """
         Run the specified kordesii decoder against the file data.  The reporter object is returned
         and can be accessed as necessary to obtain output files, etc.
 
         :param decoder_name: name of the decoder to run
         :param warn_no_strings: Whether to produce a warning if no string were found.
+        :param decoderdir: directory where decoders reside
 
         :return: Instance of the kordesii_reporter.
 
@@ -218,7 +219,7 @@ class FileObject(object):
             raise RuntimeError('Please install kordesii to use this function.')
 
         logger.info('Running {} kordesii decoder on file {}.'.format(decoder_name, self.file_name))
-        kordesii_reporter = kordesiireporter(base64outputfiles=True, enableidalog=True)
+        kordesii_reporter = kordesiireporter(base64outputfiles=True, enableidalog=True, decoderdir=decoderdir)
 
         kordesii_reporter.run_decoder(decoder_name, data=self.file_data)
         for message in kordesii_reporter.get_debug():
