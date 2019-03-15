@@ -50,6 +50,9 @@ It is assumed if you are not updating/adding tests.
     - `disablemodulesearch`
     - `disablevaluededup`
     - `disableautosubfieldparsing`
+    
+### Fixed
+- Add ability to set decoder directory from the `run_kordesii_decoder()` function by @ddash-ct ([\#8](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/8))
 
 
 ## [1.4.1] - 2018-10-15
