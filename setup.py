@@ -14,7 +14,7 @@ def read(fname):
 
 setup(
     name="mwcp",
-    version="2.0.0",
+    version="2.0.1",
     author="DC3",
     author_email="dcci@dc3.mil",
     description=__doc__,

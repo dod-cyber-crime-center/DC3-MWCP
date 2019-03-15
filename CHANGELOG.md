@@ -2,7 +2,7 @@
 All notable changes to this project will be documented in this file.
 
 
-## [Unreleased]
+## [2.0.1] - 2019-03-15
 ### Added
 - Added caching of kordesii results.
 
@@ -162,7 +162,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.0...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.1...HEAD
+[2.0.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.0...2.0.1
 [2.0.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.4.1...2.0.0
 [1.4.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.4.0...1.4.1
 [1.4.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.3.0...1.4.0
