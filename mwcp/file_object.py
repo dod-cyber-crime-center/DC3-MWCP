@@ -55,6 +55,7 @@ class FileObject(object):
         self._elf_attempt = False
         self.output_file = output_file
         self._outputted_file = False
+        self._kordesii_cache = {}
         self.parent = None   # Parent FileObject from which FileObject was extracted from (this is set externally).
         self.parser = None   # This will be set by the dispatcher.
         self.file_data = file_data
@@ -204,6 +205,17 @@ class FileObject(object):
             self._resources = list(pefileutils.iter_rsrc(self.pe))
         return self._resources
 
+    @property
+    def is_64bit(self):
+        """
+        Evaluates whether the file is a 64 bit pe file.
+
+        :return: True if 64-bit, False if 32-bit, None if could not be determined.
+        """
+        if not self.pe:
+            return None
+        return pefileutils.is_64bit(pe=self.pe)
+
     def output(self):
         """
         Outputs FileObject instance to reporter it it hasn't already been outputted.
@@ -221,6 +233,7 @@ class FileObject(object):
 
         :param decoder_name: name of the decoder to run
         :param warn_no_strings: Whether to produce a warning if no string were found.
+        :param decoderdir: Custom decoder directory to use instead of the default.
 
         :return: Instance of the kordesii_reporter.
 
@@ -229,15 +242,15 @@ class FileObject(object):
         if not kordesii:
             raise RuntimeError('Please install kordesii to use this function.')
 
+        # Pull from cache if we already ran this decoder.
+        if decoder_name in self._kordesii_cache:
+            return self._kordesii_cache[decoder_name]
+
         logger.info('Running {} kordesii decoder on file {}.'.format(decoder_name, self.file_name))
-        kordesii_reporter = kordesii.Reporter(base64outputfiles=True, enableidalog=True, decoderdir=decoderdir)
+        kordesii_reporter = kordesii.Reporter(
+            decoderdir=decoderdir, base64outputfiles=True, enableidalog=True)
 
         kordesii_reporter.run_decoder(decoder_name, data=self.file_data)
-        for message in kordesii_reporter.get_debug():
-            logger.info('[kordesii_debug] {}'.format(message))
-
-        for message in kordesii_reporter.get_errors():
-            logger.error('[kordesii_error] {}'.format(message))
 
         if warn_no_strings:
             decrypted_strings = kordesii_reporter.get_strings()
@@ -245,5 +258,8 @@ class FileObject(object):
                 # Not necessarily a bad thing, the decoder might be used for something else.
                 logger.info(
                     'No decrypted strings were returned by the decoder for file {}.'.format(self.file_name))
+
+        # Cache results
+        self._kordesii_cache[decoder_name] = kordesii_reporter
 
         return kordesii_reporter

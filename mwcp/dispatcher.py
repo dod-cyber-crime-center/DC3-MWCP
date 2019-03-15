@@ -91,6 +91,9 @@ class Dispatcher(object):
         # E.g. an encryption key found in the loader to be used by the implant.
         self.knowledge_base = {}
 
+    def __repr__(self):
+        return '{}({})'.format(self.name, ', '.join(repr(parser) for parser in self.parsers))
+
     def identify(self, file_object):
         """
         Determines if this dispatcher is identified to support the given file_object.
@@ -109,11 +112,15 @@ class Dispatcher(object):
         :return:
         """
         assert isinstance(file_object, FileObject), "Not a FileObject: {!r}".format(file_object)
-        file_object.parent = self._current_file_object
+        # If we already have a parent, this means this file is trickling up from a sub-dispatcher.
+        # Don't duplicate logs or change the parent.
+        if not file_object.parent:
+            file_object.parent = self._current_file_object
+            if self._current_file_object:
+                logger.info(u'{} dispatched residual file: {}'.format(
+                    self._current_file_object.file_name, file_object.file_name))
+
         self._fifo_buffer.appendleft(file_object)
-        if self._current_file_object:
-            logger.info('{} dispatched residual file: {}'.format(
-                self._current_file_object.file_name, file_object.file_name))
 
     def _iter_parsers(self, file_object):
         """
@@ -123,23 +130,41 @@ class Dispatcher(object):
 
         :yields: Identified Parser class or another Dispatcher that can be run
         """
-        identified = False
         for parser in self.parsers:
+            logger.debug(u'Identifying {} with {!r}.'.format(file_object.file_name, parser))
             if parser.identify(file_object):
                 logger.info(
-                    'File {} identified as {}.'.format(file_object.file_name, parser.DESCRIPTION))
-                identified = True
+                    u'File {} identified as {}.'.format(file_object.file_name, parser.DESCRIPTION))
+                logger.debug(u'{} identified with {!r}'.format(file_object.file_name, parser))
                 yield parser
 
-        if not identified:
-            if not self._output_unidentified:
-                file_object.output_file = False
-            # If no parsers match and developer didn't set a description, mark as unidentified file and run
-            # default.
-            if not file_object.description:
-                logger.info('Supplied file {} was not identified.'.format(file_object.file_name))
-                if self.default:
-                    yield self.default
+    def _parse(self, file_object, parser, reporter):
+        """
+        Parse given file_object with given sub parser
+
+        :raises UnableToParse: If the subparser raised an error.
+        """
+        self._current_file_object = file_object
+        self._current_parser = parser
+
+        # If a description wasn't set for the file, use the parser's
+        # (But ignore setting it for sub dispatchers)
+        if (not file_object.description or self._overwrite_descriptions) \
+                and not isinstance(parser, Dispatcher):
+            file_object.description = parser.DESCRIPTION
+
+        # Set parser class used in order to keep a history.
+        file_object.parser = parser
+
+        try:
+            parser.parse(file_object, reporter, dispatcher=self)
+        except UnableToParse as exception:
+            logger.info(
+                u'File {} was misidentified as {}, due to: ({}) '
+                u'Trying other parsers...'.format(file_object.file_name, parser.DESCRIPTION, exception))
+            raise
+        except Exception:
+            logger.exception(u'{} dispatch parser failed'.format(parser.name))
 
     def parse(self, file_object, reporter, dispatcher=None):
         """
@@ -147,7 +172,8 @@ class Dispatcher(object):
 
         :param FileObject file_object: Object containing data about component file.
         :param mwcp.Reporter reporter: reference to reporter object that executed this parser.
-        :param Dispatcher dispatcher: reference to the dispatcher object that called this parse command. (unused)
+        :param Dispatcher dispatcher: reference to the parent dispatcher object that called this parse command.
+            (None if this dispatcher is the root)
         :return:
         """
         # TODO: Use reporter to output metadata about initial input file.
@@ -159,35 +185,39 @@ class Dispatcher(object):
 
         while self._fifo_buffer:
             file_object = self._fifo_buffer.pop()
+            identified = False
 
-            # Run any applicable parsers.
-            for parser in self._iter_parsers(file_object):
-                self._current_file_object = file_object
-                self._current_parser = parser
-
-                # If a description wasn't set for the file, use the parser's
-                if not file_object.description or self._overwrite_descriptions:
-                    file_object.description = parser.DESCRIPTION
-
-                # Set parser class used in order to keep a history.
-                file_object.parser = parser
-
-                try:
-                    parser.parse(file_object, reporter, dispatcher=self)
-
-                except UnableToParse as exception:
-                    logger.info(
-                        'File {} was misidentified as {}, due to: ({}) '
-                        'Trying other parsers...'.format(file_object.file_name, parser.DESCRIPTION, exception))
+            try:
+                # Run any applicable parsers.
+                for parser in self._iter_parsers(file_object):
+                    try:
+                        self._parse(file_object, parser, reporter)
+                    except UnableToParse:
+                        continue
+                    identified = True
+                    if not self.greedy:
+                        break
+                if identified:
                     continue
 
-                except Exception:
-                    logger.exception('{} dispatch parser failed'.format(parser.name))
+                # Give it to the parent dispatcher if we can't identify it.
+                if dispatcher:
+                    dispatcher.add_to_queue(file_object)
+                    continue
 
-                if not self.greedy:
-                    break
+                # If no parsers match and developer didn't set a description,
+                # mark as unidentified file and run default.
+                if not file_object.description:
+                    logger.info(u'Supplied file {} was not identified.'.format(file_object.file_name))
+                    if self.default:
+                        try:
+                            self._parse(file_object, self.default, reporter)
+                        except UnableToParse:
+                            pass
 
-            # Output the file.
-            # NOTE: We don't want to output the file until the very end, since a parser may want to change
-            # the file's filename or description.
-            file_object.output()
+            finally:
+                # Output the file if we identified it or we are the root.
+                # NOTE: We don't want to output the file until the very end, since a parser may want to change
+                # the file's filename or description.
+                if identified or (not dispatcher and self._output_unidentified):
+                    file_object.output()

@@ -45,7 +45,7 @@ def test_identify_file(components):
     dispatcher = components['dispatcher']
     assert list(dispatcher._iter_parsers(components['file_A'])) == [components['A']]
     assert list(dispatcher._iter_parsers(components['file_B'])) == [components['B']]
-    assert list(dispatcher._iter_parsers(components['file_C'])) == [mwcp.UnidentifiedFile]
+    assert list(dispatcher._iter_parsers(components['file_C'])) == []
 
 
 @pytest.mark.parametrize("input_file,expected", [

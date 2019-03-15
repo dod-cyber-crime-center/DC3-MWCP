@@ -1,4 +1,5 @@
 include *.md LICENSE.txt
+include mwcp/resources/RATDecoders/PLACE_PARSERS_HERE
 recursive-include mwcp/resources *.json *.txt
 recursive-include mwcp/config *
 include mwcp/utils/construct/construct_template.html

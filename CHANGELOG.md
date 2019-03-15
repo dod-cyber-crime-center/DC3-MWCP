@@ -2,6 +2,20 @@
 All notable changes to this project will be documented in this file.
 
 
+## [Unreleased]
+### Added
+- Added caching of kordesii results.
+
+### Changed
+- `mwcp test` can now accept more than one parser.
+
+### Fixed
+- Fixed up dispatcher logic to properly work with sub parser groups.
+- Fixed missing dispatcher issue when running a single parser directly from command line.
+- Fixed up unicode string handling in Reporter.
+- Fixed handling of optional capture groups for `Regex` construct helper.
+
+
 ## [2.0.0] - 2019-02-11
 ### Added
 - `sha1` and `sha256` attributes in FileObject class.

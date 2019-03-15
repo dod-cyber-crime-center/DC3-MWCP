@@ -4,9 +4,10 @@ This module will be imported along with 'from mwcp.utils import construct'
 and accessible from the submodule "ARM". (e.g. construct.ARM.LDR)
 """
 
+from . import version28 as construct
 from .version28 import this
 
-from mwcp.utils.construct import helpers, version28 as construct
+from . import helpers
 from mwcp.utils import elffileutils
 
 

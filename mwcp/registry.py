@@ -187,18 +187,18 @@ def _generate_parser(name, config, package_prefix, recursive=True):
         options = dict(config[name])
     except KeyError:
         if '.' not in name:
-            raise ValueError('Unable to find parser: {}'.format(name))
+            raise ValueError('Unable to find {} parser: Invalid name.'.format(name))
         # If not, find and import the referenced mwcp.Parser class.
         module_name, _, class_name = name.rpartition('.')
-        logger.debug('Importing: {}'.format(package_prefix + module_name))
         try:
+            logger.debug('Importing: {}'.format(package_prefix + module_name))
             module = importlib.import_module(package_prefix + module_name)
             klass = getattr(module, class_name)
             klass.name = name
+            logger.debug('Created parser: {!r}'.format(klass))
             return klass
         except (AttributeError, ImportError) as e:
-            logger.debug('Failed to import parser: {}'.format(e))
-            raise ValueError('Unable to find parser: {}'.format(name))
+            raise ValueError('Unable to find {} parser: {}'.format(name, e))
 
     # Otherwise, instantiate a mwcp.Dispatcher class for the parser group.
     group_name = name
@@ -218,7 +218,9 @@ def _generate_parser(name, config, package_prefix, recursive=True):
             default = group_name + default
         options['default'] = _generate_parser(default, config, package_prefix)
 
-    return Dispatcher(group_name, parsers=sub_parsers, **options)
+    parser = Dispatcher(group_name, parsers=sub_parsers, **options)
+    logger.debug('Created parser group: {!r}'.format(parser))
+    return parser
 
 
 def _import_all_modules(package):
@@ -283,7 +285,8 @@ def iter_parsers(name=None, source=None, config_only=True, _recursive=True):
                 parser = _generate_parser(
                     name, source.config, package_prefix, recursive=_recursive)
                 yield source, parser
-            except ValueError:
+            except ValueError as e:
+                logger.debug('[{}] {}'.format(source_name, e))
                 # Parser couldn't be found for this source.
                 continue
         else:

@@ -7,9 +7,10 @@ from __future__ import absolute_import
 
 import datetime
 
+from . import version28 as construct
 from .version28 import this, len_
 
-from mwcp.utils.construct import windows_enums, datetime_, version28 as construct, network
+from . import network, datetime_, windows_enums
 from .windows_constants import *
 
 
@@ -221,7 +222,15 @@ PEFILE_HEADER = construct.Struct(
 
 SOCKADDR_IN = construct.Struct(
     "sin_family" / construct.Int16ul,
-    "sin_port" / construct.Int16ub,
+    "sin_port" / construct.Int16ub,  # in network byte order
+    "sin_addr" / network.IP4Address,
+    "sin_zero" / construct.Bytes(8)
+)
+
+# Same as SOCKADDR_IN but with the port as little endian.
+SOCKADDR_IN_L = construct.Struct(
+    "sin_family" / construct.Int16ul,
+    "sin_port" / construct.Int16ul,
     "sin_addr" / network.IP4Address,
     "sin_zero" / construct.Bytes(8)
 )

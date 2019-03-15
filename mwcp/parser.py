@@ -1,10 +1,13 @@
-
 import abc
 import logging
+import six
+
+# This is here for type hints and autocomplete in PyCharm
+# noinspection PyUnreachableCode
+if False:
+    from mwcp import FileObject
 
 logger = logging.getLogger(__name__)
-
-import six
 
 
 # A way to create a class properties
@@ -21,6 +24,9 @@ class ParserMeta(abc.ABCMeta):
     def name(cls, value):
         cls._name = value
 
+    def __repr__(cls):
+        return '<{}>'.format(cls.name)
+
 
 @six.add_metaclass(ParserMeta)
 class Parser(object):
@@ -30,6 +36,7 @@ class Parser(object):
     inherit this class into a customized base class for all parsers.  This class includes some of the required data
     used by various other classes.
     """
+    file_object = None  # type: FileObject
     # This is the description that will be given the the file object during output
     # if no description is set in the file_object. This must be overwritten by inherited classes.
     DESCRIPTION = None
@@ -37,13 +44,13 @@ class Parser(object):
     # TODO: Deprecate the AUTHOR field?
     AUTHOR = ''  # Optional
 
-    def __init__(self, file_object, reporter, dispatcher=None):
+    def __init__(self, file_object, reporter, dispatcher):
         """
         Initializes the Parser.
 
         :param FileObject file_object: Object containing data about component file.
         :param mwcp.Reporter reporter: reference to reporter object that executed this parser.
-        :param Dispatcher dispatcher: reference to the dispatcher object (if used)
+        :param Dispatcher dispatcher: reference to the dispatcher object
         """
         if not self.DESCRIPTION:
             raise NotImplementedError('Parser class is missing a DESCRIPTION.')
@@ -90,8 +97,15 @@ class Parser(object):
         :return:
         """
         # TODO: Use reporter to output metadata about initial input file.
-        parser_object = cls(file_object, reporter, dispatcher)
-        parser_object.run()
+        if dispatcher:
+            parser_object = cls(file_object, reporter, dispatcher)
+            parser_object.run()
+
+        # If dispatcher isn't provided, create a dummy one containing only this parser.
+        else:
+            from mwcp import Dispatcher  # Must import here to avoid cyclic import.
+            dispatcher = Dispatcher(cls.name, author=cls.AUTHOR, description=cls.DESCRIPTION, parsers=[cls])
+            dispatcher.parse(file_object, reporter)
 
     def run(self):
         """

@@ -29,8 +29,8 @@ except ImportError:
     pkg_resources = None
 
 # Constants
-DEFAULT_EXCLUDE_FIELDS = ["debug"]
-INPUT_FILE_PATH = "inputfilename"
+DEFAULT_EXCLUDE_FIELDS = [u"debug"]
+INPUT_FILE_PATH = u"inputfilename"  # MUST BE UNICODE
 FILE_EXTENSION = ".json"
 
 # Setting encoding to utf8 is a hotfix for a larger issue

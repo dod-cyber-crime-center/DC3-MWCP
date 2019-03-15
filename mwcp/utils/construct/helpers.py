@@ -888,6 +888,12 @@ class Regex(Construct):
                 except IndexError:
                     continue
 
+                # If data is None, then we are most likely dealing with an optional capture group.
+                if data is None:
+                    obj[name] = None
+                    context[name] = None
+                    continue
+
                 # If we have an empty capture group, the user would like to use it as an anchor.
                 if not data:
                     stream.seek(start + match.start(name))

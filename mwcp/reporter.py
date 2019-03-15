@@ -18,6 +18,7 @@ import re
 import shutil
 import sys
 import tempfile
+import codecs
 
 import mwcp
 import mwcp.parsers
@@ -27,7 +28,7 @@ from mwcp.utils import logutil
 
 
 logger = logging.getLogger(__name__)
-
+ascii_writer = codecs.getwriter('ascii')
 
 PY3 = sys.version_info > (3,)
 
@@ -96,10 +97,6 @@ class Reporter(object):
             use debug instead
 
     """
-    URL_RE = re.compile(r"[a-z\.-]{1,40}://(?P<address>\[?[^/]+\]?)(?P<path>/[^?]+)?")
-    PORT_RE = re.compile(r"[0-9]{1,5}")
-    SHA1_RE = re.compile('[0-9a-fA-F]{40}')
-
     URL_RE = re.compile(r"[a-z\.-]{1,40}://(?P<address>\[?[^/]+\]?)(?P<path>/[^?]+)?")
     PORT_RE = re.compile(r"[0-9]{1,5}")
     SHA1_RE = re.compile('[0-9a-fA-F]{40}')
@@ -192,7 +189,7 @@ class Reporter(object):
             # not guaranteed to be reliable
             if '.exe' in value:
                 self.add_metadata("filepath", value[
-                                  0:value.find('.exe') + 4])
+                                              0:value.find('.exe') + 4])
 
         if key == "servicedll":
             self.add_metadata("filepath", value)
@@ -339,7 +336,7 @@ class Reporter(object):
                         if subvalue not in obj[subkey]:
                             obj[subkey].append(subvalue)
                     elif subvalue != existing_value:
-                            obj[subkey] = [existing_value, subvalue]
+                        obj[subkey] = [existing_value, subvalue]
                 else:
                     # normal insert of single value
                     obj[subkey] = subvalue
@@ -360,7 +357,7 @@ class Reporter(object):
 
         """
         keyu = convert_to_unicode(key)
-        if not value or all(not _value for _value in value):
+        if value is None or all(not _value for _value in value):
             logger.warn("no values provided for %s, skipping" % key)
             return
 
@@ -506,27 +503,35 @@ class Reporter(object):
             return ' '.join(values)
 
     def print_keyvalue(self, key, value):
-        print(self.get_printable_key_value(key, value))
+        print(
+            self.get_printable_key_value(key, value),
+            file=ascii_writer(getattr(sys.stdout, 'buffer', sys.stdout), 'backslashreplace')
+        )
 
     def print_report(self):
         """
         Output in human readable report format
         """
-        print(self.get_output_text())
+        # Use sys.stdout.buffer if it exists, which is the case for Python 3 and is required
+        # for writing a bytes string. Otherwise just write to whatever is at sys.stdout
+        print(
+            self.get_output_text(),
+            file=ascii_writer(getattr(sys.stdout, 'buffer', sys.stdout), 'backslashreplace')
+        )
 
     def get_printable_key_value(self, key, value):
-        output = ""
+        output = u""
         printkey = key
 
         if isinstance(value, (str, bytes)):
-            output += "{:20} {}\n".format(printkey, convert_to_unicode(value))
+            output += u"{:20} {}\n".format(printkey, convert_to_unicode(value))
         else:
             for item in value:
                 if isinstance(item, (str, bytes)):
-                    output += "{:20} {}\n".format(printkey, convert_to_unicode(item))
+                    output += u"{:20} {}\n".format(printkey, convert_to_unicode(item))
                 else:
-                    output += "{:20} {}\n".format(printkey, self.format_list(item, key=key))
-                printkey = ""
+                    output += u"{:20} {}\n".format(printkey, self.format_list(item, key=key))
+                printkey = u""
 
         return output
 
@@ -535,18 +540,18 @@ class Reporter(object):
         Get data in human readable report format.
         """
 
-        output = ""
+        output = u""
         infoorderlist = INFO_FIELD_ORDER
         fieldorderlist = STANDARD_FIELD_ORDER
 
         if 'inputfilename' in self.metadata:
-            output += "\n----File Information----\n\n"
+            output += u"\n----File Information----\n\n"
             for key in infoorderlist:
                 if key in self.metadata:
                     output += self.get_printable_key_value(
                         key, self.metadata[key])
 
-        output += "\n----Standard Metadata----\n\n"
+        output += u"\n----Standard Metadata----\n\n"
 
         for key in fieldorderlist:
             if key in self.metadata:
@@ -559,27 +564,27 @@ class Reporter(object):
                 output += self.get_printable_key_value(key, self.metadata[key])
 
         if "other" in self.metadata:
-            output += "\n----Other Metadata----\n\n"
+            output += u"\n----Other Metadata----\n\n"
             for key in sorted(list(self.metadata["other"])):
                 output += self.get_printable_key_value(
                     key, self.metadata["other"][key])
 
         # TODO: Should we still be showing these debug logs?
         if "debug" in self.metadata:
-            output += "\n----Debug----\n\n"
+            output += u"\n----Debug----\n\n"
             for item in self.metadata["debug"]:
-                output += "{}\n".format(item)
+                output += u"{}\n".format(item)
 
         if "outputfile" in self.metadata:
-            output += "\n----Output Files----\n\n"
+            output += u"\n----Output Files----\n\n"
             for value in self.metadata["outputfile"]:
                 output += self.get_printable_key_value(
                     value[0], (value[1], value[2]))
 
         if self.errors:
-            output += "\n----Errors----\n\n"
+            output += u"\n----Errors----\n\n"
             for item in self.errors:
-                output += "{}\n".format(item)
+                output += u"{}\n".format(item)
 
         return output
 
@@ -587,11 +592,14 @@ class Reporter(object):
     @contextlib.contextmanager
     def __redirect_stdout(self):
         """Redirects stdout temporarily to the logger."""
+
         class _LogWriter(object):
             def write(self, message):
                 logger.info(message)
+
             def flush(self):
                 pass
+
         orig_stdout = sys.stdout
         sys.stdout = _LogWriter()
         try:

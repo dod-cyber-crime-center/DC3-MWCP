@@ -49,6 +49,7 @@ Alternatively you can clone this repo and install locally.
 ```
 
 For a development mode use the `-e` flag to install in editable mode:
+
 ```console
 > git clone https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP.git
 > pip install -e ./DC3-MWCP

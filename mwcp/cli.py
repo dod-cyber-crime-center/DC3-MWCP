@@ -451,14 +451,14 @@ def _run_tests(tester, silent=False, show_passed=False):
 @click.option('-s', '--silent', is_flag=True,
               help='Limit output to statemtn saying whether all tests passed or not.')
 # Parser to process.
-@click.argument('parser', required=False)
+@click.argument('parser', nargs=-1, required=False)
 def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
          yes, show_passed, silent, parser):
     """
     Testing utility to create and execute parser test cases.
 
     \b
-    PARSER: Name of parser to test or add test cases to.
+    PARSER: Parsers to test. Test all parers if not provided.
 
     \b
     Common usages::
@@ -468,14 +468,14 @@ def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
         mwcp test -u                                          - Update existing test cases for all parsers.
         mwcp test foo --add=./malware.bin                     - Add test case for malware.bin sample for foo parser.
         mwcp test foo --add-filelist=./paths.txt              - Add tests cases for foo parser using text file of paths.
-        mwcp test foo --delete=./malware.bin
+        mwcp test foo --delete=./malware.bin                  - Delete test case for malware.bin sample for foo parser.
     """
     # Configure test object
     reporter = mwcp.Reporter(disable_output_files=True)
     tester = Tester(
         reporter=reporter,
         results_dir=testcase_dir,
-        parser_names=[parser] if parser else [None],
+        parser_names=parser or [None],
         nprocs=nprocs,
     )
 
@@ -511,10 +511,10 @@ def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
     else:
         if not parser and not yes:
             click.confirm('PARSER argument not provided. Run tests for ALL parsers?', default=True, abort=True)
-            # Force ERROR level logs so we don't spam the console.
-            logging.root.setLevel(logging.ERROR)
+        # Force ERROR level logs so we don't spam the console.
+        logging.root.setLevel(logging.ERROR)
         _run_tests(tester, silent, show_passed)
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
