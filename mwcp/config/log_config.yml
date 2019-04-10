@@ -29,6 +29,9 @@ handlers:
     backupCount: 3
     encoding: utf8
 
+  null_handler:
+    class: logging.NullHandler
+
 root:
   level: INFO
   handlers: [console, error_file]

@@ -58,13 +58,13 @@ setup(
         'ruamel.yaml',
         'six',
         'tabulate',
-
         # Testing
         'pytest',
         'pytest-console-scripts',
         'tox',
     ],
     extras_require={
-        'kordesii': ['kordesii'],
+        ':python_version < "3.0"': ['pathlib2'],
+        'kordesii': ['kordesii>=1.4.0'],
     }
 )

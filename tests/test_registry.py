@@ -7,22 +7,22 @@ import mwcp
 from mwcp import registry
 
 
-def test_register_parser_directory(monkeypatch, test_parser):
+def test_register_parser_directory(monkeypatch, Sample_parser):
     # Monkey patch parsers registration so previous test runs don't muck with this.
     monkeypatch.setattr('mwcp.registry._sources', {})
 
-    parser_path, config_path = test_parser
-    parser_dir = os.path.dirname(parser_path)
+    parser_path, config_path = Sample_parser
+    parser_dir = str(parser_path.dirname)
 
     # Test registration
-    assert not list(mwcp.iter_parsers('test_parser'))
-    mwcp.register_parser_directory(parser_dir, config_file_path=config_path)
-    parsers = list(mwcp.iter_parsers('test_parser'))
+    assert not list(mwcp.iter_parsers('Sample'))
+    mwcp.register_parser_directory(parser_dir, config_file_path=str(config_path))
+    parsers = list(mwcp.iter_parsers('Sample'))
     assert len(parsers) == 1
 
     # Test it was registered properly
     source, parser = parsers[0]
-    assert parser.name == 'test_parser'
+    assert parser.name == 'Sample'
     assert source.name == parser_dir
     assert source.path == parser_dir
 
@@ -33,22 +33,22 @@ def test_register_parser_directory(monkeypatch, test_parser):
     assert len(parsers) == 1
     
     
-def test_register_parser_directory2(monkeypatch, test_parser):
+def test_register_parser_directory2(monkeypatch, Sample_parser):
     # Monkey patch parsers registration so previous test runs don't muck with this.
     monkeypatch.setattr('mwcp.registry._sources', {})
 
-    parser_path, config_path = test_parser
-    parser_dir = os.path.dirname(parser_path)
+    parser_path, config_path = Sample_parser
+    parser_dir = str(parser_path.dirname)
 
     # Test registration
-    assert not list(mwcp.iter_parsers('test_parser'))
-    mwcp.register_parser_directory(parser_dir, config_file_path=config_path, source_name='ACME')
-    parsers = list(mwcp.iter_parsers('test_parser'))
+    assert not list(mwcp.iter_parsers('Sample'))
+    mwcp.register_parser_directory(parser_dir, config_file_path=str(config_path), source_name='ACME')
+    parsers = list(mwcp.iter_parsers('Sample'))
     assert len(parsers) == 1
 
     # Test it was registered properly
     source, parser = parsers[0]
-    assert parser.name == 'test_parser'
+    assert parser.name == 'Sample'
     assert source.name == 'ACME'
     assert source.path == parser_dir
 
@@ -59,18 +59,18 @@ def test_register_parser_directory2(monkeypatch, test_parser):
     assert len(parsers) == 1
 
 
-def test_iter_parsers(monkeypatch, test_parser):
+def test_iter_parsers(monkeypatch, Sample_parser):
     monkeypatch.setattr('mwcp.registry._sources', {})
-    parser_path, config_path = test_parser
-    source = os.path.abspath(os.path.dirname(parser_path))
-    mwcp.register_parser_directory(source, config_file_path=config_path)
+    parser_path, config_path = Sample_parser
+    source = os.path.abspath(str(parser_path.dirname))
+    mwcp.register_parser_directory(source, config_file_path=str(config_path))
 
-    parsers = list(mwcp.iter_parsers('test_parser'))
+    parsers = list(mwcp.iter_parsers('Sample'))
     assert len(parsers) == 1
 
     _source, parser = parsers[0]
     assert parser.__class__ == mwcp.Dispatcher
-    assert parser.name == 'test_parser'
+    assert parser.name == 'Sample'
     assert _source.path == source
     assert len(parser.parsers) == 2
     assert parser.DESCRIPTION == 'A test parser'
@@ -81,7 +81,7 @@ def test_iter_parsers(monkeypatch, test_parser):
 
     _source, parser = parsers[0]
     assert parser.__class__ == mwcp.Dispatcher
-    assert parser.name == 'test_parser'
+    assert parser.name == 'Sample'
     assert len(parser.parsers) == 2
     downloader_parser, implant_parser = parser.parsers
     assert parser.DESCRIPTION == 'A test parser'
@@ -92,11 +92,11 @@ def test_iter_parsers(monkeypatch, test_parser):
     assert parsers[2][1] == implant_parser
 
 
-def test_parsers_descriptions(monkeypatch, test_parser):
+def test_parsers_descriptions(monkeypatch, Sample_parser):
     monkeypatch.setattr('mwcp.registry._sources', {})
-    parser_path, config_path = test_parser
-    source = os.path.abspath(os.path.dirname(parser_path))
-    mwcp.register_parser_directory(source, config_file_path=config_path)
+    parser_path, config_path = Sample_parser
+    source = os.path.abspath(str(parser_path.dirname))
+    mwcp.register_parser_directory(source, config_file_path=str(config_path))
 
     # Test bogus
     descriptions = list(mwcp.get_parser_descriptions('bogus'))
@@ -105,49 +105,49 @@ def test_parsers_descriptions(monkeypatch, test_parser):
     # Test config only
     descriptions = list(mwcp.get_parser_descriptions())
     assert descriptions == [
-        ('test_parser', source, 'Mr. Tester', 'A test parser')
+        ('Sample', source, 'Mr. Tester', 'A test parser')
     ]
-    descriptions = list(mwcp.get_parser_descriptions('test_parser'))
+    descriptions = list(mwcp.get_parser_descriptions('Sample'))
     assert descriptions == [
-        ('test_parser', source, 'Mr. Tester', 'A test parser')
+        ('Sample', source, 'Mr. Tester', 'A test parser')
     ]
     descriptions = list(mwcp.get_parser_descriptions(source=source))
     assert descriptions == [
-        ('test_parser', source, 'Mr. Tester', 'A test parser')
+        ('Sample', source, 'Mr. Tester', 'A test parser')
     ]
 
     # Test all non-config only
-    descriptions = list(mwcp.get_parser_descriptions('test_parser', config_only=False))
+    descriptions = list(mwcp.get_parser_descriptions('Sample', config_only=False))
     assert descriptions == [
-        ('test_parser', source, 'Mr. Tester', 'A test parser')
+        ('Sample', source, 'Mr. Tester', 'A test parser')
     ]
 
     descriptions = list(mwcp.get_parser_descriptions(config_only=False))
     assert descriptions == [
-        ('test_parser', source, 'Mr. Tester', 'A test parser'),
-        ('test_parser.Downloader', source, '', 'TestParser Downloader'),
-        ('test_parser.Implant', source, '', 'TestParser Implant'),
+        ('Sample', source, 'Mr. Tester', 'A test parser'),
+        ('Sample.Downloader', source, '', 'TestParser Downloader'),
+        ('Sample.Implant', source, '', 'TestParser Implant'),
     ]
-    descriptions = list(mwcp.get_parser_descriptions('test_parser.Downloader', config_only=False))
+    descriptions = list(mwcp.get_parser_descriptions('Sample.Downloader', config_only=False))
     assert descriptions == [
-        ('test_parser.Downloader', source, '', 'TestParser Downloader')
+        ('Sample.Downloader', source, '', 'TestParser Downloader')
     ]
 
     descriptions = list(mwcp.get_parser_descriptions(source=source, config_only=False))
     assert descriptions == [
-        ('test_parser', source, 'Mr. Tester', 'A test parser'),
-        ('test_parser.Downloader', source, '', 'TestParser Downloader'),
-        ('test_parser.Implant', source, '', 'TestParser Implant'),
+        ('Sample', source, 'Mr. Tester', 'A test parser'),
+        ('Sample.Downloader', source, '', 'TestParser Downloader'),
+        ('Sample.Implant', source, '', 'TestParser Implant'),
     ]
 
     # Test using ":" syntax
-    descriptions = list(mwcp.get_parser_descriptions(':test_parser', config_only=False))
+    descriptions = list(mwcp.get_parser_descriptions(':Sample', config_only=False))
     assert descriptions == [
-        ('test_parser', source, 'Mr. Tester', 'A test parser')
+        ('Sample', source, 'Mr. Tester', 'A test parser')
     ]
     descriptions = list(mwcp.get_parser_descriptions(source + ':', config_only=False))
     assert descriptions == [
-        ('test_parser', source, 'Mr. Tester', 'A test parser'),
-        ('test_parser.Downloader', source, '', 'TestParser Downloader'),
-        ('test_parser.Implant', source, '', 'TestParser Implant'),
+        ('Sample', source, 'Mr. Tester', 'A test parser'),
+        ('Sample.Downloader', source, '', 'TestParser Downloader'),
+        ('Sample.Implant', source, '', 'TestParser Implant'),
     ]

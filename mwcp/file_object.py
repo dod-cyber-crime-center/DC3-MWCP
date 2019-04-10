@@ -248,9 +248,9 @@ class FileObject(object):
 
         logger.info('Running {} kordesii decoder on file {}.'.format(decoder_name, self.file_name))
         kordesii_reporter = kordesii.Reporter(
-            decoderdir=decoderdir, base64outputfiles=True, enableidalog=True)
+            decoderdir=decoderdir, base64outputfiles=True)
 
-        kordesii_reporter.run_decoder(decoder_name, data=self.file_data)
+        kordesii_reporter.run_decoder(decoder_name, data=self.file_data, log=True)
 
         if warn_no_strings:
             decrypted_strings = kordesii_reporter.get_strings()

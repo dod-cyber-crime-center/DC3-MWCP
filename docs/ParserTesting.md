@@ -11,7 +11,7 @@ The `mwcp test` command line utility has been created for users to generate and 
 - [Executing Existing Test Cases](#executing-existing-test-cases)
 - [Creating or Adding Test Cases](#creating-or-adding-test-cases)
     - [Determining files to use as test cases](#determining-file-to-use-as-test-cases)
-    - [Adding test cases](#adding-test-cases)
+- [Adding test cases](#adding-test-cases)
 - [Updating Test Cases](#updating-test-cases)
 - [Removing Test Cases](#removing-test-cases)
 - [Testing External Parsers](#testing-external-parsers)
@@ -36,7 +36,7 @@ Running test cases. May take a while...
 All Passed = True
 ```
 
-If a parser is not provied all parsers instead of selecting an individual parser.
+If a parser is not provided all registered parsers will be tested.
 
 ```console
 > mwcp test
@@ -88,10 +88,10 @@ Selectively creating test cases using appropriate samples is critical.
 
 ## Adding Test Cases
 
-`mwcp test` with the `-a` flag can be used to add new test case files.
+`mwcp test` with the `--add` flag can be used to add new test case files.
 
 ```console
-> mwcp test foo -a file1.exe -a file2.exe
+> mwcp test foo --add=file1.exe --add=file2.exe
 
 Updating results for file1.exe in mwcp\parsers\tests\foo.json
 Updating results for file2.exe in mwcp\parsers\tests\foo.json
@@ -100,11 +100,11 @@ Updating results for file2.exe in mwcp\parsers\tests\foo.json
 ## Updating Test Cases
 
 When a parser is updated or any other situation requires all the existing test cases to be regenerated, 
-the `-u` option should be used. It will simply re-run the metadata
+the `--update` option should be used. It will simply re-run the metadata
 extraction for all the input files in the current test cases and replace the results.
 
 ```console
-> mwcp test foo -u
+> mwcp test foo --update
 
 Updating results for file1.exe in mwcp\parsers\tests\foo.json
 Updating results for file2.exe in mwcp\parsers\tests\foo.json
@@ -113,10 +113,10 @@ Updating results for file3.exe in mwcp\parsers\tests\foo.json
 
 ## Removing Test Cases
 
-Test cases can be removed using the `-x` option and specifying the path to a test file.
+Test cases can be removed using the `--delete` option and specifying the path to a test file.
 
 ```console
-> mwcp test foo -d file1.exe -d file2.exe
+> mwcp test foo --delete=file1.exe --delete=file2.exe
 
 Removing results for file1.exe in mwcp\parsers\tests\foo.json
 Removing results for file2.exe in mwcp\parsers\tests\foo.json

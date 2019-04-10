@@ -1,5 +1,6 @@
 """Tests the mwcp.Reporter object."""
 
+import logging
 import os
 
 import pytest
@@ -69,19 +70,6 @@ def test_managed_tempdir(tmpdir):
 def test_add_metadata(key, value, expected):
     reporter = mwcp.Reporter()
     reporter.add_metadata(key, value)
-
-    # Print out the debug messages to make a more useful message if we fail.
-    debug = reporter.metadata.get('debug', None)
-    if debug:
-        print('\n'.join(debug))
-        del reporter.metadata['debug']
-
-    # We shouldn't have any error messages. If we do that means an exception has occurred.
-    # Lets raise that exception to create a more useful message.
-    errors = reporter.errors
-    if errors:
-        raise AssertionError('\n'.join(errors))
-
     assert reporter.metadata == expected
 
 
@@ -95,19 +83,66 @@ def test_other_add_metadata():
 
 
 def test_output_file(tmpdir):
-    output_dir = str(tmpdir)
-    reporter = mwcp.Reporter(outputdir=output_dir)
+    test_file = tmpdir / 'foo.txt'
+    reporter = mwcp.Reporter(outputdir=str(tmpdir))
     reporter.output_file(b'This is data!', 'foo.txt', description='A foo file')
 
-    file_path = os.path.join(output_dir, 'foo.txt')
-    assert os.path.exists(file_path)
-    with open(file_path, 'rb') as fo:
-        assert fo.read() == b'This is data!'
+    assert test_file.exists()
+    assert test_file.read_binary() == b'This is data!'
     assert reporter.outputfiles['foo.txt'] == {
         'data': b'This is data!',
         'description': 'A foo file',
         'md5': '9c91e665b5b7ba5a3066c92dd02d3d7c',
-        'path': file_path
+        'path': str(test_file)
     }
-    assert reporter.metadata['outputfile'] == [['foo.txt', 'A foo file', '9c91e665b5b7ba5a3066c92dd02d3d7c']]
+    assert reporter.metadata['outputfile'] == [
+        ['foo.txt', 'A foo file', '9c91e665b5b7ba5a3066c92dd02d3d7c']
+    ]
 
+    # Add file with same name to test name collision code.
+    test_file_2 = tmpdir / 'foo.txt_4d8cf'
+    reporter.output_file(b'More data!', 'foo.txt', description='Another foo file')
+
+    assert test_file_2.exists()
+    assert test_file_2.read_binary() == b'More data!'
+    assert reporter.metadata['outputfile'] == [
+        ['foo.txt', 'A foo file', '9c91e665b5b7ba5a3066c92dd02d3d7c'],
+        ['foo.txt_4d8cf', 'Another foo file', '4d8cfa4b19f5f971b0e6d79250cb1321'],
+    ]
+
+
+def test_print_report(tmpdir, capsys):
+    """Tests the text report generation."""
+    reporter = mwcp.Reporter(outputdir=str(tmpdir))
+    reporter.add_metadata('proxy', (b'admin', b'pass', b'192.168.1.1', b'80', 'tcp'))
+    reporter.add_metadata('other', {b'foo': b'bar', 'biz': 'baz\x00\x01'})
+    reporter.output_file(b'data', 'file_1.exe', 'example output file')
+
+    expected_output = u'''
+----Standard Metadata----
+
+proxy                admin pass 192.168.1.1 80 tcp
+proxy_socketaddress  192.168.1.1:80/tcp
+proxy_address        192.168.1.1
+socketaddress        192.168.1.1:80/tcp
+address              192.168.1.1
+port                 80/tcp
+credential           admin:pass
+username             admin
+password             pass
+
+----Other Metadata----
+
+biz                  baz\x00\x01
+foo                  bar
+
+----Output Files----
+
+file_1.exe           example output file
+                     8d777f385d3dfec8815d20f7496026dc
+'''
+
+    assert reporter.get_output_text() == expected_output
+
+    reporter.print_report()
+    assert capsys.readouterr().out == expected_output + u'\n'

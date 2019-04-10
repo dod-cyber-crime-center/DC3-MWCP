@@ -204,7 +204,8 @@ def _parse_file(reporter, file_path, parser, include_filename=False):
 @main.command()
 @click.option('-f', '--format', type=click.Choice(['csv', 'json']),
               help='Displays results in another format.')
-@click.option('-o', '--output-dir', type=click.Path(exists=True, file_okay=False), help='Output directory.')
+@click.option('-o', '--output-dir', type=click.Path(exists=True, file_okay=False),
+              help='Root output directory to store residual files. (defaults to current directory)')
 @click.option('--output-files/--no-output-files', default=True, show_default=True,
               help='Whether to output files to filesystem.')
 @click.option('--cleanup/--no-cleanup', default=True, show_default=True,
@@ -239,15 +240,17 @@ def parse(parser, input, format, output_dir, output_files, cleanup, include_file
         input = new_input
 
     input_files = list(filter(os.path.isfile, input))
+    output_dir = output_dir or ''
 
     # Run MWCP
     try:
-        reporter = mwcp.Reporter(
-            outputdir=output_dir,
-            disable_output_files=not output_files,
-            disable_temp_cleanup=not cleanup)
         results = []
         for path in input_files:
+            reporter = mwcp.Reporter(
+                # Store output files to a folder with the same name as the input file.
+                outputdir=os.path.join(output_dir, os.path.basename(path) + '_mwcp_output'),
+                disable_output_files=not output_files,
+                disable_temp_cleanup=not cleanup)
             logger.info('Parsing: {}'.format(path))
             result = _parse_file(reporter, path, parser, include_filename=include_filename)
             results.append(result)
@@ -486,9 +489,13 @@ def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
             # Don't allow adding a file to ALL test cases.
             raise click.BadParameter('PARSER must be provided when adding or deleting a file from a test case.')
 
+        # Cast tuple to list so we can manipulate.
+        add = list(add)
         for filelist in add_filelist:
             with open(filelist, 'r') as f:
-                add.extend(f.readlines())
+                for file_path in f.readlines():
+                    add.append(file_path.rstrip('\n'))
+
         for file_path in add:
             if malware_repo:
                 file_path = _add_to_malware_repo(file_path, malware_repo)
@@ -497,7 +504,6 @@ def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
         for file_path in delete:
             if malware_repo:
                 file_path = _get_malware_repo_path(file_path, malware_repo)
-                # TODO: Also remove from malware repo?
             tester.remove_test(file_path)
 
     # Update

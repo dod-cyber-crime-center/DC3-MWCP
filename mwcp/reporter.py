@@ -19,13 +19,13 @@ import shutil
 import sys
 import tempfile
 import codecs
+import warnings
 
 import mwcp
 import mwcp.parsers
 from mwcp import config
 from mwcp.utils.stringutils import convert_to_unicode
 from mwcp.utils import logutil
-
 
 logger = logging.getLogger(__name__)
 ascii_writer = codecs.getwriter('ascii')
@@ -464,10 +464,15 @@ class Reporter(object):
         else:
             fullpath = os.path.join(self._output_dir, basename)
 
+        # Make directory if it doesn't exist.
+        directory = os.path.dirname(fullpath)
+        if directory and not os.path.isdir(directory):
+            os.makedirs(directory)
+
         try:
             with open(fullpath, "wb") as f:
                 f.write(data)
-            logger.info("Output file: %s" % (fullpath))
+            logger.debug("Output file: %s" % (fullpath))
             self.outputfiles[filename]['path'] = fullpath
         except Exception as e:
             logger.error("Failed to write output file: %s, %s" % (fullpath, str(e)))
@@ -477,6 +482,9 @@ class Reporter(object):
         """
         load filename from filesystem and report using output_file
         """
+        warnings.warn(
+            'report_tempfile() is deprecated. Please output files using FileObject.output() instead.',
+            DeprecationWarning)
         if os.path.isfile(filename):
             with open(filename, "rb") as f:
                 data = f.read()

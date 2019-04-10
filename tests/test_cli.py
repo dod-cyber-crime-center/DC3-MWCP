@@ -3,36 +3,30 @@ Tests the CLI tools.
 """
 
 from __future__ import print_function
-
 from future.builtins import open
 
+import hashlib
 import json
 import re
 import os
 import sys
 
 import pytest
+try:
+    import pathlib
+except ImportError:
+    import pathlib2 as pathlib
 
 from mwcp import cli
 
 
-def test_testcases(tmpdir, script_runner):
-    """Run mwcp test on all test cases."""
-    # Change working directory so we can cleanup outputted files.
-    cwd = str(tmpdir)
 
-    # Run all parser tests.
-    ret = script_runner.run('mwcp', 'test', '-y', cwd=cwd)
-    print(ret.stdout)
-    print(ret.stderr, file=sys.stderr)
-    assert ret.success
-
-
-def test_parse(tmpdir, script_runner, test_file):
+def test_parse(tmpdir, script_runner):
     """Test running a parser"""
-    # Change working directory so we can cleanup outputted files.
+    test_file = tmpdir / 'test.txt'
+    test_file.write_binary(b'This is some test data!')
+    test_file = test_file.basename
     cwd = str(tmpdir)
-    test_file = os.path.basename(test_file)
 
     # Run the foo parser on the test input file.
     ret = script_runner.run('mwcp', 'parse', 'foo', test_file, cwd=cwd)
@@ -50,7 +44,6 @@ address              127.0.0.1
 
 [+] File test.txt identified as Foo.
 [+] size of inputfile is 23 bytes
-[+] Output file: fooconfigtest.txt
 [+] operating on inputfile {}
 
 ----Output Files----
@@ -83,7 +76,6 @@ address              127.0.0.1
 
 [+] File test.txt identified as Foo.
 [+] size of inputfile is 23 bytes
-[+] Output file: fooconfigtest.txt
 [+] operating on inputfile {0}
 
 ----Output Files----
@@ -94,7 +86,7 @@ fooconfigtest.txt    example output file
 '''.format(test_file)
 
     # Check that the output file was created
-    output_file = os.path.join(cwd, 'fooconfigtest.txt')
+    output_file = os.path.join(cwd, '{}_mwcp_output'.format(test_file), 'fooconfigtest.txt')
     assert os.path.isfile(output_file)
 
     # Test the "--no-output-files" flag.
@@ -115,7 +107,6 @@ fooconfigtest.txt    example output file
             "debug": [
                 "[+] File {} identified as Foo.".format(test_file),
                 "[+] size of inputfile is 23 bytes",
-                "[+] Output file: fooconfigtest.txt",
                 "[+] operating on inputfile {}".format(test_file)
             ],
             "url": [
@@ -135,69 +126,110 @@ fooconfigtest.txt    example output file
     ]
 
 
+def test_get_malware_repo_path(tmpdir):
+    """Tests generating malware repo path."""
+    malware_repo = tmpdir.mkdir('malware_repo')
+    test_file = tmpdir / 'test.txt'
+    test_file.write_binary(b'This is some test data!')
 
-def test_list_parsers(script_runner):
-    """Tests the list parser feature."""
-    # Test text out
-    ret = script_runner.run('mwcp', 'list')
-    print(ret.stdout)
+    sample_path = cli._get_malware_repo_path(str(test_file), str(malware_repo))
+    assert sample_path == str(malware_repo / 'fb84' / 'fb843efb2ffec987db12e72ca75c9ea2')
+
+
+def test_add_to_malware_repo(tmpdir):
+    """Tests adding a file to the malware repo."""
+    malware_repo = tmpdir.mkdir('malware_repo')
+    test_file = tmpdir / 'test.txt'
+    test_file.write_binary(b'This is some test data!')
+
+    sample_path = cli._add_to_malware_repo(str(test_file), str(malware_repo))
+    expected_sample_path = malware_repo / 'fb84' / 'fb843efb2ffec987db12e72ca75c9ea2'
+    assert sample_path == str(expected_sample_path)
+    assert expected_sample_path.exists()
+    assert expected_sample_path.read_binary() == test_file.read_binary()
+
+
+def test_list(tmpdir, script_runner, Sample_parser):
+    """
+    Tests displaying a list of parsers.
+
+    (This is also where we test the parser registration flags.)
+    """
+    # First ensure our foo parser is registered via entry_points.
+    ret = script_runner.run('mwcp', 'list', '--json')
+    # print(ret.stdout)
     print(ret.stderr, file=sys.stderr)
     assert ret.success
-    assert ret.stdout
-    assert "bar" in ret.stdout
-    assert "foo" in ret.stdout
 
-    # Test json out
-    ret = script_runner.run('mwcp', 'list', '-j')
-    print(ret.stdout)
+    results = json.loads(ret.stdout, 'utf8')
+    assert len(results) > 1
+    for name, source_name, author, description in results:
+        if name == u'foo':
+            assert source_name == u'mwcp'
+            assert author == u'DC3'
+            assert description == u'example parser that works on any file'
+            break
+    else:
+        pytest.fail('Sample parser was not listed.')
+
+    parser_file, config_file = Sample_parser
+    parser_dir = parser_file.dirname
+
+    # Now try adding a the Sample parser using the --parser-dir flag.
+    ret = script_runner.run(
+        'mwcp',
+        '--parser-dir', str(parser_dir),
+        '--parser-config', str(config_file),
+        'list', '--json'
+    )
+    # print(ret.stdout)
     print(ret.stderr, file=sys.stderr)
     assert ret.success
-    output = json.loads(ret.stdout)
-    assert output == [
-        ['bar', 'mwcp', 'DC3', 'example parser that uses dispatcher components'],
-        ['foo', 'mwcp', 'DC3', 'example parser that works on any file']
+
+    results = json.loads(ret.stdout, 'utf8')
+    assert len(results) > 1
+    for name, source_name, author, description in results:
+        if source_name == str(parser_dir):
+            assert name == u'Sample'
+            assert author == u'Mr. Tester'
+            assert description == u'A test parser'
+            break
+    else:
+        pytest.fail('Sample parser from parser directory was not listed.')
+
+    # If we set --parser-source we should only get our registered parser from the directory.
+    ret = script_runner.run(
+        'mwcp',
+        '--parser-dir', str(parser_dir),
+        '--parser-config', str(config_file),
+        '--parser-source', str(parser_dir),
+        'list', '--json'
+    )
+    # print(ret.stdout)
+    print(ret.stderr, file=sys.stderr)
+    assert ret.success
+    results = json.loads(ret.stdout, 'utf8')
+    assert results == [
+        [u'Sample', str(parser_dir), u'Mr. Tester', u'A test parser']
     ]
 
-
-# REMOVED: Deprecated feature.
-# def test_list_fields(script_runner):
-#     """Test the list fields features."""
-#     # Test text out
-#     ret = script_runner.run('mwcp-tool', '--fields')
-#     print(ret.stdout)
-#     print(ret.stderr, file=sys.stderr)
-#     assert ret.success
-#     assert ret.stdout
-#     assert "address" in ret.stdout
-#
-#     # Test json out
-#     ret = script_runner.run('mwcp-tool', '--fields', '--json')
-#     print(ret.stdout)
-#     print(ret.stderr, file=sys.stderr)
-#     assert ret.success
-#     output = json.loads(ret.stdout)
-#     assert output
-#     assert len(output) == 48
-#     assert "address" in output
-#     assert output["address"]["type"] == "listofstrings"
-
-
-# REMOVED: Deprecated feature.
-# def test_get_file_paths(tmpdir):
-#     """Tests the _get_file_paths in mwcp-tool"""
-#     # tests that it finds valid file paths.
-#     assert tool._get_file_paths([tool.__file__], is_filelist=False) == [tool.__file__]
-#
-#     # Test file list indirection
-#     file_list = os.path.join(str(tmpdir), 'file_list.txt')
-#     with open(file_list, 'w') as f:
-#         f.write('file1.exe\n')
-#         f.write('file2.exe')
-#
-#     assert tool._get_file_paths([file_list], is_filelist=True) == ['file1.exe', 'file2.exe']
-#
-#     sys.stdin = io.StringIO('file3.exe\nfile4.exe')
-#     assert tool._get_file_paths(["-"], is_filelist=True) == ['file3.exe', 'file4.exe']
+    # Now try adding the config_file path to the __init__.py file in order to avoid having
+    # to manually use the --parser-config flag.
+    init_file = pathlib.Path(parser_dir) / '__init__.py'
+    init_file.write_text(u'config = {!r}'.format(str(config_file)), 'utf8')
+    ret = script_runner.run(
+        'mwcp',
+        '--parser-dir', str(parser_dir),
+        '--parser-source', str(parser_dir),
+        'list', '--json'
+    )
+    # print(ret.stdout)
+    print(ret.stderr, file=sys.stderr)
+    assert ret.success
+    results = json.loads(ret.stdout, 'utf8')
+    assert results == [
+        [u'Sample', str(parser_dir), u'Mr. Tester', u'A test parser']
+    ]
 
 
 def test_csv(tmpdir):
@@ -213,25 +245,28 @@ def test_csv(tmpdir):
             'a': ['b', 'c'],
         }
     ]
-    csv_path = os.path.join(str(tmpdir), 'test.csv')
+    csv_file = tmpdir / 'test.csv'
 
-    cli._write_csv(input_files, results, csv_path)
+    cli._write_csv(input_files, results, str(csv_file))
 
     expected = (
         'scan_date,inputfilename,outputfile.name,outputfile.description,outputfile.md5,a,address,other.field1,other.field2\n'
         '[TIMESTAMP],file1.exe,"out_name\nout_name2","out_desc\nout_desc2","out_md5\nout_md52",,"https://google.com\nftp://amazon.com",value1,"value2\nvalue3"\n'
         '[TIMESTAMP],file2.exe,,,,"b\nc",,,\n'
     )
-    with open(csv_path, 'r') as fo:
+    with csv_file.open() as fo:
         # Replace timestamp.
         results = re.sub('\n[^"]*?,', '\n[TIMESTAMP],', fo.read())
         assert results == expected
 
 
-def test_csv_cli(tmpdir, script_runner, test_file):
+def test_csv_cli(tmpdir, script_runner):
     """Tests the csv feature on the command line."""
+    test_file = tmpdir / 'test.txt'
+    test_file.write_binary(b'This is some test data!')
+    test_file = test_file.basename
     cwd = str(tmpdir)
-    test_file = os.path.basename(test_file)
+
     ret = script_runner.run('mwcp', 'parse', '--no-output-files', '--format', 'csv', 'foo', test_file, cwd=cwd)
     print(ret.stdout)
     print(ret.stderr, file=sys.stderr)
@@ -250,3 +285,113 @@ def test_csv_cli(tmpdir, script_runner, test_file):
     # Replace timestamp.
     results = re.sub('\n[^"]*?,', '\n[TIMESTAMP],', results)
     assert results == expected
+    
+    
+def test_add_testcase(tmpdir, script_runner):
+    """Tests adding a parser testcase."""
+    malware_repo = tmpdir.mkdir('malware_repo')
+    test_case_dir = tmpdir.mkdir('testcases')
+    test_file = tmpdir / 'test.txt'
+    test_file.write_binary(b'This is some test data!')
+
+    # Add a test case for our foo parser.
+    ret = script_runner.run(
+        'mwcp', 'test', 'foo',
+        '--testcase-dir', str(test_case_dir),
+        '--malware-repo', str(malware_repo),
+        '--add', str(test_file),
+    )
+    print(ret.stdout)
+    print(ret.stderr, file=sys.stderr)
+    assert ret.success
+
+    # Ensure test file got placed in the right location.
+    test_sample = malware_repo / 'fb84' / 'fb843efb2ffec987db12e72ca75c9ea2'
+    assert test_sample.exists()
+    assert test_sample.read_binary() == test_file.read_binary()
+
+    # Ensure the test case was created correctly.
+    test_case_file = test_case_dir / 'foo.json'
+    assert test_case_file.exists()
+    assert json.loads(test_case_file.read_text('utf8')) == [
+        {
+            u"debug": [
+                u"[+] File {} identified as Foo.".format(test_sample.basename),
+                u"[+] size of inputfile is 23 bytes",
+                u"[+] operating on inputfile {}".format(test_sample.basename)
+            ],
+            u"url": [
+                u"http://127.0.0.1"
+            ],
+            u"outputfile": [
+                [
+                    u"fooconfigtest.txt",
+                    u"example output file",
+                    u"5eb63bbbe01eeed093cb22bb8f5acdc3"
+                ]
+            ],
+            u'inputfilename': u'{}'.format(str(test_sample)),
+            u"address": [
+                u"127.0.0.1"
+            ]
+        }
+    ]
+
+    # Now test the deletion of the test case.
+    ret = script_runner.run(
+        'mwcp', 'test', 'foo',
+        '--testcase-dir', str(test_case_dir),
+        '--malware-repo', str(malware_repo),
+        '--delete', str(test_file)
+    )
+    print(ret.stdout)
+    print(ret.stderr, file=sys.stderr)
+    assert ret.success
+
+    # Make sure we did NOT remove the file from the malware repo.
+    assert test_sample.exists()
+    assert test_sample.read_binary() == test_file.read_binary()
+
+    # Check that the test case has been removed, but the test case file still exists.
+    assert test_case_file.exists()
+    assert json.loads(test_case_file.read_text('utf8')) == []
+
+
+def test_add_filelist_testcase(tmpdir, script_runner):
+    """Tests bulk adding testcases with --add-filelist flag."""
+    malware_repo = tmpdir.mkdir('malware_repo')
+    test_case_dir = tmpdir.mkdir('testcases')
+
+    # Create a file list of paths.
+    filelist = []
+    for i in range(10):
+        file = tmpdir / 'file_{}'.format(i)
+        data = b'this is file {}'.format(i)
+        file.write_binary(data)
+        filelist.append((str(file), hashlib.md5(data).hexdigest()))
+
+    filelist_txt = tmpdir / 'filelist.txt'
+    filelist_txt.write_text(u'\n'.join(file_path for file_path, _ in filelist), 'utf8')
+
+    # Add a test case for our sample parser.
+    ret = script_runner.run(
+        'mwcp', 'test', 'foo',
+        '--testcase-dir', str(test_case_dir),
+        '--malware-repo', str(malware_repo),
+        '--add-filelist', str(filelist_txt),
+    )
+    print(ret.stdout)
+    print(ret.stderr, file=sys.stderr)
+    assert ret.success
+
+    # Ensure a sample was added for each file and exists in the testcase.
+    test_case_file = test_case_dir / 'Foo.json'
+    assert test_case_file.exists()
+    testcases = json.loads(test_case_file.read_text('utf8'))
+    input_files = [testcase[u'inputfilename'] for testcase in testcases]
+    assert len(input_files) == len(filelist)
+    for _, md5 in filelist:
+        test_sample = malware_repo / md5[:4] / md5
+        assert test_sample.exists()
+        assert hashlib.md5(test_sample.read_binary()).hexdigest() == md5
+        assert str(test_sample) in input_files

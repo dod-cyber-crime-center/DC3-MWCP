@@ -1,6 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+### Changed
+- Moved output files to a folder named '{input filename}_mwcp_output' when running `mwcp parse`
+  - This prevents output files from being overwritten when running multiple input files.
+
+### Fixed
+- Pinned kordesii dependency to 1.4.0 or greater.
+- Fixed bug with using old "enableidalog" parameter when running kordesii parsers.
+- Fixed tuple error when attempting to use the `--add-filelist` option in `mwcp test`.
+
+### Deprecated
+- `Reporter.report_tempfile()` is deprecated. Use `FileObject.output()` instead.
+
 
 ## [2.0.1] - 2019-03-15
 ### Added

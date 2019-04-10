@@ -32,17 +32,12 @@ command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 - [Testing](docs/Testing.md)
 
 
-
 ## Install
-
-<!-- Uncomment if we ever get published in PyPi
 ```console
 > pip install mwcp
 ```
 
 Alternatively you can clone this repo and install locally.
--->
-
 ```console
 > git clone https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP.git
 > pip install ./DC3-MWCP
