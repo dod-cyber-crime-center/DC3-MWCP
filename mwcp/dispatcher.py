@@ -181,7 +181,7 @@ class Dispatcher(object):
 
         # Pull knowledge_base from previous dispatcher.
         if dispatcher:
-            self.knowledge_base.update(dispatcher.knowledge_base)
+            self.knowledge_base = dispatcher.knowledge_base
 
         while self._fifo_buffer:
             file_object = self._fifo_buffer.pop()
