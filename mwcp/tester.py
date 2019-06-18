@@ -436,6 +436,7 @@ class TestResult(object):
 
     def __init__(self, parser, passed,
                  input_file_path=None, errors=None, debug=None, results=None, run_time=None):
+        self.parser = parser
         self.parser_source, _, self.parser_name = parser.rpartition(':')
         self.input_file_path = input_file_path or 'N/A'
         self.filename = os.path.basename(input_file_path) if input_file_path else 'N/A'
@@ -464,12 +465,12 @@ class TestResult(object):
             filtered_output = ""
             passed = self.passed
             if passed and passed_tests:
-                filtered_output += "Parser Name = {}\n".format(self.parser_name)
+                filtered_output += "Parser Name = {}\n".format(self.parser)
                 if self.input_file_path and self.input_file_path != 'N/A':
                     filtered_output += "Input Filename = {}\n".format(self.input_file_path)
                 filtered_output += "Tests Passed = {}\n".format(self.passed)
             elif not passed and failed_tests:
-                filtered_output += "Parser Name = {}\n".format(self.parser_name)
+                filtered_output += "Parser Name = {}\n".format(self.parser)
                 if self.input_file_path and self.input_file_path != 'N/A':
                     filtered_output += "Input Filename = {}\n".format(self.input_file_path)
                 filtered_output += "Tests Passed = {}\n".format(self.passed)

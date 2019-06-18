@@ -347,7 +347,7 @@ def _run_tests(tester, silent=False, show_passed=False):
         parser_len = 10
         filename_len = 10
     else:
-        parser_len = max(len(test_case.parser_name) for test_case in tester.test_cases)
+        parser_len = max(len(test_case.parser) for test_case in tester.test_cases)
         filename_len = max(len(test_case.filename) for test_case in tester.test_cases)
     msg_format = "{{parser:{0}}} {{filename:{1}}} {{run_time:.4f}}s".format(parser_len, filename_len)
 
@@ -357,7 +357,7 @@ def _run_tests(tester, silent=False, show_passed=False):
     for count, test_result in enumerate(tester, start=1):
         all_passed &= test_result.passed
         if not test_result.passed:
-            failed.append((count, test_result.parser_name, test_result.filename))
+            failed.append((count, test_result.parser, test_result.filename))
 
         if test_result.run_time:  # Ignore missing tests from stat summary.
             test_results.append(test_result)
@@ -366,7 +366,7 @@ def _run_tests(tester, silent=False, show_passed=False):
             message = format_str.format(
                 count=count,
                 total=total,
-                parser=test_result.parser_name,
+                parser=test_result.parser,
                 filename=test_result.filename,
                 run_time=test_result.run_time
             )
@@ -389,7 +389,7 @@ def _run_tests(tester, silent=False, show_passed=False):
         for i, test_result in enumerate(sorted_cases[:10], start=1):
             print(format_str.format(
                 index=i,
-                parser=test_result.parser_name,
+                parser=test_result.parser,
                 filename=test_result.filename,
                 run_time=test_result.run_time
             ))
@@ -398,7 +398,7 @@ def _run_tests(tester, silent=False, show_passed=False):
         for i, test_result in enumerate(list(reversed(sorted_cases))[:10], start=1):
             print(format_str.format(
                 index=i,
-                parser=test_result.parser_name,
+                parser=test_result.parser,
                 filename=test_result.filename,
                 run_time=test_result.run_time
             ))
