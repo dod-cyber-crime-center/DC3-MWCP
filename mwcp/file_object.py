@@ -45,6 +45,10 @@ class FileObject(object):
         :param bool use_arch: use_arch argument to pass to obtain_original_filename()
         :param str ext: default extension to use if not determined from pe file.
         """
+        # Ensure we are getting a bytes string. Libraries like pefile depend on this.
+        if not isinstance(file_data, bytes):
+            raise TypeError('file_data must be a bytes string.')
+
         self._file_path = None
         self._md5 = None
         self._sha1 = None

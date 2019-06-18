@@ -6,9 +6,10 @@ python version: 2.7.8
 import logging
 import os
 
-logger = logging.getLogger(__name__)
-
 import pefile
+
+
+logger = logging.getLogger(__name__)
 
 
 def obtain_pe(file_data):
@@ -23,8 +24,8 @@ def obtain_pe(file_data):
         return None
     try:
         return pefile.PE(data=file_data)
-    except pefile.PEFormatError:
-        logger.debug('A pefile.PE object on the file data could not be created.')
+    except pefile.PEFormatError as e:
+        logger.debug('A pefile.PE object on the file data could not be created: {}'.format(e))
         return None
 
 
@@ -334,7 +335,7 @@ def obtain_architecture_string(pe=None, file_data=None, bitterm=True):
         return None
 
 
-def __obtain_exif_fname__(pe):
+def _obtain_exif_fname(pe):
     """
     Obtain the filename from the pe.FileInfo listing of exif metadata.
 
@@ -344,16 +345,18 @@ def __obtain_exif_fname__(pe):
     """
     try:
         for file_info in pe.FileInfo:
-            if file_info.Key == 'StringFileInfo':
-                for string_table in file_info.StringTable:
-                    for field_name, name_value in string_table.entries.iteritems():
-                        if field_name == 'OriginalFilename':
-                            return name_value
+            for entry in file_info:
+                if entry.Key == 'StringFileInfo':
+                    for string_table in entry.StringTable:
+                        try:
+                            return string_table.entries['OriginalFilename']
+                        except KeyError:
+                            continue
     except AttributeError:
         return None
 
 
-def __obtain_exportdir_fname__(pe):
+def _obtain_exportdir_fname(pe):
     """
     Obtain the filename from the export directory of the pefile.PE object.
 
@@ -388,7 +391,7 @@ def obtain_original_filename(def_stub, pe=None, file_data=None, use_arch=False, 
     if pe:
         ext = obtain_file_ext(pe=pe)
         arch = obtain_architecture_string(pe=pe, bitterm=False)
-        filename = __obtain_exportdir_fname__(pe) or __obtain_exif_fname__(pe)
+        filename = _obtain_exportdir_fname(pe) or _obtain_exif_fname(pe)
         if filename:
             if use_arch:
                 base, ext = os.path.splitext(filename)
@@ -398,6 +401,89 @@ def obtain_original_filename(def_stub, pe=None, file_data=None, use_arch=False, 
             return def_stub + "_" + arch + ext
     else:
         return def_stub + ext
+
+
+def get_overlay_data_start_offset(pe, include_data_directories=True):
+    """
+    Get the offset of data appended to the file and not contained within
+    the area described in the headers.
+
+    MODIFICATIONS:
+        - Use include_data_directories parameter to allow user to specify if they
+          want to include the data directories in the calculation.
+        - Include SECURITY table.
+    """
+
+    largest_offset_and_size = (0, 0)
+
+    def update_if_sum_is_larger_and_within_file(offset_and_size, file_size=len(pe.__data__)):
+        if sum(offset_and_size) <= file_size and sum(offset_and_size) > sum(largest_offset_and_size):
+            return offset_and_size
+        return largest_offset_and_size
+
+    if hasattr(pe, 'OPTIONAL_HEADER'):
+        largest_offset_and_size = update_if_sum_is_larger_and_within_file(
+            (pe.OPTIONAL_HEADER.get_file_offset(), pe.FILE_HEADER.SizeOfOptionalHeader))
+
+    for section in pe.sections:
+        largest_offset_and_size = update_if_sum_is_larger_and_within_file(
+            (section.PointerToRawData, section.SizeOfRawData))
+
+    if include_data_directories:
+        for idx, directory in enumerate(pe.OPTIONAL_HEADER.DATA_DIRECTORY):
+            try:
+                # Security directory is special in that its VirtualAddress is actually a file offset.
+                if idx == pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']:
+                    largest_offset_and_size = update_if_sum_is_larger_and_within_file(
+                        (directory.VirtualAddress, directory.Size))
+                else:
+                    largest_offset_and_size = update_if_sum_is_larger_and_within_file(
+                        (pe.get_offset_from_rva(directory.VirtualAddress), directory.Size))
+            # Ignore directories with RVA out of file
+            except pefile.PEFormatError:
+                continue
+
+    if len(pe.__data__) > sum(largest_offset_and_size):
+        return sum(largest_offset_and_size)
+
+    return None
+
+
+def get_overlay(pe, include_data_directories=True):
+    """
+    Get the data appended to the file and not contained within the area described in the headers.
+
+    MODIFICATIONS:
+        - Use include_data_directories parameter to allow user to specify if they
+          want to include the data directories in the calculation.
+    """
+
+    overlay_data_offset = get_overlay_data_start_offset(
+        pe, include_data_directories=include_data_directories)
+
+    if overlay_data_offset is not None:
+        return pe.__data__[overlay_data_offset:]
+
+    return None
+
+
+def trim(pe, include_data_directories=True):
+    """
+    Return the just data defined by the PE headers, removing any overlayed data.
+
+    MODIFICATIONS:
+        - Use include_data_directories parameter to allow user to specify if they
+          want to include the data directories in the calculation.
+    """
+
+    overlay_data_offset = get_overlay_data_start_offset(
+        pe, include_data_directories=include_data_directories)
+
+    if overlay_data_offset is not None:
+        return pe.__data__[:overlay_data_offset]
+
+    return pe.__data__[:]
+
 
 
 def is_memory_mapped(file_data):
@@ -514,6 +600,12 @@ class Resource(object):
             rva = self._entry.directory.entries[0].data.struct.OffsetToData
             size = self._entry.directory.entries[0].data.struct.Size
             self._data = self._pe.get_memory_mapped_image()[rva:rva + size]
+            if not self._data:
+                # Sometimes the get_memory_mapped_image() method failed for an unknown reason.
+                # Resort to using get_data() if this happens.
+                # We can't just use get_data() to start with because this method fails to pull
+                # all the data for large resources.
+                self._data = self._pe.get_data(rva, size)
         return self._data
 
     @data.setter

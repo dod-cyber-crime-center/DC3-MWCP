@@ -50,7 +50,7 @@ setup(
         'construct==2.9.45',  # pin because parsers are very dependent on this.
         'future',
         'jinja2',  # For construct.html_hex()
-        'pefile',
+        'pefile>=2019.4.18',
         'pyelftools',
         'pyparsing',
         'pyyaml',

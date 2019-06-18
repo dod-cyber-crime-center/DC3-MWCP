@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Updated pefileutils to support pefile version 2018.4.18
+
+
 ## [2.0.2] - 2019-04-10
 ### Changed
 - Moved output files to a folder named '{input filename}_mwcp_output' when running `mwcp parse`
