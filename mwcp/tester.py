@@ -248,7 +248,7 @@ class Tester(object):
                     results_file_data.append(metadata)
 
             with open(results_file_path, 'w', encoding='utf8') as results_file:
-                results_file.write(str(json.dumps(results_file_data, results_file, indent=4, sort_keys=True)))
+                results_file.write(str(json.dumps(results_file_data, indent=4, sort_keys=True)))
 
     def _update_test_results(self, results_file_path, results_data, replace=True):
         """
@@ -283,7 +283,7 @@ class Tester(object):
         # Write updated data to results file
         # NOTE: We need to use dumps instead of dump to avoid TypeError.
         with open(results_file_path, 'w', encoding='utf8') as results_file:
-            results_file.write(str(json.dumps(results_file_data, results_file, indent=4, sort_keys=True)))
+            results_file.write(str(json.dumps(results_file_data, indent=4, sort_keys=True)))
 
     def remove_test_results(self, parser_name, filenames):
         """
@@ -300,7 +300,7 @@ class Tester(object):
                 results_file_data.append(metadata)
 
         with open(self.get_results_filepath(parser_name), 'w', encoding='utf8') as results_file:
-            results_file.write(str(json.dumps(results_file_data, results_file, indent=4, sort_keys=True)))
+            results_file.write(str(json.dumps(results_file_data, indent=4, sort_keys=True)))
 
         return removed_files
 

@@ -161,7 +161,7 @@ def test_list(tmpdir, script_runner, Sample_parser):
     print(ret.stderr, file=sys.stderr)
     assert ret.success
 
-    results = json.loads(ret.stdout, 'utf8')
+    results = json.loads(ret.stdout, encoding='utf8')
     assert len(results) > 1
     for name, source_name, author, description in results:
         if name == u'foo':
@@ -186,7 +186,7 @@ def test_list(tmpdir, script_runner, Sample_parser):
     print(ret.stderr, file=sys.stderr)
     assert ret.success
 
-    results = json.loads(ret.stdout, 'utf8')
+    results = json.loads(ret.stdout, encoding='utf8')
     assert len(results) > 1
     for name, source_name, author, description in results:
         if source_name == str(parser_dir):
@@ -208,7 +208,7 @@ def test_list(tmpdir, script_runner, Sample_parser):
     # print(ret.stdout)
     print(ret.stderr, file=sys.stderr)
     assert ret.success
-    results = json.loads(ret.stdout, 'utf8')
+    results = json.loads(ret.stdout, encoding='utf8')
     assert results == [
         [u'Sample', str(parser_dir), u'Mr. Tester', u'A test parser']
     ]
@@ -226,7 +226,7 @@ def test_list(tmpdir, script_runner, Sample_parser):
     # print(ret.stdout)
     print(ret.stderr, file=sys.stderr)
     assert ret.success
-    results = json.loads(ret.stdout, 'utf8')
+    results = json.loads(ret.stdout, encoding='utf8')
     assert results == [
         [u'Sample', str(parser_dir), u'Mr. Tester', u'A test parser']
     ]
@@ -366,7 +366,7 @@ def test_add_filelist_testcase(tmpdir, script_runner):
     filelist = []
     for i in range(10):
         file = tmpdir / 'file_{}'.format(i)
-        data = b'this is file {}'.format(i)
+        data = 'this is file {}'.format(i).encode('utf8')
         file.write_binary(data)
         filelist.append((str(file), hashlib.md5(data).hexdigest()))
 
