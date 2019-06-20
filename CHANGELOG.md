@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Updated pefileutils to support pefile version 2018.4.18
+- Pinned pyparsing dependency to 2.3.0 to avoid breaking poshdeob.
 
 
 ## [2.0.2] - 2019-04-10

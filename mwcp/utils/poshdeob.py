@@ -54,8 +54,6 @@ Usage:
     ['http://192.168.200.100:8000', 'iex', '@*$()|[_']
 """
 
-from __future__ import absolute_import, print_function
-
 import argparse
 import re
 import sys
@@ -120,7 +118,7 @@ def _split(tokens):
 # endregion
 
 
-# region PARSING GRAMMAR
+# region PARSING GRAMMER
 
 def OptionalParen(expr, parenthesis='()'):
     """

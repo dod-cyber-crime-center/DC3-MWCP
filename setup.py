@@ -52,7 +52,7 @@ setup(
         'jinja2',  # For construct.html_hex()
         'pefile>=2019.4.18',
         'pyelftools',
-        'pyparsing',
+        'pyparsing==2.3.0',  # 2.4.0 seems to break poshdeob
         'pyyaml',
         'requests',
         'ruamel.yaml',
