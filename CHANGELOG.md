@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [2.0.3] - 2019-06-20
 
 ### Fixed
 - Updated pefileutils to support pefile version 2018.4.18
@@ -182,7 +182,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.2...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.3...HEAD
+[2.0.3]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.2...2.0.3
 [2.0.2]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.1...2.0.2
 [2.0.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.0...2.0.1
 [2.0.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.4.1...2.0.0
