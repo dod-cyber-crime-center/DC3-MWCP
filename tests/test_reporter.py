@@ -1,3 +1,4 @@
+# coding=utf-8
 """Tests the mwcp.Reporter object."""
 
 import logging
@@ -83,31 +84,36 @@ def test_other_add_metadata():
 
 
 def test_output_file(tmpdir):
-    test_file = tmpdir / 'foo.txt'
+    test_file = tmpdir / '9c91e_foo.txt'
     reporter = mwcp.Reporter(outputdir=str(tmpdir))
-    reporter.output_file(b'This is data!', 'foo.txt', description='A foo file')
+    assert reporter.output_file(b'This is data!', 'foo.txt', description='A foo file') == str(test_file)
 
     assert test_file.exists()
     assert test_file.read_binary() == b'This is data!'
-    assert reporter.outputfiles['foo.txt'] == {
-        'data': b'This is data!',
-        'description': 'A foo file',
-        'md5': '9c91e665b5b7ba5a3066c92dd02d3d7c',
-        'path': str(test_file)
-    }
     assert reporter.metadata['outputfile'] == [
         ['foo.txt', 'A foo file', '9c91e665b5b7ba5a3066c92dd02d3d7c']
     ]
 
     # Add file with same name to test name collision code.
-    test_file_2 = tmpdir / 'foo.txt_4d8cf'
-    reporter.output_file(b'More data!', 'foo.txt', description='Another foo file')
+    test_file = tmpdir / '4d8cf_foo.txt'
+    assert reporter.output_file(b'More data!', 'foo.txt', description='Another foo file') == str(test_file)
 
-    assert test_file_2.exists()
-    assert test_file_2.read_binary() == b'More data!'
+    assert test_file.exists()
+    assert test_file.read_binary() == b'More data!'
     assert reporter.metadata['outputfile'] == [
         ['foo.txt', 'A foo file', '9c91e665b5b7ba5a3066c92dd02d3d7c'],
-        ['foo.txt_4d8cf', 'Another foo file', '4d8cfa4b19f5f971b0e6d79250cb1321'],
+        ['foo.txt', 'Another foo file', '4d8cfa4b19f5f971b0e6d79250cb1321'],
+    ]
+
+    # Test file sanitization
+    test_file = tmpdir / '6f1ed_hello.txt'
+    reporter = mwcp.Reporter(outputdir=str(tmpdir))
+    assert reporter.output_file(b'blah', u'héllo!!\x08.txt') == str(test_file)
+
+    assert test_file.exists()
+    assert test_file.read_binary() == b'blah'
+    assert reporter.metadata['outputfile'] == [
+        [u'héllo!!\x08.txt', '', '6f1ed002ab5595859014ebf0951522d9']
     ]
 
 

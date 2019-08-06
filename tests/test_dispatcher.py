@@ -72,8 +72,7 @@ def test_dispatch(components, input_file, expected):
 
 def test_file_object(tmpdir):
     """Tests the mwcp.FileObject class"""
-    output_dir = str(tmpdir)
-    reporter = mwcp.Reporter(tempdir=output_dir, outputdir=output_dir)
+    reporter = mwcp.Reporter(tempdir=str(tmpdir), outputdir=str(tmpdir))
     file_object = mwcp.FileObject(b'This is some test data!', reporter)
 
     assert file_object.file_name == u'fb843efb2ffec987db12e72ca75c9ea2.bin'
@@ -81,19 +80,13 @@ def test_file_object(tmpdir):
     assert file_object.md5 == u'fb843efb2ffec987db12e72ca75c9ea2'
     assert file_object.resources is None
     assert file_object.pe is None
-    assert file_object.file_path.startswith(os.path.join(output_dir, 'mwcp-managed_tempdir-'))
+    assert file_object.file_path.startswith(os.path.join(str(tmpdir), 'mwcp-managed_tempdir-'))
 
     with file_object as fo:
         assert fo.read() == b'This is some test data!'
 
-    assert not reporter.outputfiles
     file_object.output()
-    file_path = os.path.join(output_dir, 'fb843efb2ffec987db12e72ca75c9ea2.bin')
-    assert file_object.file_name in reporter.outputfiles
-    assert reporter.outputfiles[file_object.file_name] == {
-        'data': b'This is some test data!',
-        'path': file_path,
-        'description': '',
-        'md5': 'fb843efb2ffec987db12e72ca75c9ea2'
-    }
-    assert os.path.exists(file_path)
+    assert (tmpdir / 'fb843_fb843efb2ffec987db12e72ca75c9ea2.bin').exists()
+    assert reporter.metadata['outputfile'] == [
+        [file_object.file_name, '', 'fb843efb2ffec987db12e72ca75c9ea2']
+    ]

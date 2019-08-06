@@ -86,7 +86,7 @@ fooconfigtest.txt    example output file
 '''.format(test_file)
 
     # Check that the output file was created
-    output_file = os.path.join(cwd, '{}_mwcp_output'.format(test_file), 'fooconfigtest.txt')
+    output_file = os.path.join(cwd, '{}_mwcp_output'.format(test_file), '5eb63_fooconfigtest.txt')
     assert os.path.isfile(output_file)
 
     # Test the "--no-output-files" flag.

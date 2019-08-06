@@ -3,9 +3,9 @@
 """
 from __future__ import print_function
 
-import contextlib
-
 from future.builtins import str, open, map
+
+import contextlib
 
 import base64
 import binascii
@@ -24,7 +24,7 @@ import warnings
 import mwcp
 import mwcp.parsers
 from mwcp import config
-from mwcp.utils.stringutils import convert_to_unicode
+from mwcp.utils.stringutils import convert_to_unicode, sanitize_filename
 from mwcp.utils import logutil
 
 logger = logging.getLogger(__name__)
@@ -84,10 +84,6 @@ class Reporter(object):
             the original parsed file. (instance of mwcp.FileObject)
         metadata:
             Dictionary containing the metadata extracted from the malware by the parser
-        outputfiles:
-            dictionary of entries for each output file. The key is the filename specified. Each entry
-            is a dictionary with keys of data, description, and md5. If the path key is set, the file was written
-            to that path on the filesystem.
         fields:
             dictionary containing the standardized fields with each field comprising an embedded
             dictionary. The 1st level keys are the field names. Under that, the keys are "description",
@@ -104,7 +100,6 @@ class Reporter(object):
     def __init__(self,
                  outputdir=None,
                  tempdir=None,
-                 outputfile_prefix=None,
                  disable_output_files=False,
                  disable_temp_cleanup=False,
                  base64_output_files=False,
@@ -116,16 +111,12 @@ class Reporter(object):
         :param str outputdir:
             sets directory for output_file(). Should not be written to (or read from) by parsers
             directly (use tempdir)
-        :param str outputfile_prefix:
-            sets prefix for output files written to outputdir. Special value "md5" causes prefix
-            by md5 of the input file.
         :param bool disable_output_files: disable writing if files to filesystem
         :param bool disable_temp_cleanup: disable cleanup (deletion) of temp files
         """
 
         # defaults
         self.tempdir = tempdir or tempfile.gettempdir()
-        self.outputfiles = {}
         self._log_handler = None
         self.fields = {"debug": {"description": "debug", "type": "listofstrings"}}
         self.metadata = {}
@@ -134,7 +125,6 @@ class Reporter(object):
 
         self._managed_tempdir = None
         self._output_dir = outputdir or ''
-        self._output_file_prefix = outputfile_prefix or ''
 
         self._disable_output_files = disable_output_files
         self._disable_temp_cleanup = disable_temp_cleanup
@@ -423,59 +413,37 @@ class Reporter(object):
         :param bytes data: The contents of the output file
         :param str filename: filename (basename) of file
         :param str description: description of the file
+
+        :returns str: The file path of the written file if successful.
         """
         md5 = hashlib.md5(data).hexdigest()
 
-        # TODO: Add filename sanitization.
-
-        # Rename file if we have a name collision.
-        num_char = 5
-        orig_filename = filename
-        while filename in self.outputfiles:
-            if md5 == self.outputfiles[filename]['md5']:
-                logger.info('Ignoring duplicate output file: {}'.format(filename))
-                return
-            assert num_char <= 32  # We shouldn't get into an infinite loop due to the check above.
-            filename = orig_filename + '_' + md5[:num_char]
-            num_char += 1
-        if orig_filename != filename:
-            logger.info('Renamed {} to {}'.format(orig_filename, filename))
-
-        basename = os.path.basename(filename)
-        self.outputfiles[filename] = {
-            'data': data, 'description': description, 'md5': md5}
-
         if self._base64_output_files:
             self.add_metadata(
-                "outputfile", [basename, description, md5, base64.b64encode(data)])
+                "outputfile", [filename, description, md5, base64.b64encode(data)])
         else:
-            self.add_metadata("outputfile", [basename, description, md5])
+            self.add_metadata("outputfile", [filename, description, md5])
 
         if self._disable_output_files:
-            return
+            return None
 
-        if self._output_file_prefix:
-            if self._output_file_prefix == "md5":
-                fullpath = os.path.join(self._output_dir, "%s_%s" % (
-                    self.input_file.md5, basename))
-            else:
-                fullpath = os.path.join(self._output_dir, "%s_%s" % (
-                    self._output_file_prefix, basename))
-        else:
-            fullpath = os.path.join(self._output_dir, basename)
+        # Create a safe filename that won't have any name collisions.
+        safe_filename = '{}_{}'.format(md5[:5], sanitize_filename(filename))
+        full_path = os.path.join(self._output_dir, safe_filename)
 
         # Make directory if it doesn't exist.
-        directory = os.path.dirname(fullpath)
+        directory = os.path.dirname(full_path)
         if directory and not os.path.isdir(directory):
             os.makedirs(directory)
 
         try:
-            with open(fullpath, "wb") as f:
+            with open(full_path, "wb") as f:
                 f.write(data)
-            logger.debug("Output file: %s" % (fullpath))
-            self.outputfiles[filename]['path'] = fullpath
+            logger.debug('Output file: {}'.format(full_path))
+            return full_path
         except Exception as e:
-            logger.error("Failed to write output file: %s, %s" % (fullpath, str(e)))
+            logger.error('Failed to write output file {} with error: {}'.format(full_path, e))
+            return None
 
     # TODO: Deprecate this function, we should be interfacing with FileObject instead.
     def report_tempfile(self, filename, description=''):
@@ -625,7 +593,6 @@ class Reporter(object):
         self.input_file = None
 
         self.metadata = {}
-        self.outputfiles = {}
         self.errors = []
 
         # To keep backwards compatibility, setup log handler to add errors and debug messages to reporter.

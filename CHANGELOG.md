@@ -1,6 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+## [Unreleased]
+
+### Changed
+- The `outputfiles` attribute in `mwcp.Reporter` has been removed. 
+Instead, the output file path will be returned by `output_file()`.
+- All output filenames now include the first 5 digits of it's md5 and are 
+converted to file system safe names.
+
+### Removed
+- Removed support for adding a prefix to output files.
+
+
 ## [2.0.3] - 2019-06-20
 
 ### Fixed

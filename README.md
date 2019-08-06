@@ -256,11 +256,6 @@ reporter.run_parser("foo", "README.md")
 reporter.run_parser("foo", data="lorem ipsum")
 
 reporter.print_report()
-
-# access output files
-for filename in reporter.outputfiles:
-    print("%s: %i bytes" % (reporter.outputfiles[filename]['path'],
-                            len(reporter.outputfiles[filename]['data'])))
 ```
 
 

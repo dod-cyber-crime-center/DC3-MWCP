@@ -370,9 +370,10 @@ def main(args=None):
 
     # Run MWCP
     try:
+        if args.outputfile_prefix:
+            warnings.warn('WARNING: --outputfile-prefix argument is no longer supported and will be ignored.')
         reporter = mwcp.Reporter(
             outputdir=args.outputdir,
-            outputfile_prefix=args.outputfile_prefix,
             tempdir=args.tempdir,
             disable_output_files=args.disableoutputfiles,
             disable_temp_cleanup=args.disabletempcleanup,
