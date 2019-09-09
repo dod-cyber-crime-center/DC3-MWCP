@@ -4,15 +4,16 @@ DC3-MWCP client tool--submit files to the mwcp-server
 """
 from __future__ import print_function
 
+import argparse
+import base64
+import hashlib
+import json
 import os
 import sys
-import argparse
-import json
-import requests
-import hashlib
 import traceback
-import base64
+import warnings
 
+import requests
 from six import iteritems
 
 
@@ -173,6 +174,8 @@ def make_arg_parser():
 def main():
     """Run tool."""
 
+    warnings.warn('mwcp-client is deprecated.', DeprecationWarning)
+
     arg_parser = make_arg_parser()
     args = arg_parser.parse_args()
 
@@ -227,6 +230,7 @@ def main():
 
     # Shouldn't get here
     sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

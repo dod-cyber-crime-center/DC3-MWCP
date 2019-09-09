@@ -130,7 +130,7 @@ class Reporter(object):
         self._disable_temp_cleanup = disable_temp_cleanup
         self._base64_output_files = base64_output_files
 
-        with open(config.FIELDS_PATH, 'rb') as f:
+        with open(config.get('FIELDS_PATH'), 'rb') as f:
             self.fields = json.load(f)
 
     @property

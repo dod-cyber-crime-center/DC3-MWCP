@@ -34,10 +34,10 @@ setup(
     entry_points={
         'console_scripts': [
             'mwcp = mwcp.cli:main',
-            'mwcp-tool = mwcp.tools.tool:main',
-            'mwcp-client = mwcp.tools.client:main',
-            'mwcp-server = mwcp.tools.server:main',
-            'mwcp-test = mwcp.tools.test:main',
+            'mwcp-server = mwcp.cli:serve',          # DEPRECATED
+            'mwcp-tool = mwcp.tools.tool:main',      # DEPRECATED
+            'mwcp-client = mwcp.tools.client:main',  # DEPRECATED
+            'mwcp-test = mwcp.tools.test:main',      # DEPRECATED
             'poshdeob = mwcp.utils.poshdeob:main'
         ],
         'mwcp.parsers': [
@@ -45,8 +45,8 @@ setup(
         ]
     },
     install_requires=[
+        'appdirs',
         'click',
-        'bottle',
         'construct==2.9.45',  # pin because parsers are very dependent on this.
         'future',
         'jinja2',  # For construct.html_hex()
@@ -58,6 +58,11 @@ setup(
         'ruamel.yaml',
         'six',
         'tabulate',
+
+        # For the server and API
+        'flask~=1.1.0',
+        'pygments~=2.2.0',
+
         # Testing
         'pytest',
         'pytest-console-scripts',

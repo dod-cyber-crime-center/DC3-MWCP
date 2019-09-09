@@ -213,26 +213,18 @@ def main():
 
     # Delete files from test cases
     if args.delete:
-        removed_files = tester.remove_test_results(
-            args.parser_name, input_files)
-        for filename in removed_files:
-            print(u"Removing results for {} in {}".format(
-                filename, tester.get_results_filepath(args.parser_name)))
+        for file_path in input_files:
+            tester.remove_test(file_path)
 
     # Update previously existing test cases
     elif args.update and args.parser_name:
         print("Updating test cases. May take a while...")
-        results_file_path = tester.get_results_filepath(args.parser_name)
-        if os.path.isfile(results_file_path):
-            input_files = tester.list_test_files(args.parser_name)
-        else:
-            sys.exit(u"No test case file found for parser '{}'. "
-                     u"No update could be made.".format(args.parser_name))
-        update_tests(tester, input_files, args.parser_name)
+        tester.update_tests()
 
     # Add/update test cases for specified input files and specified parser
     elif args.parser_name and not args.delete and input_files:
-        update_tests(tester, input_files, args.parser_name)
+        for file_path in input_files:
+            tester.add_test(file_path)
 
     # Run test cases
     else:
@@ -329,27 +321,6 @@ def main():
 
         print("All Passed = {0}\n".format(all_passed))
         exit(0 if all_passed else 1)
-
-
-def update_tests(tester, input_files, parser_name):
-    """Updates the test cases for given input files and parser_name."""
-    logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
-    results_file_path = tester.get_results_filepath(parser_name)
-    for input_file in input_files:
-        metadata = tester.gen_results(
-            parser_name=parser_name, input_file_path=input_file)
-        if metadata:
-            # TODO: Now that parsers can produce warning messages, we need to allow errors
-            # or move warning messages to debug.
-            if not tester.reporter.errors:
-                print(u"Updating results for {} in {}".format(input_file, results_file_path))
-                tester._update_test_results(results_file_path=results_file_path,
-                                            results_data=metadata,
-                                            replace=True)
-            else:
-                sys.exit(u"Error occurred for {} in {}, not updating".format(input_file, results_file_path))
-        else:
-            sys.exit(u"Empty results for {} in {}, not updating".format(input_file, results_file_path))
 
 
 def read_input_list(filename):

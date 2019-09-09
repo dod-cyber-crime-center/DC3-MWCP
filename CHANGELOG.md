@@ -4,11 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Simple HTML interface with mwcp server. 
+
 ### Changed
 - The `outputfiles` attribute in `mwcp.Reporter` has been removed. 
 Instead, the output file path will be returned by `output_file()`.
-- All output filenames now include the first 5 digits of it's md5 and are 
+- All output filenames now include the first 5 digits of its md5 and are
 converted to file system safe names.
+- Configuration is now set using a yaml file located within the user's profile directory.
+    - This file can be modified by running `mwcp config`.
+- Input file paths in test cases now support environment variable expansion. 
+- Input file paths in test cases can include `{MALWARE_REPO}` which will be replaced
+by the currently set malware repository path.
+- Using `mwcp test Foo --add=...` to a add file that already exists in the test cases will no
+longer cause the test case to be updated. This must be explicitly allowed by also adding the `--update` flag.
+- Added `mwcp serve` command to run mwcp server.
+- mwcp server is now implemented with Flask instead of Bottle.
+    - If using the server as a WSGI app, the app instance must be created with
+      the factory function `mwcp.tools.server.create_app()`.
+
+### Deprecated
+- Setting configuration using environment variables is deprecated. Please use the configuration file instead.
 
 ### Removed
 - Removed support for adding a prefix to output files.

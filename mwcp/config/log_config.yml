@@ -32,6 +32,13 @@ handlers:
   null_handler:
     class: logging.NullHandler
 
+  mwcp_server:
+    (): mwcp.utils.logutil.ListHandler
+    level: INFO
+    filters: [level_char]
+    formatter: simple
+    entries: 1000
+
 root:
   level: INFO
-  handlers: [console, error_file]
+  handlers: [console, error_file, mwcp_server]

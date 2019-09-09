@@ -52,15 +52,13 @@ def multiproc_test_wrapper(args):
 class Tester(object):
     """DC3-MWCP Tester class"""
 
-    def __init__(self, reporter, results_dir=None, parser_names=None, nprocs=None,
+    def __init__(self, reporter, parser_names=None, nprocs=None,
                  field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
         """
 
         Run tests and compare produced results to expected results.
 
         :param mwcp.Reporter reporter: MWCP reporter object
-        :param str results_dir: Directory of json test cases
-                (defaults to dynamically pulling from a "tests" folder within parser's directory.)
         :param [str] parser_names:
                 A list of parser names to run tests for. If the list is empty (default),
                 then test cases for all parsers will be run.
@@ -71,7 +69,6 @@ class Tester(object):
         :param int nprocs: Number of processes to use. (defaults to (3*num_cores)/4)
         """
         self.reporter = reporter
-        self.results_dir = results_dir
         self.parser_names = parser_names or [None]
         self.field_names = field_names or []
         self.ignore_field_names = ignore_field_names
@@ -117,14 +114,7 @@ class Tester(object):
                     full_parser_name = '{}:{}'.format(source.name, parser.name)
                     results_file_path = self.get_results_filepath(full_parser_name)
                     if os.path.isfile(results_file_path):
-                        for expected_results in self.parse_results_file(results_file_path):
-                            # Add results_file_path for relative paths.
-                            # NOTE: os.path.join will ignore the prefix we add if the second is not relative.
-                            input_file_path = expected_results[INPUT_FILE_PATH]
-                            input_file_path = os.path.join(os.path.dirname(results_file_path), input_file_path)
-                            input_file_path = os.path.abspath(input_file_path)
-                            expected_results[INPUT_FILE_PATH] = input_file_path
-
+                        for expected_results in self.read_results_file(results_file_path):
                             self._test_cases.append(TestCase(
                                 self.reporter, full_parser_name, expected_results,
                                 field_names=self.field_names, ignore_field_names=self.ignore_field_names))
@@ -154,25 +144,23 @@ class Tester(object):
         self.reporter.metadata[INPUT_FILE_PATH] = convert_to_unicode(input_file_path)
         return self.reporter.metadata
 
-    def list_test_files(self, parser_name):
+    def _list_test_files(self, results_list):
         """
-        Generate list of files (test cases) for parser
+        Returns a list of the input file paths for the given results_list.
         """
-        filelist = []
-        for metadata in self.parse_results_file(self.get_results_filepath(parser_name)):
-            filelist.append(metadata[INPUT_FILE_PATH])
-        return filelist
+        return [results[INPUT_FILE_PATH] for results in results_list]
 
     def get_results_filepath(self, name, source=None):
         """
         Returns the results file path based on the parser name provided and the
-        previously specified output directory.
+        set testcase directory.
         """
         for source, parser in mwcp.iter_parsers(name, source=source):
             file_name = parser.name + FILE_EXTENSION
-            # Use hardcoded results dir if requested.
-            if self.results_dir:
-                return os.path.join(self.results_dir, file_name)
+            # Use hardcoded testcase directory if set.
+            testcase_dir = mwcp.config.get('TESTCASE_DIR')
+            if testcase_dir:
+                return os.path.join(testcase_dir, file_name)
 
             if source.is_pkg:
                 # Dynamically pull based on parser's top level module.
@@ -185,18 +173,53 @@ class Tester(object):
 
         raise ValueError('Invalid parser: {}'.format(name))
 
-    def parse_results_file(self, results_file_path):
+    def read_results_file(self, results_file_path):
         """
-        Parses and validates the the JSON results file and returns the parsed data.
+        Parses and validates the JSON results file and returns the parsed results_dict.
         """
-        with open(results_file_path) as results_file:
-            data = json.load(results_file)
+        if not os.path.exists(results_file_path):
+            results_dict = []
+        else:
+            with open(results_file_path) as results_file:
+                results_dict = json.load(results_file)
 
-        # The results file data is expected to be a list of metadata dictionaries
-        if not isinstance(data, list) or not all(isinstance(a, dict) for a in data):
+        # The results file results_dict is expected to be a list of metadata dictionaries
+        if not isinstance(results_dict, list) or not all(isinstance(a, dict) for a in results_dict):
             raise ValueError('Results file is invalid: {}'.format(results_file_path))
 
-        return data
+        # Resolve input file paths.
+        for testcase in results_dict:
+            input_file_path = testcase[INPUT_FILE_PATH]
+            # expand environment variables
+            input_file_path = os.path.expandvars(input_file_path)
+            # resolve variables
+            input_file_path = input_file_path.format(MALWARE_REPO=mwcp.config.get('MALWARE_REPO', ''))
+            # make relative paths relative to json file
+            input_file_path = os.path.join(os.path.dirname(results_file_path), input_file_path)
+            input_file_path = os.path.abspath(input_file_path)
+            testcase[INPUT_FILE_PATH] = input_file_path
+
+        return results_dict
+
+    def write_results_file(self, results_list, file_path):
+        """
+        Saves the JSON results list to the given file path.
+        :param list[dict] results_list: JSON results list to save
+        :param str file_path: Path to save the results JSON file.
+        """
+        # Replace references to the malware repo with a variable.
+        malware_repo = mwcp.config.get('MALWARE_REPO', None)
+        if malware_repo:
+            for results in results_list:
+                input_file_path = results[INPUT_FILE_PATH]
+                if input_file_path.startswith(malware_repo):
+                    input_file_path = '{MALWARE_REPO}' + input_file_path[len(malware_repo):]
+                results[INPUT_FILE_PATH] = input_file_path
+
+        # Write updated data to results file
+        # NOTE: We need to use dumps instead of dump to avoid TypeError.
+        with open(file_path, 'w', encoding='utf8') as results_file:
+            results_file.write(str(json.dumps(results_list, indent=4, sort_keys=True)))
 
     def update_tests(self):
         """
@@ -210,29 +233,60 @@ class Tester(object):
                 if not os.path.isfile(results_file_path):
                     logger.warning('No test case file found for parser: {}')
                     continue
-                for input_file in self.list_test_files(parser_name):
-                    metadata = self.gen_results(parser_name, input_file)
-                    if not metadata:
-                        logger.warning('Empty results for {} in {}, not updating.'.format(input_file, results_file_path))
-                    if not self.reporter.errors:
-                        logger.info('Updating results for {} in {}'.format(input_file, results_file_path))
-                        self._update_test_results(results_file_path, metadata, replace=True)
+                results_list = self.read_results_file(results_file_path)
+                for index, file_path in enumerate(self._list_test_files(results_list)):
+                    new_results = self.gen_results(parser_name, file_path)
+                    if not new_results:
+                        logger.warning('Empty results for {} in {}, not updating.'.format(file_path, results_file_path))
+                        continue
+                    if self.reporter.errors:
+                        logger.warning('Results for {} has errors, not updating.'.format(file_path))
+                        continue
+
+                    logger.info('Updating results for {} in {}'.format(file_path, results_file_path))
+                    results_list[index] = new_results
+
+                self.write_results_file(results_list, results_file_path)
         finally:
             logging.root.setLevel(orig_level)
 
-    def add_test(self, file_path):
-        """Adds test case for given file path."""
+    def add_test(self, file_path, update=False):
+        """
+        Adds test case for given file path.
+
+        :param str file_path: Path to input file to add.
+        :param bool update: Whether to allow updating the test case if a test for this file already exists.
+        """
         orig_level = logging.root.level
         logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
         try:
             for parser_name in self.parser_names:
                 results_file_path = self.get_results_filepath(parser_name)
-                metadata = self.gen_results(parser_name, file_path)
-                if not metadata:
+                results_list = self.read_results_file(results_file_path)
+                input_files = self._list_test_files(results_list)
+                if file_path in input_files and not update:
+                    logger.warning(
+                        'Test case for {} already exists in {}'.format(file_path, results_file_path))
+                    continue
+
+                new_results = self.gen_results(parser_name, file_path)
+                file_path = new_results[INPUT_FILE_PATH]  # Replace with unicode file path.
+                if not new_results:
                     logger.warning('Empty results for {} in {}, not adding.'.format(file_path, results_file_path))
-                if not self.reporter.errors:
+                    continue
+                if self.reporter.errors:
+                    logger.warning('Results for {} has errors, not adding.'.format(file_path))
+                    continue
+
+                if file_path in input_files:
+                    logger.info('Updating results for {} in {}'.format(file_path, results_file_path))
+                    index = input_files.index(file_path)
+                    results_list[index] = new_results
+                else:
                     logger.info('Adding results for {} in {}'.format(file_path, results_file_path))
-                    self._update_test_results(results_file_path, metadata, replace=True)
+                    results_list.append(new_results)
+
+                self.write_results_file(results_list, results_file_path)
         finally:
             logging.root.setLevel(orig_level)
 
@@ -240,69 +294,17 @@ class Tester(object):
         """Removes test case for given file path."""
         for parser_name in self.parser_names:
             results_file_path = self.get_results_filepath(parser_name)
-            results_file_data = []
-            for metadata in self.parse_results_file(results_file_path):
-                if metadata["inputfilename"] == file_path:
+            results_list = []
+            removed = False
+            for results in self.read_results_file(results_file_path):
+                if results[INPUT_FILE_PATH] == file_path:
                     logger.info('Removed results for {} in {}'.format(file_path, results_file_path))
+                    removed = True
                 else:
-                    results_file_data.append(metadata)
+                    results_list.append(results)
 
-            with open(results_file_path, 'w', encoding='utf8') as results_file:
-                results_file.write(str(json.dumps(results_file_data, indent=4, sort_keys=True)))
-
-    def _update_test_results(self, results_file_path, results_data, replace=True):
-        """
-        Update results in the results file with the passed in results data. If the
-        file path for the results data matches a file path that is already found in
-        the passed in results file, then the replace argument comes into play to
-        determine if the record should be replaced.
-        """
-
-        # The results data is expected to be a dictionary representing results
-        # for a single file
-        assert isinstance(results_data, dict)
-
-        if os.path.isfile(results_file_path):
-            results_file_data = self.parse_results_file(results_file_path)
-
-            # Check if there is a duplicate file path already in the results
-            # path
-            for index, metadata in enumerate(results_file_data):
-                if metadata[INPUT_FILE_PATH] == results_data[INPUT_FILE_PATH]:
-                    if replace:
-                        results_file_data[index] = results_data
-                    break
-            else:
-                # If no duplicate found, then append the passed in results data to
-                # existing results
-                results_file_data.append(results_data)
-        else:
-            # Results file should be a list of metadata dictionaries
-            results_file_data = [results_data]
-
-        # Write updated data to results file
-        # NOTE: We need to use dumps instead of dump to avoid TypeError.
-        with open(results_file_path, 'w', encoding='utf8') as results_file:
-            results_file.write(str(json.dumps(results_file_data, indent=4, sort_keys=True)))
-
-    def remove_test_results(self, parser_name, filenames):
-        """
-        remove filenames from test cases for parser_name
-
-        return files that were removed
-        """
-        removed_files = []
-        results_file_data = []
-        for metadata in self.parse_results_file(self.get_results_filepath(parser_name)):
-            if metadata[INPUT_FILE_PATH] in filenames:
-                removed_files.append(metadata[INPUT_FILE_PATH])
-            else:
-                results_file_data.append(metadata)
-
-        with open(self.get_results_filepath(parser_name), 'w', encoding='utf8') as results_file:
-            results_file.write(str(json.dumps(results_file_data, indent=4, sort_keys=True)))
-
-        return removed_files
+            if removed:
+                self.write_results_file(results_list, results_file_path)
 
 
 class TestCase(object):

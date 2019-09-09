@@ -17,6 +17,7 @@ try:
 except ImportError:
     import pathlib2 as pathlib
 
+import mwcp
 from mwcp import cli
 
 
@@ -132,7 +133,8 @@ def test_get_malware_repo_path(tmpdir):
     test_file = tmpdir / 'test.txt'
     test_file.write_binary(b'This is some test data!')
 
-    sample_path = cli._get_malware_repo_path(str(test_file), str(malware_repo))
+    mwcp.config['MALWARE_REPO'] = str(malware_repo)
+    sample_path = cli._get_malware_repo_path(str(test_file))
     assert sample_path == str(malware_repo / 'fb84' / 'fb843efb2ffec987db12e72ca75c9ea2')
 
 
@@ -142,7 +144,8 @@ def test_add_to_malware_repo(tmpdir):
     test_file = tmpdir / 'test.txt'
     test_file.write_binary(b'This is some test data!')
 
-    sample_path = cli._add_to_malware_repo(str(test_file), str(malware_repo))
+    mwcp.config['MALWARE_REPO'] = str(malware_repo)
+    sample_path = cli._add_to_malware_repo(str(test_file))
     expected_sample_path = malware_repo / 'fb84' / 'fb843efb2ffec987db12e72ca75c9ea2'
     assert sample_path == str(expected_sample_path)
     assert expected_sample_path.exists()
@@ -313,7 +316,7 @@ def test_add_testcase(tmpdir, script_runner):
     # Ensure the test case was created correctly.
     test_case_file = test_case_dir / 'foo.json'
     assert test_case_file.exists()
-    assert json.loads(test_case_file.read_text('utf8')) == [
+    expected_results = [
         {
             u"debug": [
                 u"[+] File {} identified as Foo.".format(test_sample.basename),
@@ -330,12 +333,47 @@ def test_add_testcase(tmpdir, script_runner):
                     u"5eb63bbbe01eeed093cb22bb8f5acdc3"
                 ]
             ],
-            u'inputfilename': u'{}'.format(str(test_sample)),
+            u'inputfilename': u'{MALWARE_REPO}\\fb84\\fb843efb2ffec987db12e72ca75c9ea2',
             u"address": [
                 u"127.0.0.1"
             ]
         }
     ]
+    assert json.loads(test_case_file.read_text('utf8')) == expected_results
+
+    # Now test that it ignores a second add of the same file.
+    ret = script_runner.run(
+        'mwcp', 'test', 'foo',
+        '--testcase-dir', str(test_case_dir),
+        '--malware-repo', str(malware_repo),
+        '--add', str(test_file)
+    )
+    print(ret.stdout)
+    print(ret.stderr, file=sys.stderr)
+    assert ret.success
+    assert ret.stderr.splitlines()[-1] == (
+        '[-] (MainProcess:mwcp.tester): Test case for {test_sample} already exists in {test_case_file}'
+    ).format(test_sample=str(test_sample), test_case_file=str(test_case_file))
+    assert json.loads(test_case_file.read_text('utf8')) == expected_results
+
+    # Now test force updating the results.
+    ret = script_runner.run(
+        'mwcp', 'test', 'foo',
+        '--testcase-dir', str(test_case_dir),
+        '--malware-repo', str(malware_repo),
+        '--update',
+        '--add', str(test_file)
+    )
+    print(ret.stdout)
+    print(ret.stderr, file=sys.stderr)
+    assert ret.success
+    # Since it would be too hard to dynamically change what the parser does, just ensure
+    # we get the right stderr and the testcase hasn't changed.
+    assert ret.stderr.splitlines()[-1] == (
+        '[+] (MainProcess:mwcp.tester): Updating results for {test_sample} in {test_case_file}'
+    ).format(test_sample=str(test_sample), test_case_file=str(test_case_file))
+    assert json.loads(test_case_file.read_text('utf8')) == expected_results
+
 
     # Now test the deletion of the test case.
     ret = script_runner.run(
@@ -394,4 +432,4 @@ def test_add_filelist_testcase(tmpdir, script_runner):
         test_sample = malware_repo / md5[:4] / md5
         assert test_sample.exists()
         assert hashlib.md5(test_sample.read_binary()).hexdigest() == md5
-        assert str(test_sample) in input_files
+        assert '{{MALWARE_REPO}}\\{}\\{}'.format(md5[:4], md5) in input_files

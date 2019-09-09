@@ -1,0 +1,27 @@
+
+# Path to logging configuration file.
+LOG_CONFIG_PATH: "./log_config.yml"
+
+# Overwrites the directory containing JSON test case files for all parsers.
+# If not set, the "tests" directory located within the root directory of the respective parser source
+# will be used.
+#TESTCASE_DIR: "~/mwcp_tests"
+
+# Directory containing malware samples used for testing.
+# If set, this path will be available by adding "{MALWARE_REPO}" to the inputfile field.
+# e.g.  "inputfile":  "{MALWARE_REPO}/5d41/5d41402abc4b2a76b9719d911017c592"
+#MALWARE_REPO: "~/malware_repo"
+
+# Optional extra parser directory to use along with registered parser extension.
+# This allows you so use a directory of parsers that aren't officially part of any python package.
+#PARSER_DIR: "~/mwcp_parsers"
+
+# Path to the parser_config.yml file to use for the provided extra parser directory above.
+# If this is not set, the "config" attribute in the __init__.py of the parser's directory is used instead.
+# This must be set if the parser directory doesn't have an __init__.py file!
+#PARSER_CONFIG_PATH: "~/mwcp_parsers/parser_config.yml"
+
+# Name (or path) of a default parser source to use if not explicitly defined.
+# If this is not set, all sources will be considered.
+# (This is useful for enforcing parsers of only a specific source to be used)
+#PARSER_SOURCE: "acme"

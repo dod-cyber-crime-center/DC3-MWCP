@@ -6,6 +6,7 @@ import logging
 logging.getLogger().addHandler(logging.NullHandler())
 
 
+from mwcp.config import _config as config
 from mwcp.parser import Parser
 from mwcp.file_object import FileObject
 from mwcp.registry import (

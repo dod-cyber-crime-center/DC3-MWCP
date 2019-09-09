@@ -17,9 +17,11 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
 import timeit
 import traceback
+import warnings
 
 import click
 import six
@@ -37,16 +39,39 @@ logger = logging.getLogger('mwcp')
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
 @click.option('-d', '--debug', is_flag=True, help="Enables DEBUG level logs.")
 @click.option('-v', '--verbose', is_flag=True, help="Enables INFO level logs.")
+@click.option('-c', '--config', 'config_path', type=click.Path(exists=True, dir_okay=False),
+              help='File path to configuration file.', default=mwcp.config.user_path, show_default=True,
+              envvar='MWCP_CONFIG', show_envvar=True)
 @click.option('--parser-dir', type=click.Path(exists=True, file_okay=False),
               help="Optional extra parser directory.",
-              envvar='MWCP_PARSER_DIR', show_envvar=True)
+              envvar='MWCP_PARSER_DIR')
 @click.option('--parser-config', type=click.Path(exists=True, dir_okay=False),
               help="Optional parser configuration file to use with extra parser directory.",
-              envvar='MWCP_PARSER_CONFIG', show_envvar=True)
+              envvar='MWCP_PARSER_CONFIG')
 @click.option('--parser-source',
               help="Set a default parsers source to use. If not provided parsers from all sources will be available.",
-              envvar='MWCP_PARSER_SOURCE', show_envvar=True)
-def main(debug, verbose, parser_dir, parser_config, parser_source):
+              envvar='MWCP_PARSER_SOURCE')
+def main(debug, verbose, config_path, parser_dir, parser_config, parser_source):
+    if (parser_dir and parser_dir == os.getenv('MWCP_PARSER_DIR')) \
+            or (parser_config and parser_config == os.getenv('MWCP_PARSER_CONFIG')) \
+            or (parser_source and parser_source == os.getenv('MWCP_PARSER_SOURCE')):
+        warnings.warn(
+            'Setting parser directory, parser config or parser source'
+            ' through an environment variable is deprecated. '
+            'Please set these values in the configuration file or in the command line.')
+
+    # Setup configuration
+    mwcp.config.load(config_path)
+    if parser_dir:
+        mwcp.config['PARSER_DIR'] = parser_dir
+    parser_dir = mwcp.config.get('PARSER_DIR')
+    if parser_config:
+        mwcp.config['PARSER_CONFIG_PATH'] = parser_config
+    parser_config = mwcp.config.get('PARSER_CONFIG_PATH')
+    if parser_source:
+        mwcp.config['PARSER_SOURCE'] = parser_source
+    parser_source = mwcp.config.get('PARSER_SOURCE')
+
     # Setup logging
     mwcp.setup_logging()
     if debug:
@@ -59,9 +84,42 @@ def main(debug, verbose, parser_dir, parser_config, parser_source):
     mwcp.register_entry_points()
     if parser_dir:
         mwcp.register_parser_directory(parser_dir, config_file_path=parser_config)
-
     if parser_source:
         mwcp.set_default_source(parser_source)
+
+
+@main.command()
+@click.option('--host', default='127.0.0.1', show_default=True, help="The interface to bind to.")
+@click.option('--port', default=8080, show_default=True, help="The port to bind to.")
+@click.option(
+    '--debug', is_flag=True,
+    help="Show the interactive debugger if errors occur.")
+def serve(host, port, debug):
+    """Run a server to handle parsing requests."""
+    from mwcp.tools import server
+
+    if debug:
+        os.environ['FLASK_ENV'] = 'development'
+
+    app = server.create_app()
+    app.run(host=host, port=port, debug=debug, use_reloader=False)
+
+
+@main.command()
+def config():
+    """Opens up configuration file for editing."""
+    file_path = mwcp.config.user_path
+    if sys.platform == 'win32':
+        try:
+            os.startfile(file_path, 'edit')
+        except WindowsError:
+            os.startfile(file_path)
+    else:
+        opener = 'open' if sys.platform == 'darwin' else 'xdg-open'
+        subprocess.call([opener, file_path])
+
+    # TODO: Add a "-u" flag to this command when we need to update the user's configuration file
+    # with new fields.
 
 
 @main.command('list')
@@ -227,7 +285,7 @@ def parse(parser, input, format, output_dir, output_files, cleanup, include_file
         mwcp parse foo ./malware.bin                          - Run foo parser on ./malware.bin
         mwcp parse foo ./repo/*                               - Run foo parser on files found in repo directory.
         mwcp parse -f json foo ./malware.bin                  - Run foo parser and display results as json.
-        mwcp parse -f csv foo ./malware.bin > ./results.csv   - Run foo parser and output results as a csv file.
+        mwcp parse -f csv foo ./repo/* > ./results.csv        - Run foo parser on a directory and output results as a csv file.
     """
     # Python won't process wildcards when used through Windows command prompt.
     if any('*' in path for path in input):
@@ -272,25 +330,27 @@ def parse(parser, input, format, output_dir, output_files, cleanup, include_file
         sys.exit(1)
 
 
-def _get_malware_repo_path(file_path, malware_repo):
+def _get_malware_repo_path(file_path):
     """
     Gets file path for a file in the malware_repo based on the md5 of the given file_path.
     """
+    if not mwcp.config.get('MALWARE_REPO'):
+        raise ValueError('Malware Repository not set.')
     with open(file_path, 'rb') as fo:
         md5 = hashlib.md5(fo.read()).hexdigest()
-    return os.path.join(malware_repo, md5[0:4], md5)
+    return os.path.join(mwcp.config['MALWARE_REPO'], md5[0:4], md5)
 
 
-def _add_to_malware_repo(file_path, malware_repo):
+def _add_to_malware_repo(file_path):
     """
     Adds the given file path to the malware repo.
     Returns resulting destination path.
     """
-    dest_path = _get_malware_repo_path(file_path, malware_repo)
+    dest_path = _get_malware_repo_path(file_path)
     dest_dir = os.path.dirname(dest_path)
 
     if os.path.isfile(dest_path):
-        click.echo('File already exists: {}'.format(dest_path))
+        click.echo('File already exists in malware repo: {}'.format(dest_path))
         return dest_path
 
     if not os.path.exists(dest_dir):
@@ -430,15 +490,18 @@ def _run_tests(tester, silent=False, show_passed=False):
 @click.option('-t', '--testcase-dir', type=click.Path(exists=True, file_okay=False),
               help='Directory containing JSON test case files. (defaults to a '
                    '"tests" directory located within the root of the parsers directory)',
-              envvar='MWCP_TESTCASE_DIR', show_envvar=True)
+              envvar='MWCP_TESTCASE_DIR')
 @click.option('-m', '--malware-repo', type=click.Path(exists=True, file_okay=False),
               help='Directory containing malware samples used for testing.',
-              envvar='MWCP_MALWARE_REPO', show_envvar=True)
+              envvar='MWCP_MALWARE_REPO')
 # Arguments used for run test cases.
 @click.option('-n', '--nprocs', type=int,
               help='Number of test cases to run simultaneously. [default: 3/4 * logical CPU cores]')
 # Arguments used to generate and update test cases
-@click.option('-u', '--update', is_flag=True, help='Update all stored test cases with newly produced results.')
+@click.option('-u', '--update', is_flag=True,
+              help='Update all stored test cases with newly produced results. '
+                   'If used with the --add option, this allows the test cases for the added files to '
+                   'be updated if the file already exists in the test case.')
 @click.option('-a', '--add', multiple=True, type=click.Path(exists=True, dir_okay=False),
               help='Adds given file to the test case. (Will first copy file to malware repo if provided.)')
 @click.option('-i', '--add-filelist', multiple=True, type=click.Path(exists=True, dir_okay=False),
@@ -470,14 +533,26 @@ def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
         mwcp test foo -u                                      - Update existing test cases for foo parser.
         mwcp test -u                                          - Update existing test cases for all parsers.
         mwcp test foo --add=./malware.bin                     - Add test case for malware.bin sample for foo parser.
+        mwcp test foo -u --add=./malware.bin                  - Add test case for malware.bin sample.
+                                                                Allow updating if a test case for this file already exists.
         mwcp test foo --add-filelist=./paths.txt              - Add tests cases for foo parser using text file of paths.
         mwcp test foo --delete=./malware.bin                  - Delete test case for malware.bin sample for foo parser.
     """
+    if (testcase_dir and testcase_dir == os.getenv('MWCP_TESTCASE_DIR')) \
+            or (malware_repo and malware_repo == os.getenv('MWCP_MALWARE_REPO')):
+        warnings.warn(
+            'Setting testcase directory or malware repo through an environment variable is deprecated. '
+            'Please set these values in the configuration file or in the command line.')
+    # Overwrite configuration with command line flags.
+    if testcase_dir:
+        mwcp.config['TESTCASE_DIR'] = testcase_dir
+    if malware_repo:
+        mwcp.config['MALWARE_REPO'] = malware_repo
+
     # Configure test object
     reporter = mwcp.Reporter(disable_output_files=True)
     tester = Tester(
         reporter=reporter,
-        results_dir=testcase_dir,
         parser_names=parser or [None],
         nprocs=nprocs,
     )
@@ -497,13 +572,13 @@ def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
                     add.append(file_path.rstrip('\n'))
 
         for file_path in add:
-            if malware_repo:
-                file_path = _add_to_malware_repo(file_path, malware_repo)
-            tester.add_test(file_path)
+            if mwcp.config.get('MALWARE_REPO'):
+                file_path = _add_to_malware_repo(file_path)
+            tester.add_test(file_path, update=update)
 
         for file_path in delete:
-            if malware_repo:
-                file_path = _get_malware_repo_path(file_path, malware_repo)
+            if mwcp.config.get('MALWARE_REPO'):
+                file_path = _get_malware_repo_path(file_path)
             tester.remove_test(file_path)
 
     # Update

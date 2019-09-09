@@ -19,6 +19,7 @@ from mwcp.dispatcher import Dispatcher
 logger = logging.getLogger(__name__)
 
 Source = namedtuple('Source', ('name', 'path', 'config', 'is_pkg'))
+ParserInfo = namedtuple('ParserInfo', ('name', 'source', 'author', 'description'))
 
 
 # Set of parser sources mapped to configuration files.
@@ -322,5 +323,5 @@ def get_parser_descriptions(name=None, source=None, config_only=True):
     descriptions = []
     for _source, parser in iter_parsers(
             name=name, source=source, config_only=config_only, _recursive=False):
-        descriptions.append((parser.name, _source.name, parser.AUTHOR, parser.DESCRIPTION))
+        descriptions.append(ParserInfo(parser.name, _source.name, parser.AUTHOR, parser.DESCRIPTION))
     return sorted(descriptions, key=lambda e: tuple(sub.lower() for sub in e))  # Case-insensitive sorting.

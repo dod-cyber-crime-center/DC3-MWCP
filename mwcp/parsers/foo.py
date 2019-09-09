@@ -29,7 +29,7 @@ class Foo(Parser):
         # also demonstrate use of pefile object
         if input_file.pe:
             self.reporter.add_metadata(
-                "other", {"section0": input_file.pe.sections[0].Name.rstrip('\x00')})
+                "other", {"section0": input_file.pe.sections[0].Name.rstrip(b'\x00')})
 
         # demonstrate file output
         self.reporter.output_file(

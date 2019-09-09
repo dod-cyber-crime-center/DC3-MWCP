@@ -138,8 +138,8 @@ of an DC3-MWCP parser.
 
 There are 3 options for integration of DC3-MWCP:
 - CLI: `mwcp`
-- REST API based on wsgi/bottle: `mwcp-server`, `mwcp-client`
-- python API
+- REST API: `mwcp serve`
+- Python API
 
 DC3-MWCP also includes a utility for test case generation and execution.
 
@@ -179,16 +179,21 @@ DC3-MWCP can be used as a web service. The REST API provides two commonly used f
 
 To use, first start the server by running:
 ```console
-> mwcp-server
+> mwcp serve
 ```
 
-Then you can either use `mwcp-client` or create REST requests.
+Then you can either use an HTTP client to create REST requests.
 
-Input:
+Using cURL:
 ```console
-> mwcp-client --host=localhost:8080 --parser=foo README.md
-# OR
 > curl --form data=@README.md http://localhost:8080/run_parser/foo
+```
+
+Using Python requests:
+```python
+import requests
+req = requests.post("http://localhost:8080/run_parser/foo", files={'data': open("README.md", 'rb')})
+req.json()
 ```
 
 Output:
@@ -219,6 +224,9 @@ le-n4mw7uw3\n\n----Output Files----\n\nfooconfigtest.txt    example output file\
 }
 ```
 
+A simple HTML interface is also available at the same address. By default this
+is `http://localhost:8080/`. Individual samples can be submitted and results
+saved as JSON, plain text, or ZIP archives.
 
 ### Python API
 DC3-MWCP can be run directly from Python.
@@ -258,12 +266,32 @@ reporter.run_parser("foo", data="lorem ipsum")
 reporter.print_report()
 ```
 
+## Configuration
+DC3-MWCP uses a configuration file which is located within the user's 
+profile directory. (`%APPDATA%\Local\mwcp\config.yml` for Windows or `~/.config/mwcp/config.yml` for Linux)
+
+This configuration file is used to manage configurable parameters, such as the location
+of the malware repository used for testing or the default parser source.
+
+To configure this file, run `mwcp config` to open up the file in your default text
+editor.
+
+An alternative configuration file can also be temporarily set using the `--config` parameter.
+```console
+> mwcp --config='new_config.yml' test Foo
+```
+
+Individual configuration parameters can be overwritten on the command line using the respective parameter.
+
 
 ## Logging
 DC3-MWCP uses Python's builtin in `logging` module to log all messages.
 By default, logging is configured using the [log_config.yml](mwcp/config/log_config.yml) configuration
-file. Which is currently set to log all messages to the console and error messages to `%LOCALAPPDATA%/mwcp/errors.log`. You can provide your own custom log configuration file by adding the path
-to the environment variable `MWCP_LOG_CFG`. (Please see [Python's documentation](http://docs.python.org/dev/library/logging.config.html) for more information on how to write your own configuration file.)
+file. Which is currently set to log all messages to the console and error messages to `%LOCALAPPDATA%/mwcp/errors.log`. 
+
+You can provide your own custom log configuration file by adding the path
+to the configuration parameter `LOG_CONFIG_PATH`. 
+(Please see [Python's documentation](http://docs.python.org/dev/library/logging.config.html) for more information on how to write your own configuration file.)
 
 You may also use the `--verbose` or `--debug` flags to adjust the logging level when using the `mwcp` tool.
 
@@ -275,9 +303,9 @@ DC3-MWCP code updates are implemented to be backwards compatible.
 One exception to backwards compatibility is when new attributes are amended to previously existing
 fields. An example of this is the MD5 entry being amended to the 'outputfile' field. When attribute
 additions like this are made, it causes a backwards compatibility conflict with test cases. If
-`mwcp-test` is being used to manage regression tests, the amended attributes can cause previously
+`mwcp test` is being used to manage regression tests, the amended attributes can cause previously
 passing test cases to fail. To resolve this issue, work in an environment where parsers are in a known
-good state and run the command `mwcp-test -ua` to update all test cases. The newly generated test
+good state and run the command `mwcp test -u` to update all test cases. The newly generated test
 cases will include the updated field values.
 
 ## Schema

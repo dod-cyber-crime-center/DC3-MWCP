@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <form action="/run_parser" method="post" enctype="multipart/form-data">
+        <fieldset>
+        <label for="upload-file">File</label>
+        <input id="upload-file" type="file" name="data" required/>
+        <label for="parser">Parser</label>
+        <select id="parser" name="parser">
+        {% for parser in parsers %}
+            <option value="{{parser.name}}">{{parser.name}}</option>
+        {% endfor %}
+        </select>
+        <label for="options">Output Format</label>
+        <fieldset id="options">
+        <input id="request-text" type="radio" name="output" value="text" checked>
+        <label class="label-inline" for="request-text">Plain text</label>
+        <br>
+        <input id="request-json" type="radio" name="output" value="json">
+        <label class="label-inline" for="request-json">JSON</label>
+        <br>
+        <input id="request-zip" type="radio" name="output" value="zip">
+        <label class="label-inline" for="request-zip">ZIP</label>
+        </fieldset>
+        <input type="hidden" id="highlight" name="highlight" value="True">
+        <input type="submit" value="Upload">
+        </fieldset>
+    </form>
+{% endblock %}

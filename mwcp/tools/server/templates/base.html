@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <style type="text/css">
+        {{ extra_css|safe }}
+    </style>
+
+    <meta charset="UTF-8">
+    <title>{{ g.title + " |" if g.title else "" }} {{ config.get('SERVICE_NAME', 'DC3-MWCP Service') }}</title>
+</head>
+<body>
+<div class="container">
+    <div class="navbar">
+        <ul>
+            <li><a href="/">Home</a></li>
+            {% for link in config.get('MENU_LINKS', []) %}
+                <li><a href="{{ link.url or url_for(link.endpoint) }}">{{ link.name }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+    <h2>{{ g.title|default("DC3-MWCP Service") }}</h2>
+
+    {% block content %}{% endblock %}
+
+    <footer class='footer'>
+        {% block footer %}
+        <p>
+            {{ config.get('SERVICE_NAME', 'DC3-MWCP Service') }}.
+        </p>
+        {% endblock %}
+    </footer>
+</div>
+
+</body>
+</html>

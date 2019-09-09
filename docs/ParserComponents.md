@@ -43,7 +43,7 @@ for self.file_object as fo:
 You can report configuration data using `self.reporter`, which is an instance of a `mwcp.Reporter` class.
 
 You can add metadata via the `add_metadata(key, value)` function
-- `key` is the field name of the metadata item. This should be one of the standardized fields reported in [mwcp/resources/fields.json](../mwcp/resources/fields.json). (Hint: Run `mwcp-tool -k` to get a list of all fields.
+- `key` is the field name of the metadata item. This should be one of the standardized fields reported in [mwcp/resources/fields.json](../mwcp/resources/fields.json).
 - `value` is the actual value to report.
    - For a "listofstrings" type, this is simply the string to report.
    - For a "listofstringtuples" type, this is a tuple or list.

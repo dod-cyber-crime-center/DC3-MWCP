@@ -147,11 +147,11 @@ To use, add `--malware-repo` pointing to your repository when adding or deleting
 > mwcp test --malware-repo=X:\MalwareRepo foo -x ./malware.bin
 ```
 
-For more persistence, you can add the environment variable `MWCP_MALWARE_REPO` which points 
-to your malware repository. This will cause `--malware-repo` to automatically apply if not supplied. 
+This will cause the input file to be copied into the malware repository
+and the input file path within the test case will be appended with `{MALWARE_REPO}`.
+This allows for more portable test case files and prevents exposing internal file paths.
 
-```console
-> set MWCP_MALWARE_REPO="X:\MalwareRepo"
-> mwcp test foo -a ./malware.bin
-> mwcp test foo -x ./malware.bin
-```
+
+For more persistence, you can add the malware repository path to the configuration parameter `MALWARE_REPO`.
+(Run `mwcp config`). This will cause `--malware-repo` to automatically apply if not supplied. 
+

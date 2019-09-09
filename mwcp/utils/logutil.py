@@ -1,19 +1,19 @@
 """Utilities for setting up logging."""
-
+import copy
 import errno
 import logging.config
 import logging.handlers
 import multiprocessing as mp
 import os
-import warnings
 import sys
 import threading
 import traceback
+import warnings
+from collections import deque
 
 import yaml
 
-import mwcp.config as mwcp_config
-
+import mwcp
 
 # Queue used to send over log messages from child to main process.
 # (See mwcp.utils.multi_proc for its use.)
@@ -87,6 +87,56 @@ class MPChildHandler(logging.Handler):
         self.queue.put(record)
 
 
+class ListHandler(logging.Handler):
+    """
+    Log to a list, with an optional maximum number of records to store.
+
+    Full records are available with the `records` property, and messages (i.e.
+    the text of the log entry) at available with the `messages` property.
+    """
+
+    def __init__(self, entries=None):
+        """
+        Behaves essentially identical to any other handler.
+
+        The only option is max_entries, to specify the max number of log
+        entries kept. By default, no limit.
+
+        :param int entries: Maximum number of records to store.
+        """
+        super(ListHandler, self).__init__()
+
+        self._deque = deque(maxlen=entries)
+
+    def __copy__(self):
+        new_handler = ListHandler()
+        # Actually copy the deque, otherwise we'll get double entries
+        new_handler._deque = copy.copy(self._deque)
+        return new_handler
+
+    def emit(self, record):
+        msg = self.format(record)
+        record.formatted_msg = msg
+        self._deque.append(record)
+
+    def clear(self):
+        return self._deque.clear()
+
+    @property
+    def records(self):
+        """
+        List of the last `max_entries` records logged.
+        """
+        return list(self._deque)
+
+    @property
+    def messages(self):
+        """
+        List of the last `max_entries` formatted messages logged.
+        """
+        return [record.formatted_msg for record in self._deque]
+
+
 def start_listener():
     """Start the listener thread for multi-process logging."""
     if mp.current_process().name != 'MainProcess':
@@ -117,13 +167,21 @@ def setup_logging(default_level=logging.INFO, queue=None):
         logging.root.setLevel(logging.DEBUG)  # Allow all records to pass through.
     else:
         # Allow setting log configuration using 'MWCP_LOG_CFG' environment variable.
-        log_config = os.getenv('MWCP_LOG_CFG', mwcp_config.LOG_CONFIG_PATH)
-        try:
-            with open(log_config, 'rt') as f:
-                config = yaml.safe_load(f.read())
-            logging.config.dictConfig(config)
-        except IOError as e:
-            warnings.warn('Unable to set log config file: {} with error: {}'.format(log_config, e))
+        log_config = os.getenv('MWCP_LOG_CFG', None)
+        if log_config is None:
+            log_config = mwcp.config.get('LOG_CONFIG_PATH', None)
+        else:
+            warnings.warn('Using MWCP_LOG_CFG to set log configuration is deprecated. '
+                          'Please specify path in the configuration file instead.')
+        if log_config:
+            try:
+                with open(log_config, 'rt') as f:
+                    config = yaml.safe_load(f.read())
+                logging.config.dictConfig(config)
+            except IOError as e:
+                warnings.warn('Unable to set log config file: {} with error: {}'.format(log_config, e))
+                logging.basicConfig(level=default_level)
+        else:
             logging.basicConfig(level=default_level)
 
         # Startup queue listener if we are in the main process.

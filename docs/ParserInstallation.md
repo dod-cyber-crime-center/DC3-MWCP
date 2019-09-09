@@ -46,14 +46,8 @@ If you don't include the `--all` flag, you will notice that your parsers are not
 This is because, by default, DC3-MWCP will only list parser groups defined in a parser configuration file.
 To create a parser group, please see the next section.
 
-For more persistence, you can add the environment variable `MWCP_PARSER_DIR` which points 
-to your parser directory. This will cause `--parser-dir` to automatically apply if not supplied. 
-
-```console
-> set MWCP_PARSER_DIR="C:\my_parsers"
-> mwcp parse Foo.Implant ./malware.bin
-> mwcp list --all
-```
+For more persistence, you can add the directory path to the configuration parameter `PARSER_DIR`.
+(Run `mwcp config`). This will cause `--parser-dir` to automatically apply if not supplied. 
 
 
 ## Grouping Parsers
@@ -62,7 +56,7 @@ parser. This was originally referred to as the "Dispatcher model".
 A parser group is comprised of a name, description, author, and list of parsers (or other parser groups) to run (in that order).
 
 Creating a group allows you to chain
-the processing of possible components the parser's could extract.
+the processing of possible components the parsers could extract.
 For example, if you have a malware family that comprises of a downloader, loader, implant, and could
 possibly be UPX packed.
 
@@ -85,7 +79,7 @@ This YAML file must be declared as the `config` attribute in the root `__init__.
 import os
 
 
-config = os.path.join(os.path.dirname(__file__), '.parser_config.yml')
+config = os.path.join(os.path.dirname(__file__), "parser_config.yml")
 ```
 
 
@@ -96,7 +90,7 @@ Foo:
     description: A Foo parser
     author: ACME
     parsers:
-        - .Downloader  # equivelent to "Foo.Downloader"
+        - .Downloader  # equivalent to "Foo.Downloader"
         - .Implant
 ```
 
@@ -148,7 +142,7 @@ some_root_dir/
 |   |- __init__.py
 |   |- parsers/
 |   |   |- __init__.py
-|   |   |- .parser_config.yml
+|   |   |- parser_config.yml
 |   |   |- baz.py
 |   |   |- foo.py
 |   |   |- tests/  # Tests should be found within the root of your parsers package with the name "tests"
@@ -156,7 +150,7 @@ some_root_dir/
 |   |   |   |- foo.json
 ```
 
-If you have a parser configuration file (`.parser_config.yml`). Make sure you include
+If you have a parser configuration file (`parser_config.yml`). Make sure you include
 the path to the file as the variable `config` in the `__init__.py` in the root parsers folder.
 
 
@@ -172,7 +166,7 @@ from setuptools import setup, find_packages
 
 
 setup(
-    name='mwcp-acme',
+    name='mwcp_acme',
     description='DC3-MWCP parsers developed by ACME inc.',
     version='1.0.0',
     packages=find_packages(),
@@ -230,14 +224,9 @@ the `--parser-source` flag to limit parsers to a single source.
 > mwcp --parser-source ACME parse foo <input>
 ```
 
-For more persistence, you can add the environment variable `MWCP_PARSER_SOURCE` which points 
-to your parser source. This will cause `--parser-source` to automatically apply if not supplied. 
+For more persistence, you can add the name of your parser source to the configuration parameter `PARSER_SOURCE`.
+(Run `mwcp config`). This will cause `--parser-source` to automatically apply if not supplied. 
 
-```console
-> set MWCP_PARSER_SOURCE="ACME"
-> mwcp parse Foo.Implant ./malware.bin
-> mwcp list --all
-```
 
 
 ## Parser Contribution

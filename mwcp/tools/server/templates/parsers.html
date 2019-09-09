@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <table>
+        <thead>
+        <tr>
+            {% for column in headers %}
+                <th>{{ column }}</th>
+            {% endfor %}
+        </tr>
+        </thead>
+        <tbody>
+        {% for parser in parsers %}
+            <tr>
+                {% for column in parser %}
+                    <td>{{ column }}</td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
