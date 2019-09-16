@@ -221,9 +221,11 @@ class Tester(object):
         with open(file_path, 'w', encoding='utf8') as results_file:
             results_file.write(str(json.dumps(results_list, indent=4, sort_keys=True)))
 
-    def update_tests(self):
+    def update_tests(self, force):
         """
         Updates existing test cases by rerunning parsers.
+
+        :param bool force: Whether to force adding the test case even if errors are encountered
         """
         orig_level = logging.root.level
         logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
@@ -239,7 +241,7 @@ class Tester(object):
                     if not new_results:
                         logger.warning('Empty results for {} in {}, not updating.'.format(file_path, results_file_path))
                         continue
-                    if self.reporter.errors:
+                    if self.reporter.errors and not force:
                         logger.warning('Results for {} has errors, not updating.'.format(file_path))
                         continue
 
@@ -250,11 +252,12 @@ class Tester(object):
         finally:
             logging.root.setLevel(orig_level)
 
-    def add_test(self, file_path, update=False):
+    def add_test(self, file_path, force, update=False):
         """
         Adds test case for given file path.
 
         :param str file_path: Path to input file to add.
+        :param bool force: Whether to force adding the test case even if errors are encountered
         :param bool update: Whether to allow updating the test case if a test for this file already exists.
         """
         orig_level = logging.root.level
@@ -274,7 +277,7 @@ class Tester(object):
                 if not new_results:
                     logger.warning('Empty results for {} in {}, not adding.'.format(file_path, results_file_path))
                     continue
-                if self.reporter.errors:
+                if self.reporter.errors and not force:
                     logger.warning('Results for {} has errors, not adding.'.format(file_path))
                     continue
 
