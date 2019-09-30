@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- `pefileutils.obtain_export_list` would contain a `null` entry as the last item in the list for any file
 
 ## [2.1.0] - 2019-09-10
 

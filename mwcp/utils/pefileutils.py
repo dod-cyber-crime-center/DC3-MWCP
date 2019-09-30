@@ -170,7 +170,7 @@ def obtain_exports_list(pe=None, file_data=None):
         pe = obtain_pe(file_data)
     if pe:
         try:
-            return [export.name for export in pe.DIRECTORY_ENTRY_EXPORT.symbols]
+            return [export.name for export in pe.DIRECTORY_ENTRY_EXPORT.symbols if export.name]
         except AttributeError:
             return []
     else:
