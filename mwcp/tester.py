@@ -221,7 +221,7 @@ class Tester(object):
         with open(file_path, 'w', encoding='utf8') as results_file:
             results_file.write(str(json.dumps(results_list, indent=4, sort_keys=True)))
 
-    def update_tests(self, force):
+    def update_tests(self, force=False):
         """
         Updates existing test cases by rerunning parsers.
 
@@ -252,7 +252,7 @@ class Tester(object):
         finally:
             logging.root.setLevel(orig_level)
 
-    def add_test(self, file_path, force, update=False):
+    def add_test(self, file_path, force=False, update=False):
         """
         Adds test case for given file path.
 
