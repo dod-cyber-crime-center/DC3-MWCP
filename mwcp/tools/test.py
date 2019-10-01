@@ -141,6 +141,11 @@ $ mwcp-test -p parser -i file_paths_file -d     Delete test cases for a parser
                         dest="delete",
                         action="store_true",
                         help="delete file(s) from test cases")
+    parser.add_argument("--force",
+                        default=False,
+                        dest="force",
+                        action="store_true",
+                        help="Force test case add/update when errors are encountered.")
 
     # Arguments to configure console output
     parser.add_argument("-f",
@@ -219,12 +224,12 @@ def main():
     # Update previously existing test cases
     elif args.update and args.parser_name:
         print("Updating test cases. May take a while...")
-        tester.update_tests()
+        tester.update_tests(args.force)
 
     # Add/update test cases for specified input files and specified parser
     elif args.parser_name and not args.delete and input_files:
         for file_path in input_files:
-            tester.add_test(file_path)
+            tester.add_test(file_path, args.force)
 
     # Run test cases
     else:

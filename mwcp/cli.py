@@ -510,6 +510,7 @@ def _run_tests(tester, silent=False, show_passed=False):
               help='Deletes given file from the test case. '
                    '(Note, this does not delete the file if placed in a malware repo.)')
 @click.option('-y', '--yes', is_flag=True, help="Auto confirm questions.")
+@click.options('--force', is_flag=True, help="Force test case add/update when errors are encountered.")
 # Arguments to configure console output
 @click.option('-f', '--show-passed', is_flag=True,
               help='Display tests case details for passed tests as well.'
@@ -519,7 +520,7 @@ def _run_tests(tester, silent=False, show_passed=False):
 # Parser to process.
 @click.argument('parser', nargs=-1, required=False)
 def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
-         yes, show_passed, silent, parser):
+         yes, force, show_passed, silent, parser):
     """
     Testing utility to create and execute parser test cases.
 
@@ -574,7 +575,7 @@ def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
         for file_path in add:
             if mwcp.config.get('MALWARE_REPO'):
                 file_path = _add_to_malware_repo(file_path)
-            tester.add_test(file_path, update=update)
+            tester.add_test(file_path, force, update=update)
 
         for file_path in delete:
             if mwcp.config.get('MALWARE_REPO'):
@@ -586,7 +587,7 @@ def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
         if not parser and not yes:
             click.confirm('WARNING: About to update test cases for ALL parsers. Continue?', abort=True)
         click.echo('Updating test cases. May take a while...')
-        tester.update_tests()
+        tester.update_tests(force)
 
     # Run tests
     else:
