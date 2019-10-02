@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Added `--force` flag to `Tester` for adding or updating testcases to ignore errors if set. (@ddash-ct)
 
+### Fixed
+- `pefileutils.obtain_export_list` would contain a `null` entry as the last item in the list for any file
+
 ## [2.1.0] - 2019-09-10
 
 ### Added
