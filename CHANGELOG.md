@@ -2,7 +2,10 @@
 All notable changes to this project will be documented in this file.
 
 
-## [Unreleased]
+## [2.2.0] - 2020-01-15
+
+**NOTE: This is the last version to support Python 2. 
+The next release will only support Python 3.**
 
 ### Added
 - Added `--force` flag to `Tester` for adding or updating testcases to ignore errors if set. (@ddash-ct)
@@ -224,7 +227,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.1.0...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.2.0...HEAD
+[2.2.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.2.0...2.2.0
 [2.1.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.3...2.1.0
 [2.0.3]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.2...2.0.3
 [2.0.2]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.1...2.0.2
