@@ -10,6 +10,7 @@ import logging
 import os
 import pkgutil
 
+import six
 from ruamel.yaml import YAML
 yaml = YAML()
 
@@ -20,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 Source = namedtuple('Source', ('name', 'path', 'config', 'is_pkg'))
 ParserInfo = namedtuple('ParserInfo', ('name', 'source', 'author', 'description'))
+
+
+class ParserNotFoundError(Exception):
+    """This exception gets thrown if a parser can't be found."""
 
 
 # Set of parser sources mapped to configuration files.
@@ -46,6 +51,16 @@ def clear_default_source():
     Clears a previously set default source.
     """
     global _default_source
+    _default_source = None
+
+
+def clear():
+    """
+    Removes all registered parsers.
+    """
+    global _sources
+    global _default_source
+    _sources = {}
     _default_source = None
 
 
@@ -171,7 +186,24 @@ def _create_package(directory):
     return package
 
 
-def _generate_parser(name, config, package_prefix, recursive=True):
+def _is_module_available(module_name):
+    """Determines whether given module name is available without importing."""
+    if six.PY2:
+        import pkgutil
+        try:
+            return bool(pkgutil.find_loader(module_name))
+        except ImportError:
+            # If we get an import error, that means an intermediate package couldn't be found.
+            return False
+    else:
+        try:
+            return bool(importlib.util.find_spec(module_name))
+        except ModuleNotFoundError:
+            # If we get this error, that means an intermediate package couldn't be found.
+            return False
+
+
+def _generate_parser(name, config, package_prefix, recursive=True, _visiting=None):
     """
     Generates parser for given name.
 
@@ -180,47 +212,77 @@ def _generate_parser(name, config, package_prefix, recursive=True):
     :param str package_prefix: Prefix to add to on-demand imported modules.
     :param bool recursive: Recursively generate listed sub parsers.
         (otherwise only top level parsers will be produced)
+    :param _visiting: Used internally for recursive loop detection.
 
     :returns: Either a Dispatcher object for a group of parsers or a Parser class.
+
+    :raises ParserNotFound: If parser could not be found.
     """
+    if _visiting is None:
+        _visiting = set()
+
+    _visiting.add(name)
+
     try:
         # First check if parser name is a parser group.
         options = dict(config[name])
     except KeyError:
+        logger.debug('Generating parser: {}'.format(name))
         if '.' not in name:
-            raise ValueError('Unable to find {} parser: Invalid name.'.format(name))
+            raise ParserNotFoundError('Invalid name {}'.format(name))
         # If not, find and import the referenced mwcp.Parser class.
         module_name, _, class_name = name.rpartition('.')
-        try:
-            logger.debug('Importing: {}'.format(package_prefix + module_name))
-            module = importlib.import_module(package_prefix + module_name)
-            klass = getattr(module, class_name)
-            klass.name = name
-            logger.debug('Created parser: {!r}'.format(klass))
-            return klass
-        except (AttributeError, ImportError) as e:
-            raise ValueError('Unable to find {} parser: {}'.format(name, e))
+        module_fullname = package_prefix + module_name
+
+        logger.debug('Checking existence of {}'.format(module_fullname))
+        if not _is_module_available(module_fullname):
+            raise ParserNotFoundError('{} module does not exist'.format(module_fullname))
+
+        logger.debug('Importing: {}'.format(module_fullname))
+        module = importlib.import_module(module_fullname)
+
+        if not hasattr(module, class_name):
+            raise ParserNotFoundError('{} is not in {}'.format(class_name, module_fullname))
+
+        klass = getattr(module, class_name)
+
+        if not issubclass(klass, Parser):
+            raise ParserNotFoundError('{}.{} is not a mwcp.Parser class'.format(module_fullname, class_name))
+
+        klass.name = name
+        logger.debug('Created parser: {!r}'.format(klass))
+        _visiting.remove(name)
+        return klass
 
     # Otherwise, instantiate a mwcp.Dispatcher class for the parser group.
     group_name = name
     parser_names = options.pop('parsers')
     sub_parsers = []
     if recursive:
-        # TODO: Add recursive loop detection.
         for parser_name in parser_names:
             if parser_name.startswith('.'):
                 parser_name = group_name + parser_name
-            sub_parsers.append(_generate_parser(parser_name, config, package_prefix))
+            if parser_name in _visiting:
+                raise RuntimeError('Detected recursive loop: {} -> {}'.format(name, parser_name))
+            try:
+                sub_parsers.append(_generate_parser(
+                    parser_name, config, package_prefix, _visiting=_visiting))
+            except ParserNotFoundError as e:
+                # If we can't find a sub-parser, then the whole thing should fail.
+                raise RuntimeError('Unable to find {} with error: {}'.format(parser_name, e))
 
     # Dereference default parser.
     default = options.pop('default', None)
     if default and recursive:
         if default.startswith('.'):
             default = group_name + default
-        options['default'] = _generate_parser(default, config, package_prefix)
+        if default in _visiting:
+            raise RuntimeError('Detected recursive loop: {} -> {}'.format(name, default))
+        options['default'] = _generate_parser(default, config, package_prefix, _visiting=_visiting)
 
     parser = Dispatcher(group_name, parsers=sub_parsers, **options)
     logger.debug('Created parser group: {!r}'.format(parser))
+    _visiting.remove(name)
     return parser
 
 
@@ -286,7 +348,7 @@ def iter_parsers(name=None, source=None, config_only=True, _recursive=True):
                 parser = _generate_parser(
                     name, source.config, package_prefix, recursive=_recursive)
                 yield source, parser
-            except ValueError as e:
+            except ParserNotFoundError as e:
                 logger.debug('[{}] {}'.format(source_name, e))
                 # Parser couldn't be found for this source.
                 continue

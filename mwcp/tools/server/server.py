@@ -399,7 +399,7 @@ def _run_parser_request(parser=None, upload_name="data", output_text=True):
     )
     parser_results = _run_parser(parser, data=data, append_output_text=output_text)
 
-    return parser_results, 500 if "error" in parser_results else 200
+    return parser_results, 200
 
 
 def _run_parser(name, data=b"", append_output_text=True):

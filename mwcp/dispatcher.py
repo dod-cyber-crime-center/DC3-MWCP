@@ -53,7 +53,7 @@ class Dispatcher(object):
     """
 
     def __init__(self, name, author='', description='', parsers=None, greedy=False, default=UnidentifiedFile,
-                 output_unidentified=True, overwrite_descriptions=False):
+                 output_unidentified=True, overwrite_descriptions=False, embedded=False):
         """
         Initializes the Dispatcher with the given parsers to run.
 
@@ -73,6 +73,9 @@ class Dispatcher(object):
             any parsers.
         :param bool overwrite_descriptions: Whether to allow dispatcher to overwrite any previous
             set description with the parser's
+        :param bool embedded: If True, all dispatched files will be passed up to the parent
+            dispatcher instead of being processed locally.
+            Ie, this is the equivalent of embedding the listed parsers directly into the parent's list.
         """
         self.name = name
         # TODO: Deprecate the author attribute?
@@ -86,6 +89,7 @@ class Dispatcher(object):
         self._current_parser = None
         self._output_unidentified = output_unidentified
         self._overwrite_descriptions = overwrite_descriptions
+        self._embedded = embedded
 
         # Dictionary that can be used by parsers to pass variables across parsers.
         # E.g. an encryption key found in the loader to be used by the implant.
@@ -119,6 +123,8 @@ class Dispatcher(object):
             if self._current_file_object:
                 logger.info(u'{} dispatched residual file: {}'.format(
                     self._current_file_object.file_name, file_object.file_name))
+                if file_object.description:
+                    logger.info(u'File {} described as {}'.format(file_object.file_name, file_object.description))
 
         self._fifo_buffer.appendleft(file_object)
 
@@ -183,8 +189,16 @@ class Dispatcher(object):
         if dispatcher:
             self.knowledge_base = dispatcher.knowledge_base
 
+        first = True
         while self._fifo_buffer:
             file_object = self._fifo_buffer.pop()
+
+            # If this dispatcher is embedded, simply pass any dispatched files to the parent.
+            if self._embedded and dispatcher and not first:
+                dispatcher.add_to_queue(file_object)
+                continue
+
+            first = False
             identified = False
 
             try:

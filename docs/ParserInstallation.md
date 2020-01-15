@@ -118,6 +118,44 @@ Foo:
 ```
 
 
+### Parser Group Options
+A number of options can be toggled on or off when defining a parser group.
+To set, simply add the option along with the author and description.
+If an option is not provided, it will be set to its default which is defined below.
+
+```yaml
+Decoy:
+    description: Decoy File
+    author: ACME
+    greedy: true
+    overwrite_descriptions: true  
+    embedded: true
+    ...
+    parsers:
+      ...
+```
+
+- `greedy` (default: `false`) -  By default, only the first identified parser in the list is run on the file.
+    If set to `true` all parsers that have identified the file is run. 
+    The description of the last parser to identify the file is used for reporting.
+    *(Useful if parser components are organized by file characteristics like decryption algorithms.)*
+- `output_unidentified` (default: `true`) - By default, if a file does not get identified by a parser, 
+    the file is still written out to the file system. 
+    If set to `false`, only identified files is written out.
+    *(Useful if the group contains a parser that could dispatch a lot of uninteresting files like PE resources.)*
+- `overwrite_descriptions` (default: `false`) - By default, if the developer of a parser sets the `description` 
+    argument on a dispatched `FileObject`, that description replaces the description of any identified parser
+    and is used for reporting.
+    If set to `true`, the description of an identified parser is used instead. 
+    Therefore, the description set by the developer is only used if the file is not identified by any parsers.
+- `embedded` (default: `false`) - If a parser group is referenced as a parser for another group, any dispatched files 
+    are processed against the local list of parsers first before being passed upstream to the parent group.
+    If set to `true`, all dispatched files are passed up the the parent immediately. 
+    That is, setting this to `true` is the equivalent of embedding the listed parsers directly into the parent's parser list
+    that reference the group.
+    *(Useful if the group contains a lot of generic parsers like decoy documents that you want to have lower priority)*
+
+
 ## Formal Parser Packaging
 If you would like to package your parsers in a more formal and shareable way,
 DC3-MWCP supports the use of setuptool's entry_points to register parsers from within

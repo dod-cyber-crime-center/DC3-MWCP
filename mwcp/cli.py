@@ -575,7 +575,7 @@ def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
         for file_path in add:
             if mwcp.config.get('MALWARE_REPO'):
                 file_path = _add_to_malware_repo(file_path)
-            tester.add_test(file_path, force, update=update)
+            tester.add_test(file_path, force=force, update=update)
 
         for file_path in delete:
             if mwcp.config.get('MALWARE_REPO'):
@@ -587,7 +587,7 @@ def test(testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete,
         if not parser and not yes:
             click.confirm('WARNING: About to update test cases for ALL parsers. Continue?', abort=True)
         click.echo('Updating test cases. May take a while...')
-        tester.update_tests(force)
+        tester.update_tests(force=force)
 
     # Run tests
     else:

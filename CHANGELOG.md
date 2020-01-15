@@ -1,13 +1,18 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
 ## [Unreleased]
 
 ### Added
 - Added `--force` flag to `Tester` for adding or updating testcases to ignore errors if set. (@ddash-ct)
+- Added `embedded` option that can be set in the parser configuration. (See [documentation](docs/ParserInstallation.md#parser-group-options))
 
 ### Fixed
 - `pefileutils.obtain_export_list` would contain a `null` entry as the last item in the list for any file
+- Errors that occur while importing a parser are no longer silenced.
+- Recursive loops in the parser configuration are now detected and cause an error.
+
 
 ## [2.1.0] - 2019-09-10
 
@@ -17,7 +22,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - The `outputfiles` attribute in `mwcp.Reporter` has been removed. 
 Instead, the output file path will be returned by `output_file()`.
-- All output filenames now include the first 5 digits of its md5 and are
+- All output filenames now include the first 5 digits of its MD5 and are
 converted to file system safe names.
 - Configuration is now set using a yaml file located within the user's profile directory.
     - This file can be modified by running `mwcp config`.

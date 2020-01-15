@@ -20,7 +20,7 @@
             {% endfor %}
         </ul>
     </div>
-    <h2>{{ g.title|default("DC3-MWCP Service") }}</h2>
+    <h2>{{ g.title|default(config.get('SERVICE_NAME', 'DC3-MWCP Service')) }}</h2>
 
     {% block content %}{% endblock %}
 
