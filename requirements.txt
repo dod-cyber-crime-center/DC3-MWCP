@@ -24,7 +24,7 @@ pytest==3.8.1
 pytest-console-scripts==0.1.6
 pytest-runner==4.2
 PyYAML==3.13
-requests==2.19.1
+requests==2.20.0
 ruamel.ordereddict==0.4.13
 ruamel.yaml==0.15.71
 scandir==1.9.0
