@@ -23,7 +23,7 @@ pyparsing==2.2.1
 pytest==3.8.1
 pytest-console-scripts==0.1.6
 pytest-runner==4.2
-PyYAML==3.13
+PyYAML==5.1
 requests==2.19.1
 ruamel.ordereddict==0.4.13
 ruamel.yaml==0.15.71
