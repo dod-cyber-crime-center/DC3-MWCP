@@ -36,10 +36,6 @@ setup(
     entry_points={
         'console_scripts': [
             'mwcp = mwcp.cli:main',
-            'mwcp-server = mwcp.cli:serve',          # DEPRECATED
-            'mwcp-tool = mwcp.tools.tool:main',      # DEPRECATED
-            'mwcp-client = mwcp.tools.client:main',  # DEPRECATED
-            'mwcp-test = mwcp.tools.test:main',      # DEPRECATED
             'poshdeob = mwcp.utils.poshdeob:main'
         ],
         'mwcp.parsers': [

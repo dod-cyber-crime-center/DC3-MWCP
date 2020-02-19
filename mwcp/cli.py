@@ -53,31 +53,17 @@ logger = logging.getLogger("mwcp")
     "--parser-dir",
     type=click.Path(exists=True, file_okay=False),
     help="Optional extra parser directory.",
-    envvar="MWCP_PARSER_DIR",
 )
 @click.option(
     "--parser-config",
     type=click.Path(exists=True, dir_okay=False),
     help="Optional parser configuration file to use with extra parser directory.",
-    envvar="MWCP_PARSER_CONFIG",
 )
 @click.option(
     "--parser-source",
     help="Set a default parsers source to use. If not provided parsers from all sources will be available.",
-    envvar="MWCP_PARSER_SOURCE",
 )
 def main(debug, verbose, config_path, parser_dir, parser_config, parser_source):
-    if (
-        (parser_dir and parser_dir == os.getenv("MWCP_PARSER_DIR"))
-        or (parser_config and parser_config == os.getenv("MWCP_PARSER_CONFIG"))
-        or (parser_source and parser_source == os.getenv("MWCP_PARSER_SOURCE"))
-    ):
-        warnings.warn(
-            "Setting parser directory, parser config or parser source"
-            " through an environment variable is deprecated. "
-            "Please set these values in the configuration file or in the command line."
-        )
-
     # Setup configuration
     mwcp.config.load(config_path)
     if parser_dir:
@@ -524,14 +510,12 @@ def _run_tests(tester, silent=False, show_passed=False):
     type=click.Path(file_okay=False),
     help="Directory containing JSON test case files. (defaults to a "
     '"tests" directory located within the root of the parsers directory)',
-    envvar="MWCP_TESTCASE_DIR",
 )
 @click.option(
     "-m",
     "--malware-repo",
     type=click.Path(file_okay=False),
     help="Directory containing malware samples used for testing.",
-    envvar="MWCP_MALWARE_REPO",
 )
 # Arguments used for run test cases.
 @click.option(
@@ -600,13 +584,6 @@ def test(
         mwcp test foo --add-filelist=./paths.txt              - Add tests cases for foo parser using text file of paths.
         mwcp test foo --delete=./malware.bin                  - Delete test case for malware.bin sample for foo parser.
     """
-    if (testcase_dir and testcase_dir == os.getenv("MWCP_TESTCASE_DIR")) or (
-        malware_repo and malware_repo == os.getenv("MWCP_MALWARE_REPO")
-    ):
-        warnings.warn(
-            "Setting testcase directory or malware repo through an environment variable is deprecated. "
-            "Please set these values in the configuration file or in the command line."
-        )
     # Overwrite configuration with command line flags.
     if testcase_dir:
         mwcp.config["TESTCASE_DIR"] = testcase_dir

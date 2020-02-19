@@ -477,22 +477,6 @@ class Reporter(object):
             logger.error("Failed to write output file {} with error: {}".format(full_path, e))
             return None
 
-    # TODO: Deprecate this function, we should be interfacing with FileObject instead.
-    def report_tempfile(self, filename, description=""):
-        """
-        load filename from filesystem and report using output_file
-        """
-        warnings.warn(
-            "report_tempfile() is deprecated. Please output files using FileObject.output() instead.",
-            DeprecationWarning,
-        )
-        if os.path.isfile(filename):
-            with open(filename, "rb") as f:
-                data = f.read()
-            self.output_file(data, os.path.basename(filename), description)
-        else:
-            logger.info("Could not output file because it could not be found: %s" % filename)
-
     def format_list(self, values, key=None):
 
         if key == "credential" and len(values) == 2:
