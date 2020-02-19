@@ -16,7 +16,7 @@ def read(fname):
 
 setup(
     name="mwcp",
-    version="2.2.0",
+    version="3.0.0",
     author="DC3",
     author_email="dcci@dc3.mil",
     description=__doc__,
@@ -67,7 +67,6 @@ setup(
         'tox',
     ],
     extras_require={
-        ':python_version < "3.0"': ['pathlib2'],
         'kordesii': ['kordesii>=1.4.0'],
     }
 )

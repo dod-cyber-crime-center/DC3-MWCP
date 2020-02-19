@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file.
 
 
+## [3.0.0] - 2020-02-20
+
+### Changed
+- Dropped support for Python 2
+
+### Removed
+- Removed previously deprecated components:
+    - Support for reading configuration from enviromnent variables:
+        - `MWCP_PARSER_DIR`, `MWCP_PARSER_CONFIG`, `MWCP_PARSER_SOURCE`, `MWCP_TESTCASE_DIR`, `MWCP_MALWARE_REPO`
+    - `report_tempfile()` in `Reporter` class
+    - `mwcp-tool`, `mwcp-client`, `mwcp-server`, and `mwcp-test` command line tools
+    
+
 ## [2.2.0] - 2020-01-15
 
 **NOTE: This is the last version to support Python 2. 
@@ -227,7 +240,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.2.0...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.0.0...HEAD
+[3.0.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.2.0...3.0.0
 [2.2.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.2.0...2.2.0
 [2.1.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.3...2.1.0
 [2.0.3]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.2...2.0.3
