@@ -1,7 +1,6 @@
 # coding=utf-8
 """Tests the mwcp.Reporter object."""
 
-import logging
 import os
 
 import pytest

@@ -1,12 +1,9 @@
 """Tests for found bugs/issues."""
 
-from __future__ import print_function
-
-import six
 
 import csv
-import sys
 import io
+import sys
 
 
 def test_csv_row_bug(script_runner, tmpdir, test_dir):
@@ -21,10 +18,7 @@ def test_csv_row_bug(script_runner, tmpdir, test_dir):
     print(ret.stderr, file=sys.stderr)
     assert ret.success
 
-    if six.PY2:
-        reader = csv.reader(io.BytesIO(ret.stdout))
-    else:
-        reader = csv.reader(io.StringIO(ret.stdout))
+    reader = csv.reader(io.StringIO(ret.stdout))
     rows = list(reader)
     assert len(rows) == len(test_dir.listdir()) + 1
     assert rows[0] == ['scan_date', 'inputfilename', 'outputfile.name',

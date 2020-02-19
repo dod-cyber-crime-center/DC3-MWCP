@@ -7,6 +7,7 @@ import io
 import logging
 import os
 
+import pefile
 from mwcp.utils import elffileutils, pefileutils
 
 try:
@@ -20,7 +21,6 @@ from mwcp.utils.stringutils import convert_to_unicode
 logger = logging.getLogger(__name__)
 
 
-
 class FileObject(object):
     """
     This class represents a file object which is to be parsed by the MWCP parser.
@@ -28,9 +28,18 @@ class FileObject(object):
     """
 
     def __init__(
-            self, file_data, reporter, pe=None, file_name=None, def_stub=None,
-            description=None, output_file=True, use_supplied_fname=True, use_arch=False,
-            ext='.bin'):
+        self,
+        file_data: bytes,
+        reporter,
+        pe: pefile.PE = None,
+        file_name=None,
+        def_stub=None,
+        description=None,
+        output_file=True,
+        use_supplied_fname=True,
+        use_arch=False,
+        ext=".bin",
+    ):
         """
         Initializes the FileObject.
 
@@ -47,21 +56,22 @@ class FileObject(object):
         """
         # Ensure we are getting a bytes string. Libraries like pefile depend on this.
         if not isinstance(file_data, bytes):
-            raise TypeError('file_data must be a bytes string.')
+            raise TypeError("file_data must be a bytes string.")
 
         self._file_path = None
         self._md5 = None
         self._sha1 = None
         self._sha256 = None
         self._stack_strings = None
+        self._static_strings = None
         self._resources = None
         self._elf = None
         self._elf_attempt = False
         self.output_file = output_file
         self._outputted_file = False
         self._kordesii_cache = {}
-        self.parent = None   # Parent FileObject from which FileObject was extracted from (this is set externally).
-        self.parser = None   # This will be set by the dispatcher.
+        self.parent = None  # Parent FileObject from which FileObject was extracted from (this is set externally).
+        self.parser = None  # This will be set by the dispatcher.
         self.file_data = file_data
         self.reporter = reporter
         self.description = description
@@ -75,7 +85,8 @@ class FileObject(object):
             self._file_name = file_name
         else:
             self._file_name = pefileutils.obtain_original_filename(
-                def_stub or self.md5, pe=self.pe, use_arch=use_arch, ext=ext)
+                def_stub or self.md5, pe=self.pe, use_arch=use_arch, ext=ext
+            )
         self._file_name = convert_to_unicode(self._file_name)
 
     def __enter__(self):
@@ -119,7 +130,7 @@ class FileObject(object):
         # If someone changes the name, record the rename.
         value = convert_to_unicode(value)
         if self._file_name != value:
-            logger.info('Renamed {} to {}'.format(self._file_name, value))
+            logger.info("Renamed {} to {}".format(self._file_name, value))
         self._file_name = value
 
     @property
@@ -178,7 +189,7 @@ class FileObject(object):
         if not self._file_path:
             safe_file_name = convert_to_unicode(self.md5)
             file_path = os.path.join(self.reporter.managed_tempdir, safe_file_name)
-            with open(file_path, 'wb') as file_object:
+            with open(file_path, "wb") as file_object:
                 file_object.write(self.file_data)
             self._file_path = file_path
 
@@ -198,9 +209,11 @@ class FileObject(object):
         Returns the stack strings for the file.
         """
         if not self._stack_strings:
-            kordesii_reporter = self.run_kordesii_decoder('stack_string')
+            kordesii_reporter = self.run_kordesii_decoder("stack_string")
             self._stack_strings = kordesii_reporter.get_strings()
         return self._stack_strings
+
+    # TODO: Create a static_strings property?
 
     @property
     def resources(self):
@@ -227,10 +240,11 @@ class FileObject(object):
         # Output file if we are allowed to and the file hasn't already been outputted.
         if self.output_file and not self._outputted_file:
             self.reporter.output_file(
-                data=self.file_data, filename=self.file_name or '', description=self.description or '')
+                data=self.file_data, filename=self.file_name or "", description=self.description or ""
+            )
             self._outputted_file = True
 
-    def run_kordesii_decoder(self, decoder_name, warn_no_strings=True, decoderdir=None):
+    def run_kordesii_decoder(self, decoder_name: str, warn_no_strings=True, decoderdir=None):
         """
         Run the specified kordesii decoder against the file data.  The reporter object is returned
         and can be accessed as necessary to obtain output files, etc.
@@ -244,15 +258,14 @@ class FileObject(object):
         :raises RuntimeError: If kordesii is not installed.
         """
         if not kordesii:
-            raise RuntimeError('Please install kordesii to use this function.')
+            raise RuntimeError("Please install kordesii to use this function.")
 
         # Pull from cache if we already ran this decoder.
         if decoder_name in self._kordesii_cache:
             return self._kordesii_cache[decoder_name]
 
-        logger.info('Running {} kordesii decoder on file {}.'.format(decoder_name, self.file_name))
-        kordesii_reporter = kordesii.Reporter(
-            decoderdir=decoderdir, base64outputfiles=True)
+        logger.info(f"Running {decoder_name} kordesii decoder on file {self.file_name}.")
+        kordesii_reporter = kordesii.Reporter(decoderdir=decoderdir, base64outputfiles=True)
 
         kordesii_reporter.run_decoder(decoder_name, data=self.file_data, log=True)
 
@@ -260,8 +273,7 @@ class FileObject(object):
             decrypted_strings = kordesii_reporter.get_strings()
             if not decrypted_strings:
                 # Not necessarily a bad thing, the decoder might be used for something else.
-                logger.info(
-                    'No decrypted strings were returned by the decoder for file {}.'.format(self.file_name))
+                logger.info(f"No decrypted strings were returned by the decoder for file {self.file_name}.")
 
         # Cache results
         self._kordesii_cache[decoder_name] = kordesii_reporter

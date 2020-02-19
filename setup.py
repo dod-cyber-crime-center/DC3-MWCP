@@ -12,6 +12,8 @@ def read(fname):
         return fo.read()
 
 
+
+
 setup(
     name="mwcp",
     version="2.2.0",
@@ -25,11 +27,11 @@ setup(
     include_package_data=True,
     license='MIT',
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'License :: MIT License",'
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3'
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
     ],
     entry_points={
         'console_scripts': [

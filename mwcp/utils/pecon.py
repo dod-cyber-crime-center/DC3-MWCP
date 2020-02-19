@@ -38,6 +38,9 @@ Usage:
 
 import copy
 import io
+import logging
+
+logger = logging.getLogger(__name__)
 
 from mwcp.utils import construct
 from construct import this
@@ -353,6 +356,7 @@ class PE(Container):
         for section in pe.SectionTable:
             if isinstance(section.Characteristics, dict):
                 section.Characteristics = [flag for flag, value in section.Characteristics.items() if value]
+            section.data = data[section.PointerToRawData:section.PointerToRawData + section.SizeOfRawData]
         file_header = pe.NTHeaders.FileHeader
         if isinstance(file_header.Characteristics, dict):
             file_header.Characteristics = [
@@ -413,11 +417,10 @@ class PE(Container):
 
         # Fix file header.
         file_header = pe.NTHeaders.FileHeader
-        if file_header.NumberOfSections:
-            if file_header.NumberOfSections != len(pe.SectionTable):
-                raise ValueError('NTHeaders.FileHeader.NumberOfSections does not equal the number of sections provided.')
-        else:
-            file_header.NumberOfSections = len(pe.SectionTable)
+        if file_header.NumberOfSections and file_header.NumberOfSections != len(pe.SectionTable):
+            logger.debug(
+                'NTHeaders.FileHeader.NumberOfSections does not equal the number of sections provided. Auto-adjusting.')
+        file_header.NumberOfSections = len(pe.SectionTable)
         if isinstance(file_header.Characteristics, list):
             file_header.Characteristics = {flag: True for flag in file_header.Characteristics}
 

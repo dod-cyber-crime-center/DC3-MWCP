@@ -29,15 +29,12 @@ except ImportError:
     pkg_resources = None
 
 # Constants
-DEFAULT_EXCLUDE_FIELDS = [u"debug"]
+DEFAULT_EXCLUDE_FIELDS = (u"debug",)
 INPUT_FILE_PATH = u"inputfilename"  # MUST BE UNICODE
 FILE_EXTENSION = ".json"
 
 # Setting encoding to utf8 is a hotfix for a larger issue
-encode_params = {
-    'encoding': 'utf8',
-    'errors': 'replace'
-}
+encode_params = {"encoding": "utf8", "errors": "replace"}
 
 
 def multiproc_test_wrapper(args):
@@ -52,8 +49,9 @@ def multiproc_test_wrapper(args):
 class Tester(object):
     """DC3-MWCP Tester class"""
 
-    def __init__(self, reporter, parser_names=None, nprocs=None,
-                 field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
+    def __init__(
+        self, reporter, parser_names=None, nprocs=None, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS
+    ):
         """
 
         Run tests and compare produced results to expected results.
@@ -89,8 +87,7 @@ class Tester(object):
         if not self._processed:
             self._processed = True
             pool = multi_proc.TPool(processes=self._nprocs)
-            test_iter = pool.imap_unordered(
-                multiproc_test_wrapper, [(test_case,) for test_case in self.test_cases])
+            test_iter = pool.imap_unordered(multiproc_test_wrapper, [(test_case,) for test_case in self.test_cases])
             pool.close()
 
             try:
@@ -111,24 +108,26 @@ class Tester(object):
                 found = False
                 for source, parser in mwcp.iter_parsers(parser_name):
                     found = True
-                    full_parser_name = '{}:{}'.format(source.name, parser.name)
+                    full_parser_name = "{}:{}".format(source.name, parser.name)
                     results_file_path = self.get_results_filepath(full_parser_name)
                     if os.path.isfile(results_file_path):
                         for expected_results in self.read_results_file(results_file_path):
-                            self._test_cases.append(TestCase(
-                                self.reporter, full_parser_name, expected_results,
-                                field_names=self.field_names, ignore_field_names=self.ignore_field_names))
+                            self._test_cases.append(
+                                TestCase(
+                                    self.reporter,
+                                    full_parser_name,
+                                    expected_results,
+                                    field_names=self.field_names,
+                                    ignore_field_names=self.ignore_field_names,
+                                )
+                            )
                     else:
                         # Warn user if they are missing a test file for a parser group.
-                        logger.warning('Test case file not found: {}'.format(results_file_path))
+                        logger.warning("Test case file not found: {}".format(results_file_path))
 
                 if not found and parser_name:
                     # Add a failed results if we have an orphan test.
-                    self._results.append(TestResult(
-                        parser=parser_name,
-                        passed=False,
-                        errors=['Parser not found.']
-                    ))
+                    self._results.append(TestResult(parser=parser_name, passed=False, errors=["Parser not found."]))
         return self._test_cases
 
     @property
@@ -158,20 +157,20 @@ class Tester(object):
         for source, parser in mwcp.iter_parsers(name, source=source):
             file_name = parser.name + FILE_EXTENSION
             # Use hardcoded testcase directory if set.
-            testcase_dir = mwcp.config.get('TESTCASE_DIR')
+            testcase_dir = mwcp.config.get("TESTCASE_DIR")
             if testcase_dir:
                 return os.path.join(testcase_dir, file_name)
 
             if source.is_pkg:
                 # Dynamically pull based on parser's top level module.
-                test_dir = pkg_resources.resource_filename(source.path, 'tests')
+                test_dir = pkg_resources.resource_filename(source.path, "tests")
             else:
                 # If source is a directory, assume there is a "tests" folder within it.
-                test_dir = os.path.join(source.path, 'tests')
+                test_dir = os.path.join(source.path, "tests")
 
             return os.path.normpath(os.path.join(test_dir, file_name))
 
-        raise ValueError('Invalid parser: {}'.format(name))
+        raise ValueError("Invalid parser: {}".format(name))
 
     def read_results_file(self, results_file_path):
         """
@@ -185,7 +184,7 @@ class Tester(object):
 
         # The results file results_dict is expected to be a list of metadata dictionaries
         if not isinstance(results_dict, list) or not all(isinstance(a, dict) for a in results_dict):
-            raise ValueError('Results file is invalid: {}'.format(results_file_path))
+            raise ValueError("Results file is invalid: {}".format(results_file_path))
 
         # Resolve input file paths.
         for testcase in results_dict:
@@ -193,7 +192,7 @@ class Tester(object):
             # expand environment variables
             input_file_path = os.path.expandvars(input_file_path)
             # resolve variables
-            input_file_path = input_file_path.format(MALWARE_REPO=mwcp.config.get('MALWARE_REPO', ''))
+            input_file_path = input_file_path.format(MALWARE_REPO=mwcp.config.get("MALWARE_REPO", ""))
             # make relative paths relative to json file
             input_file_path = os.path.join(os.path.dirname(results_file_path), input_file_path)
             input_file_path = os.path.abspath(input_file_path)
@@ -208,17 +207,17 @@ class Tester(object):
         :param str file_path: Path to save the results JSON file.
         """
         # Replace references to the malware repo with a variable.
-        malware_repo = mwcp.config.get('MALWARE_REPO', None)
+        malware_repo = mwcp.config.get("MALWARE_REPO", None)
         if malware_repo:
             for results in results_list:
                 input_file_path = results[INPUT_FILE_PATH]
                 if input_file_path.startswith(malware_repo):
-                    input_file_path = '{MALWARE_REPO}' + input_file_path[len(malware_repo):]
+                    input_file_path = "{MALWARE_REPO}" + input_file_path[len(malware_repo) :]
                 results[INPUT_FILE_PATH] = input_file_path
 
         # Write updated data to results file
         # NOTE: We need to use dumps instead of dump to avoid TypeError.
-        with open(file_path, 'w', encoding='utf8') as results_file:
+        with open(file_path, "w", encoding="utf8") as results_file:
             results_file.write(str(json.dumps(results_list, indent=4, sort_keys=True)))
 
     def update_tests(self, force=False):
@@ -233,19 +232,19 @@ class Tester(object):
             for parser_name in self.parser_names:
                 results_file_path = self.get_results_filepath(parser_name)
                 if not os.path.isfile(results_file_path):
-                    logger.warning('No test case file found for parser: {}')
+                    logger.warning("No test case file found for parser: {}")
                     continue
                 results_list = self.read_results_file(results_file_path)
                 for index, file_path in enumerate(self._list_test_files(results_list)):
                     new_results = self.gen_results(parser_name, file_path)
                     if not new_results:
-                        logger.warning('Empty results for {} in {}, not updating.'.format(file_path, results_file_path))
+                        logger.warning("Empty results for {} in {}, not updating.".format(file_path, results_file_path))
                         continue
                     if self.reporter.errors and not force:
-                        logger.warning('Results for {} has errors, not updating.'.format(file_path))
+                        logger.warning("Results for {} has errors, not updating.".format(file_path))
                         continue
 
-                    logger.info('Updating results for {} in {}'.format(file_path, results_file_path))
+                    logger.info("Updating results for {} in {}".format(file_path, results_file_path))
                     results_list[index] = new_results
 
                 self.write_results_file(results_list, results_file_path)
@@ -268,25 +267,24 @@ class Tester(object):
                 results_list = self.read_results_file(results_file_path)
                 input_files = self._list_test_files(results_list)
                 if file_path in input_files and not update:
-                    logger.warning(
-                        'Test case for {} already exists in {}'.format(file_path, results_file_path))
+                    logger.warning("Test case for {} already exists in {}".format(file_path, results_file_path))
                     continue
 
                 new_results = self.gen_results(parser_name, file_path)
                 file_path = new_results[INPUT_FILE_PATH]  # Replace with unicode file path.
                 if not new_results:
-                    logger.warning('Empty results for {} in {}, not adding.'.format(file_path, results_file_path))
+                    logger.warning("Empty results for {} in {}, not adding.".format(file_path, results_file_path))
                     continue
                 if self.reporter.errors and not force:
-                    logger.warning('Results for {} has errors, not adding.'.format(file_path))
+                    logger.warning("Results for {} has errors, not adding.".format(file_path))
                     continue
 
                 if file_path in input_files:
-                    logger.info('Updating results for {} in {}'.format(file_path, results_file_path))
+                    logger.info("Updating results for {} in {}".format(file_path, results_file_path))
                     index = input_files.index(file_path)
                     results_list[index] = new_results
                 else:
-                    logger.info('Adding results for {} in {}'.format(file_path, results_file_path))
+                    logger.info("Adding results for {} in {}".format(file_path, results_file_path))
                     results_list.append(new_results)
 
                 self.write_results_file(results_list, results_file_path)
@@ -301,7 +299,7 @@ class Tester(object):
             removed = False
             for results in self.read_results_file(results_file_path):
                 if results[INPUT_FILE_PATH] == file_path:
-                    logger.info('Removed results for {} in {}'.format(file_path, results_file_path))
+                    logger.info("Removed results for {} in {}".format(file_path, results_file_path))
                     removed = True
                 else:
                     results_list.append(results)
@@ -311,14 +309,12 @@ class Tester(object):
 
 
 class TestCase(object):
-
-    def __init__(self, reporter, parser, expected_results,
-                 field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
+    def __init__(self, reporter, parser, expected_results, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
         self._reporter = reporter
         self.input_file_path = expected_results[INPUT_FILE_PATH]
         self.filename = os.path.basename(self.input_file_path)
         self.parser = parser
-        self.parser_source, _, self.parser_name = parser.rpartition(':')
+        self.parser_source, _, self.parser_name = parser.rpartition(":")
         self.expected_results = expected_results
         self._field_names = field_names or []
         self._ignore_field_names = ignore_field_names or []
@@ -342,9 +338,9 @@ class TestCase(object):
             input_file_path=self.input_file_path,
             passed=passed,
             errors=self._reporter.errors,
-            debug=self._reporter.metadata.get('debug', None),
+            debug=self._reporter.metadata.get("debug", None),
             results=comparer_results,
-            run_time=run_time
+            run_time=run_time,
         )
 
     def _compare_results(self, results_a, results_b):
@@ -380,8 +376,7 @@ class TestCase(object):
             all_field_names = set(results_a.keys()).union(list(results_b.keys()))
             for field_name in all_field_names:
                 try:
-                    comparer = self._compare_results_field(
-                        results_a, results_b, field_name)
+                    comparer = self._compare_results_field(results_a, results_b, field_name)
                 except:
                     comparer = ResultComparer(field_name)
                     logger.error(traceback.format_exc())
@@ -402,14 +397,12 @@ class TestCase(object):
         try:
             field_name_u = convert_to_unicode(field_name)
         except:
-            raise Exception(
-                "Failed to convert field name '{}' to unicode.".format(field_name))
+            raise Exception("Failed to convert field name '{}' to unicode.".format(field_name))
 
         try:
-            field_type = self._reporter.fields[field_name_u]['type']
+            field_type = self._reporter.fields[field_name_u]["type"]
         except:
-            raise Exception(
-                "Key error. Field name '{}' was not identified as a standardized field.".format(field_name))
+            raise Exception("Key error. Field name '{}' was not identified as a standardized field.".format(field_name))
 
         # Establish value to send for comparison
         value_a = None
@@ -431,20 +424,17 @@ class TestCase(object):
             comparer = DictOfStringsComparer(field_name_u)
             comparer.compare(value_a, value_b)
         else:
-            raise Exception("Unhandled field type '{}' found for field name '{}'.".format(
-                field_type, field_name))
+            raise Exception("Unhandled field type '{}' found for field name '{}'.".format(field_type, field_name))
 
         return comparer
 
 
 class TestResult(object):
-
-    def __init__(self, parser, passed,
-                 input_file_path=None, errors=None, debug=None, results=None, run_time=None):
+    def __init__(self, parser, passed, input_file_path=None, errors=None, debug=None, results=None, run_time=None):
         self.parser = parser
-        self.parser_source, _, self.parser_name = parser.rpartition(':')
-        self.input_file_path = input_file_path or 'N/A'
-        self.filename = os.path.basename(input_file_path) if input_file_path else 'N/A'
+        self.parser_source, _, self.parser_name = parser.rpartition(":")
+        self.input_file_path = input_file_path or "N/A"
+        self.filename = os.path.basename(input_file_path) if input_file_path else "N/A"
         self.passed = passed
         self.errors = errors or []
         self.debug = debug or []
@@ -471,12 +461,12 @@ class TestResult(object):
             passed = self.passed
             if passed and passed_tests:
                 filtered_output += "Parser Name = {}\n".format(self.parser)
-                if self.input_file_path and self.input_file_path != 'N/A':
+                if self.input_file_path and self.input_file_path != "N/A":
                     filtered_output += "Input Filename = {}\n".format(self.input_file_path)
                 filtered_output += "Tests Passed = {}\n".format(self.passed)
             elif not passed and failed_tests:
                 filtered_output += "Parser Name = {}\n".format(self.parser)
-                if self.input_file_path and self.input_file_path != 'N/A':
+                if self.input_file_path and self.input_file_path != "N/A":
                     filtered_output += "Input Filename = {}\n".format(self.input_file_path)
                 filtered_output += "Tests Passed = {}\n".format(self.passed)
                 filtered_output += "Errors = {}".format("\n" if self.errors else "None\n")
@@ -495,9 +485,7 @@ class TestResult(object):
 
             if filtered_output:
                 filtered_output += "{0}\n".format(separator)
-                print(filtered_output.encode(**encode_params))
-
-
+                print(filtered_output.encode("ascii", "backslashreplace").decode())
 
 
 ####################################################
@@ -506,7 +494,6 @@ class TestResult(object):
 
 
 class ResultComparer(object):
-
     def __init__(self, field):
         self.field = field
         self.passed = False
@@ -554,7 +541,7 @@ class ResultComparer(object):
             return report
 
     def __bytes__(self):
-        return self.get_report().encode('utf8')
+        return self.get_report().encode("utf8")
 
     def __unicode__(self):
         return self.get_report()
@@ -570,7 +557,6 @@ class ResultComparer(object):
 
 
 class ListOfStringsComparer(ResultComparer):
-
     def field_compare(self, test_case_results, new_results):
         """Compare each string in a list of strings."""
         list_test = [] if not test_case_results else test_case_results
@@ -581,7 +567,6 @@ class ListOfStringsComparer(ResultComparer):
 
 
 class ListOfStringTuplesComparer(ResultComparer):
-
     def field_compare(self, test_case_results, new_results):
         """Compare each tuple of strings in a list of tuples."""
         set_list_test = []
@@ -595,19 +580,16 @@ class ListOfStringTuplesComparer(ResultComparer):
             if set_test not in set_list_new:
                 # Append the list entry here instead of the set to preserve the
                 # entries ordering
-                self.missing.append(
-                    repr(test_case_results[set_list_test.index(set_test)]))
+                self.missing.append(repr(test_case_results[set_list_test.index(set_test)]))
 
         for set_new in set_list_new:
             if set_new not in set_list_test:
                 # Append the list entry here instead of the set to preserve the
                 # entries ordering
-                self.unexpected.append(
-                    repr(new_results[set_list_new.index(set_new)]))
+                self.unexpected.append(repr(new_results[set_list_new.index(set_new)]))
 
 
 class DictOfStringsComparer(ResultComparer):
-
     def field_compare(self, test_case_results, new_results):
         """Compare each key value pair in a dictionary of strings."""
         dict_test = {} if not test_case_results else test_case_results
@@ -626,13 +608,11 @@ class DictOfStringsComparer(ResultComparer):
                 self.unexpected.append(u"{}: {!r}".format(key, dict_new[key]))
 
 
-
 ####################################################
 # JSON encoders
 ####################################################
 
 
 class MyEncoder(json.JSONEncoder):
-
     def default(self, o):
         return o.__dict__

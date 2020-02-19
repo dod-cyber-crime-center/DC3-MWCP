@@ -25,7 +25,7 @@ class ParserMeta(abc.ABCMeta):
         cls._name = value
 
     def __repr__(cls):
-        return '<{}>'.format(cls.name)
+        return "<{}>".format(cls.name)
 
 
 @six.add_metaclass(ParserMeta)
@@ -36,13 +36,14 @@ class Parser(object):
     inherit this class into a customized base class for all parsers.  This class includes some of the required data
     used by various other classes.
     """
+
     file_object = None  # type: FileObject
     # This is the description that will be given the the file object during output
     # if no description is set in the file_object. This must be overwritten by inherited classes.
     DESCRIPTION = None
 
     # TODO: Deprecate the AUTHOR field?
-    AUTHOR = ''  # Optional
+    AUTHOR = ""  # Optional
 
     def __init__(self, file_object, reporter, dispatcher):
         """
@@ -53,11 +54,15 @@ class Parser(object):
         :param Dispatcher dispatcher: reference to the dispatcher object
         """
         if not self.DESCRIPTION:
-            raise NotImplementedError('Parser class is missing a DESCRIPTION.')
+            raise NotImplementedError("Parser class is missing a DESCRIPTION.")
         self.file_object = file_object
         self.reporter = reporter
         self.dispatcher = dispatcher
-        self.logger = logging.getLogger('.'.join([self.__class__.__module__, self.__class__.__name__]))
+        self.logger = logging.getLogger(".".join([self.__class__.__module__, self.__class__.__name__]))
+
+    @classmethod
+    def get_logger(cls):
+        return logging.getLogger(".".join([cls.__module__, cls.__name__]))
 
     @classmethod
     def iter_subclasses(cls):
@@ -104,6 +109,7 @@ class Parser(object):
         # If dispatcher isn't provided, create a dummy one containing only this parser.
         else:
             from mwcp import Dispatcher  # Must import here to avoid cyclic import.
+
             dispatcher = Dispatcher(cls.name, author=cls.AUTHOR, description=cls.DESCRIPTION, parsers=[cls])
             dispatcher.parse(file_object, reporter)
 

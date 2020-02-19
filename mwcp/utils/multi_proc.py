@@ -40,10 +40,14 @@ class TPool(mp.pool.Pool):
     """
     Version of :class:`multiprocessing.pool.Pool` that uses :class:`TProcess`.
     """
+
     Process = TProcess
 
     def __init__(self, processes=None, maxtasksperchild=None):
         """Overwrite to add initializer."""
         super(TPool, self).__init__(
-            processes=processes, maxtasksperchild=maxtasksperchild,
-            initializer=initializer, initargs=(registry._sources, registry._default_source))
+            processes=processes,
+            maxtasksperchild=maxtasksperchild,
+            initializer=initializer,
+            initargs=(registry._sources, registry._default_source),
+        )

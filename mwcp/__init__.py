@@ -15,6 +15,5 @@ from mwcp.registry import (
     ParserNotFoundError
 )
 from mwcp.reporter import Reporter
-from mwcp.resources import techanarchy_bridge
 from mwcp.dispatcher import Dispatcher, UnableToParse, UnidentifiedFile
 from mwcp.utils.logutil import setup_logging

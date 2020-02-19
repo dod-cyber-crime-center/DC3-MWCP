@@ -5,9 +5,10 @@ python version: 2.7.8
 
 import logging
 import os
+from pathlib import Path
+from typing import List, Optional
 
 import pefile
-
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def obtain_pe(file_data):
     try:
         return pefile.PE(data=file_data)
     except pefile.PEFormatError as e:
-        logger.debug('A pefile.PE object on the file data could not be created: {}'.format(e))
+        logger.debug("A pefile.PE object on the file data could not be created: {}".format(e))
         return None
 
 
@@ -39,18 +40,21 @@ def obtain_section(section_name, pe=None, file_data=None):
 
     :return: The PE secton object, or None.
     """
+    if isinstance(section_name, str):
+        section_name = section_name.encode()
+
     if file_data:
         pe = obtain_pe(file_data)
     if pe:
         for section in pe.sections:
-            if section.Name.rstrip('\0') == section_name:
+            if section.Name.rstrip(b"\0") == section_name:
                 return section
         return None
     else:
         return None
 
 
-def obtain_section_data(section_name, pe=None, file_data=None, min_size=0):
+def obtain_section_data(section_name, pe=None, file_data=None, min_size=0) -> Optional[bytes]:
     """
     Obtain the data in a specified PE section of a file.
 
@@ -61,6 +65,10 @@ def obtain_section_data(section_name, pe=None, file_data=None, min_size=0):
 
     :return: The PE section data, or None.
     """
+
+    if isinstance(section_name, str):
+        section_name = section_name.encode()
+
     if file_data:
         pe = obtain_pe(file_data)
     if pe:
@@ -85,11 +93,14 @@ def check_section(section_name, pe=None, file_data=None):
 
     :return: True if the section name is observed, False if it is not.
     """
+    if isinstance(section_name, str):
+        section_name = section_name.encode()
+
     if file_data:
         pe = obtain_pe(file_data)
     if pe:
         for section in pe.sections:
-            if section.Name.rstrip('\0') == section_name:
+            if section.Name.rstrip(b"\0") == section_name:
                 return True
         return False
     return False
@@ -157,7 +168,7 @@ def obtain_physical_offset_x64(rel_loc, inst_end_raw, pe=None, file_data=None):
         return None
 
 
-def obtain_exports_list(pe=None, file_data=None):
+def obtain_exports_list(pe=None, file_data=None) -> List[bytes]:
     """
     Obtain a list of export names for the input PE file.
 
@@ -170,7 +181,7 @@ def obtain_exports_list(pe=None, file_data=None):
         pe = obtain_pe(file_data)
     if pe:
         try:
-            return [export.name for export in pe.DIRECTORY_ENTRY_EXPORT.symbols if export.name]
+            return [export.name for export in pe.DIRECTORY_ENTRY_EXPORT.symbols]
         except AttributeError:
             return []
     else:
@@ -187,11 +198,13 @@ def check_export(export_name, pe=None, file_data=None):
 
     :return bool: Indicating if provided export name is in file exports
     """
+    if isinstance(export_name, str):
+        export_name = export_name.encode()
     exports = obtain_exports_list(pe, file_data)
     return export_name in exports
 
 
-def obtain_imported_dlls(pe=None, file_data=None):
+def obtain_imported_dlls(pe=None, file_data=None) -> Optional[List[bytes]]:
     """
     Obtain a list of imported DLL names for the input PE file.
 
@@ -271,13 +284,13 @@ def obtain_file_ext(pe=None, file_data=None):
         pe = obtain_pe(file_data)
     if pe:
         if pe.is_driver():
-            return '.sys'
+            return ".sys"
         elif pe.is_exe():
-            return '.exe'
+            return ".exe"
         elif pe.is_dll():
-            return '.dll'
+            return ".dll"
         else:
-            return '.bin'
+            return ".bin"
     else:
         return None
 
@@ -299,7 +312,7 @@ def is_64bit(pe=None, file_data=None):
         elif pe.PE_TYPE == pefile.OPTIONAL_HEADER_MAGIC_PE:
             return False
         else:
-            logger.debug('The architecture type for the file could not be determined.')
+            logger.debug("The architecture type for the file could not be determined.")
     return None
 
 
@@ -323,7 +336,7 @@ def obtain_architecture_string(pe=None, file_data=None, bitterm=True):
                 return "64-bit"
             else:
                 return "x64"
-        # Specifically check if the return value is False, because that indicates 32-bit, None indicates undetermined.
+        # Specfically check if the return value is False, because that indicates 32-bit, None indicates undetermined.
         elif is64 is False:
             if bitterm:
                 return "32-bit"
@@ -346,10 +359,10 @@ def _obtain_exif_fname(pe):
     try:
         for file_info in pe.FileInfo:
             for entry in file_info:
-                if entry.Key == 'StringFileInfo':
+                if entry.Key == b"StringFileInfo":
                     for string_table in entry.StringTable:
                         try:
-                            return string_table.entries['OriginalFilename']
+                            return string_table.entries[b"OriginalFilename"]
                         except KeyError:
                             continue
     except AttributeError:
@@ -371,7 +384,7 @@ def _obtain_exportdir_fname(pe):
         return None
 
 
-def obtain_original_filename(def_stub, pe=None, file_data=None, use_arch=False, ext='.bin'):
+def obtain_original_filename(def_stub, pe=None, file_data=None, use_arch=False, ext=".bin"):
     """
     Attempt to obtain the original filename, either from the export directory or the pe.FileInfo, of the input file.
     If the filename cannot be recovered from either of those locations, append the applicable architecture string and
@@ -392,11 +405,14 @@ def obtain_original_filename(def_stub, pe=None, file_data=None, use_arch=False, 
         ext = obtain_file_ext(pe=pe)
         arch = obtain_architecture_string(pe=pe, bitterm=False)
         filename = _obtain_exportdir_fname(pe) or _obtain_exif_fname(pe)
+        if isinstance(filename, bytes):
+            filename = filename.decode("ascii", "backslashreplace")
         if filename:
+            filename = Path(filename)
             if use_arch:
-                base, ext = os.path.splitext(filename)
+                base, ext = filename.stem, filename.suffix
                 filename = base + "_" + arch + ext
-            return filename
+            return str(filename)
         else:
             return def_stub + "_" + arch + ext
     else:
@@ -421,24 +437,28 @@ def get_overlay_data_start_offset(pe, include_data_directories=True):
             return offset_and_size
         return largest_offset_and_size
 
-    if hasattr(pe, 'OPTIONAL_HEADER'):
+    if hasattr(pe, "OPTIONAL_HEADER"):
         largest_offset_and_size = update_if_sum_is_larger_and_within_file(
-            (pe.OPTIONAL_HEADER.get_file_offset(), pe.FILE_HEADER.SizeOfOptionalHeader))
+            (pe.OPTIONAL_HEADER.get_file_offset(), pe.FILE_HEADER.SizeOfOptionalHeader)
+        )
 
     for section in pe.sections:
         largest_offset_and_size = update_if_sum_is_larger_and_within_file(
-            (section.PointerToRawData, section.SizeOfRawData))
+            (section.PointerToRawData, section.SizeOfRawData)
+        )
 
     if include_data_directories:
         for idx, directory in enumerate(pe.OPTIONAL_HEADER.DATA_DIRECTORY):
             try:
                 # Security directory is special in that its VirtualAddress is actually a file offset.
-                if idx == pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']:
+                if idx == pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_SECURITY"]:
                     largest_offset_and_size = update_if_sum_is_larger_and_within_file(
-                        (directory.VirtualAddress, directory.Size))
+                        (directory.VirtualAddress, directory.Size)
+                    )
                 else:
                     largest_offset_and_size = update_if_sum_is_larger_and_within_file(
-                        (pe.get_offset_from_rva(directory.VirtualAddress), directory.Size))
+                        (pe.get_offset_from_rva(directory.VirtualAddress), directory.Size)
+                    )
             # Ignore directories with RVA out of file
             except pefile.PEFormatError:
                 continue
@@ -458,8 +478,7 @@ def get_overlay(pe, include_data_directories=True):
           want to include the data directories in the calculation.
     """
 
-    overlay_data_offset = get_overlay_data_start_offset(
-        pe, include_data_directories=include_data_directories)
+    overlay_data_offset = get_overlay_data_start_offset(pe, include_data_directories=include_data_directories)
 
     if overlay_data_offset is not None:
         return pe.__data__[overlay_data_offset:]
@@ -476,14 +495,12 @@ def trim(pe, include_data_directories=True):
           want to include the data directories in the calculation.
     """
 
-    overlay_data_offset = get_overlay_data_start_offset(
-        pe, include_data_directories=include_data_directories)
+    overlay_data_offset = get_overlay_data_start_offset(pe, include_data_directories=include_data_directories)
 
     if overlay_data_offset is not None:
         return pe.__data__[:overlay_data_offset]
 
     return pe.__data__[:]
-
 
 
 def is_memory_mapped(file_data):
@@ -503,7 +520,7 @@ def is_memory_mapped(file_data):
             else:
                 section_end = pe.sections[i + 1].VirtualAddress
             section_start = pe.sections[i].VirtualAddress + pe.sections[i].SizeOfRawData
-            if file_data[section_start:section_end] != '\x00' * (section_end - section_start):
+            if file_data[section_start:section_end] != b"\x00" * (section_end - section_start):
                 return False
         return True
     return False
@@ -524,10 +541,10 @@ def squash_flat_executable(memory_mapped, pe=None):
     if pe:
         squashed = pe.header
         for section in pe.sections:
-            squashed += '\x00' * (section.PointerToRawData - len(squashed))
-            squashed += memory_mapped[section.VirtualAddress:section.VirtualAddress + section.SizeOfRawData]
-        squashed += '\x00' * (-len(squashed) & 0x1ff)
-        squashed += memory_mapped[pe.OPTIONAL_HEADER.SizeOfImage:]
+            squashed += b"\x00" * (section.PointerToRawData - len(squashed))
+            squashed += memory_mapped[section.VirtualAddress : section.VirtualAddress + section.SizeOfRawData]
+        squashed += b"\x00" * (-len(squashed) & 0x1FF)
+        squashed += memory_mapped[pe.OPTIONAL_HEADER.SizeOfImage :]
         return squashed
     return None
 
@@ -560,7 +577,7 @@ def has_resources(pe):
 
     :return: Boolean value on whether the pefile.PE object has a DIRECTORY_ENTRY_RESOURCE.
     """
-    return hasattr(pe, 'DIRECTORY_ENTRY_RESOURCE')
+    return hasattr(pe, "DIRECTORY_ENTRY_RESOURCE")
 
 
 class Resource(object):
@@ -599,7 +616,7 @@ class Resource(object):
         if not self._data:
             rva = self._entry.directory.entries[0].data.struct.OffsetToData
             size = self._entry.directory.entries[0].data.struct.Size
-            self._data = self._pe.get_memory_mapped_image()[rva:rva + size]
+            self._data = self._pe.get_memory_mapped_image()[rva : rva + size]
             if not self._data:
                 # Sometimes the get_memory_mapped_image() method failed for an unknown reason.
                 # Resort to using get_data() if this happens.
@@ -702,6 +719,7 @@ def extract_target_rsrc(dirtype, idname, pe=None, file_data=None):
         pe = obtain_pe(file_data)
     if pe:
         for rsrc in iter_rsrc(pe, dirtype=dirtype):
+            assert type(rsrc.idname) == type(idname), f"{type(rsrc.idname)} != {type(idname)}"
             if rsrc.idname == idname:
                 return rsrc
     return None

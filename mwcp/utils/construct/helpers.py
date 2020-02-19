@@ -1,7 +1,7 @@
 """This modules contains helper functions for the construct library."""
 
-from __future__ import division, absolute_import
-
+import os
+import io
 import re
 import string
 import uuid
@@ -13,9 +13,6 @@ from mwcp.utils import custombase64, elffileutils, pefileutils
 # Patch with version 2.8 changes.
 from mwcp.utils.construct import version28 as construct
 from .version28 import *
-
-
-PY3 = sys.version_info.major == 3
 
 
 BYTE = Byte
@@ -134,7 +131,7 @@ class Printable(Validator):
     """
 
     def _validate(self, obj, context, path):
-        if PY3 and isinstance(obj, bytes):
+        if isinstance(obj, bytes):
             return all(chr(byte) in string.printable for byte in obj)
         return isinstance(obj, stringtypes) and all(char in string.printable for char in obj)
 
@@ -145,6 +142,51 @@ SkipNull = Const(b'\x00')[:]
 # Continuously parses until it hits the first zero byte (consumed).
 # Use this instead of CString() if you can't guarantee it won't fail to decode.
 CBytes = NullTerminated(GreedyBytes)
+
+
+class BytesTerminated(NullTerminated):
+    r"""
+    BytesTerminated is the same as NullTerminated except that it is targeted for binary data and not strings, and
+    therefore the terminator can be an arbitrary length (as opposed to having length equal to the character width).
+    See the NullTerminated documentation for the remainder of the functionality and options.
+
+    >>> BytesTerminated(GreedyBytes, term=b'TERM').parse(b'helloTERM')
+    'hello'
+    """
+
+    # The only method we need to override is _parse. Everything else from NullTerminated works as-is.
+    def _parse(self, stream, context, path):
+        term = self.term
+        term_len = len(term)
+        if term_len < 1:
+            raise PaddingError("BytesTerminated term must be at least 1 byte")
+        data = b''
+        while True:
+            pos = stream_tell(stream)
+            try:
+                b = stream_read(stream, term_len)
+                stream_seek(stream, pos, 0)
+            except StreamError:
+                if self.require:
+                    raise
+                else:
+                    stream_seek(stream, pos, 0)
+                    data += stream_read_entire(stream)
+                    break
+
+            if b == term:
+                if self.include:
+                    data += b
+                if self.consume:
+                    stream_read(stream, term_len)
+                break
+            else:
+                data += stream_read(stream, 1)
+        if self.subcon is GreedyBytes:
+            return data
+        if type(self.subcon) is GreedyString:
+            return data.decode(self.subcon.encoding)
+        return self.subcon._parsereport(io.BytesIO(data), context, path)
 
 
 # TODO: Make a LStripped?
@@ -268,7 +310,7 @@ class Base64(Adapter):
     WARNING: This adapter must be used on a unicode string value.
 
     :param subcon: the construct to wrap
-    :param str custom_alpha: optional custom alphabet to use
+    :param custom_alpha: optional custom alphabet to use
 
     e.g.
     >>> Base64(GreedyString()).build(b'hello')
@@ -651,8 +693,8 @@ class Delimited(Construct):
         """
         fallback = stream.tell()
         try:
-            for byte in iter(lambda: stream.read(1), ''):
-                if delimiter[0] == byte:
+            for byte in iter(lambda: stream.read(1), b''):
+                if delimiter[0] == ord(byte):
                     delimiter_offset = stream.seek(-1, os.SEEK_CUR)
                     if stream.read(len(delimiter)) == delimiter:
                         return delimiter_offset
@@ -831,7 +873,7 @@ class Regex(Construct):
         :raises ValueError: If arguments are invalid.
         """
         super(Regex, self).__init__()
-        if PY3 and isinstance(regex, str):
+        if isinstance(regex, str):
             regex = regex.encode()  # force byte strings
         if isinstance(regex, bytestringtype):
             regex = re.compile(regex, re.DOTALL)

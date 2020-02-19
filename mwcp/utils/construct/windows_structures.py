@@ -3,7 +3,7 @@ A central location to store common windows enumerations.
 This module will be imported along with 'from mwcp.utils import construct'
 """
 
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import datetime
 
@@ -17,7 +17,7 @@ from .windows_constants import *
 """PEFILE STRUCTURES"""
 
 IMAGE_DOS_HEADER = construct.Struct(
-    "e_magic" / construct.Default(construct.Bytes(2), "MZ"),
+    "e_magic" / construct.Default(construct.Bytes(2), b"MZ"),
     "e_cblp" / construct.Int16ul,
     "e_cp" / construct.Int16ul,
     "e_crlc" / construct.Int16ul,
@@ -251,7 +251,7 @@ PUBLICKEYBLOB = construct.Struct(
     "bitlen" / construct.Int32ul,
     construct.Check((this.bitlen % 8) == 0),
     "pubexponent" / construct.Int32ul,
-    "modulus" / construct.BytesInteger(this.bitlen / 8, swapped=True)
+    "modulus" / construct.BytesInteger(this.bitlen // 8, swapped=True)
 )
 
 PRIVATEKEYBLOB = construct.Struct(
@@ -261,17 +261,17 @@ PRIVATEKEYBLOB = construct.Struct(
     "bitlen" / construct.Int32ul,
     construct.Check((this.bitlen % 8) == 0),
     "pubexponent" / construct.Int32ul,
-    "modulus" / construct.BytesInteger(this.bitlen / 8, swapped=True),
-    "P" / construct.BytesInteger(this.bitlen / 16, swapped=True),
-    "Q" / construct.BytesInteger(this.bitlen / 16, swapped=True),
+    "modulus" / construct.BytesInteger(this.bitlen // 8, swapped=True),
+    "P" / construct.BytesInteger(this.bitlen // 16, swapped=True),
+    "Q" / construct.BytesInteger(this.bitlen // 16, swapped=True),
     # d % (p - 1)
-    "Dp" / construct.BytesInteger(this.bitlen / 16, swapped=True),
+    "Dp" / construct.BytesInteger(this.bitlen // 16, swapped=True),
     # d % (q - 1)
-    "Dq" / construct.BytesInteger(this.bitlen / 16, swapped=True),
+    "Dq" / construct.BytesInteger(this.bitlen // 16, swapped=True),
     # ~(q % p)
-    "Iq" / construct.BytesInteger(this.bitlen / 16, swapped=True),
+    "Iq" / construct.BytesInteger(this.bitlen // 16, swapped=True),
     # Private Exponent
-    "D" / construct.BytesInteger(this.bitlen / 8, swapped=True)
+    "D" / construct.BytesInteger(this.bitlen // 8, swapped=True)
 )
 
 """TIME STRUCTURES"""

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
 DC3-MWCP server--simple REST API using the Flask framework.
 """

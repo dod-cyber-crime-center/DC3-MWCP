@@ -1,6 +1,3 @@
-
-import os
-
 import pytest
 
 
@@ -22,6 +19,7 @@ def test_dir(tmpdir):
     return directory
 
 
+# language=Python
 TEST_PARSER = u'''
 from mwcp import Parser
 
@@ -34,6 +32,7 @@ class Implant(Parser):
     
 '''
 
+# language=Yaml
 TEST_PARSER_CONFIG = u'''
 Sample:
     description: A test parser

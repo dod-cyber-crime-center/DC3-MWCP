@@ -2,20 +2,14 @@
 Tests the CLI tools.
 """
 
-from __future__ import print_function
-from future.builtins import open
-
 import hashlib
 import json
-import re
 import os
+import re
 import sys
 
 import pytest
-try:
-    import pathlib
-except ImportError:
-    import pathlib2 as pathlib
+import pathlib
 
 import mwcp
 from mwcp import cli

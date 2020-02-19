@@ -22,17 +22,18 @@ mp_queue = mp.Queue()
 
 class LevelCharFilter(logging.Filter):
     """Logging filter used to add a 'level_char' format variable."""
+
     def filter(self, record):
         if record.levelno >= logging.ERROR:
-            record.level_char = '!'
+            record.level_char = "!"
         elif record.levelno >= logging.WARN:
-            record.level_char = '-'
+            record.level_char = "-"
         elif record.levelno >= logging.INFO:
-            record.level_char = '+'
+            record.level_char = "+"
         elif record.levelno >= logging.DEBUG:
-            record.level_char = '*'
+            record.level_char = "*"
         else:
-            record.level_char = ' '
+            record.level_char = " "
         return True
 
 
@@ -64,7 +65,7 @@ class MPRotatingFileHandler(logging.handlers.RotatingFileHandler):
         try:
             super(MPRotatingFileHandler, self).doRollover()
         except OSError as e:
-            if not (sys.platform == 'win32' and e.errno == errno.EACCES):
+            if not (sys.platform == "win32" and e.errno == errno.EACCES):
                 raise
 
 
@@ -81,7 +82,7 @@ class MPChildHandler(logging.Handler):
 
     def emit(self, record):
         if record.exc_info:
-            record.exc_text = ''.join(traceback.format_exception(*record.exc_info))
+            record.exc_text = "".join(traceback.format_exception(*record.exc_info))
             record.exc_info = None
 
         self.queue.put(record)
@@ -139,7 +140,7 @@ class ListHandler(logging.Handler):
 
 def start_listener():
     """Start the listener thread for multi-process logging."""
-    if mp.current_process().name != 'MainProcess':
+    if mp.current_process().name != "MainProcess":
         return
 
     def _mp_log_listener(log_queue):
@@ -162,24 +163,26 @@ def setup_logging(default_level=logging.INFO, queue=None):
     :param queue: Queue used to pass logs to.
     """
     if queue:
-        assert mp.current_process().name != 'MainProcess'
+        assert mp.current_process().name != "MainProcess"
         logging.root.addHandler(MPChildHandler(queue))
         logging.root.setLevel(logging.DEBUG)  # Allow all records to pass through.
     else:
         # Allow setting log configuration using 'MWCP_LOG_CFG' environment variable.
-        log_config = os.getenv('MWCP_LOG_CFG', None)
+        log_config = os.getenv("MWCP_LOG_CFG", None)
         if log_config is None:
-            log_config = mwcp.config.get('LOG_CONFIG_PATH', None)
+            log_config = mwcp.config.get("LOG_CONFIG_PATH", None)
         else:
-            warnings.warn('Using MWCP_LOG_CFG to set log configuration is deprecated. '
-                          'Please specify path in the configuration file instead.')
+            warnings.warn(
+                "Using MWCP_LOG_CFG to set log configuration is deprecated. "
+                "Please specify path in the configuration file instead."
+            )
         if log_config:
             try:
-                with open(log_config, 'rt') as f:
+                with open(log_config, "rt") as f:
                     config = yaml.safe_load(f.read())
                 logging.config.dictConfig(config)
             except IOError as e:
-                warnings.warn('Unable to set log config file: {} with error: {}'.format(log_config, e))
+                warnings.warn("Unable to set log config file: {} with error: {}".format(log_config, e))
                 logging.basicConfig(level=default_level)
         else:
             logging.basicConfig(level=default_level)

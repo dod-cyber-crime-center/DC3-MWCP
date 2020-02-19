@@ -55,14 +55,14 @@ Usage:
 """
 
 import argparse
+from typing import Tuple, List
+
+import pyparsing as pp
 import re
 import sys
 
-import pyparsing as pp
-
 
 _PARSER = None
-
 
 
 # region PARSING HOOKS
@@ -71,11 +71,11 @@ _PARSER = None
 # Some variables found to be used in obfuscated code with the most probable values.
 # TODO: Fill this up!
 _VARIABLE_LOOKUP = {
-    'pshome': r'C:\Windows\System32\WindowsPowerShell\v1.0',
-    'shellid': 'Microsoft.PowerShell',
-    'env:public': r'C:\Users\Public',
-    'env:comspec': r'C:\Windows\system32\cmd.exe',
-    'verbosepreference.tostring()': 'SilentlyContinue',
+    "pshome": r"C:\Windows\System32\WindowsPowerShell\v1.0",
+    "shellid": "Microsoft.PowerShell",
+    "env:public": r"C:\Users\Public",
+    "env:comspec": r"C:\Windows\system32\cmd.exe",
+    "verbosepreference.tostring()": "SilentlyContinue",
 }
 
 
@@ -98,9 +98,9 @@ def _string_replace(tokens):
     data = tokens.data
     for replace in tokens.replace:
         # Only escape "\" otherwise regex complains if it trailing.
-        old = replace.old.replace('\\', '\\\\')
-        new = replace.new.replace('\\', '\\\\')
-        data = re.sub(old, new, data, flags=re.IGNORECASE if replace.command != 'creplace' else 0)
+        old = replace.old.replace("\\", "\\\\")
+        new = replace.new.replace("\\", "\\\\")
+        data = re.sub(old, new, data, flags=re.IGNORECASE if replace.command != "creplace" else 0)
     return data
 
 
@@ -120,7 +120,8 @@ def _split(tokens):
 
 # region PARSING GRAMMER
 
-def OptionalParen(expr, parenthesis='()'):
+
+def OptionalParen(expr, parenthesis="()"):
     """
     Wraps pyparsing expression to add optional parenthesis.
 
@@ -163,78 +164,74 @@ def _gen_parser():
     >>> parser.parseString("'FOtestingFO'.RePLaCE('FO','`')")
     (['`testing`'], {})
     """
-    char = (
-        '[' + pp.CaselessKeyword('char') + ']' + pp.Word(pp.nums)('num')
-    ).setParseAction(lambda t: chr(int(t.num)))
+    char = ("[" + pp.CaselessKeyword("char") + "]" + pp.Word(pp.nums)("num")).setParseAction(lambda t: chr(int(t.num)))
     string = (
-        (pp.Suppress("'") + '`' + pp.Suppress("'"))
-        | (pp.Suppress('"') + '`' + pp.Suppress('"'))
-        | pp.QuotedString("'", escChar='`', escQuote="''", multiline=True, convertWhitespaceEscapes=False)
-        | pp.QuotedString('"', escChar='`', escQuote='""', multiline=True, convertWhitespaceEscapes=False)
+        (pp.Suppress("'") + "`" + pp.Suppress("'"))
+        | (pp.Suppress('"') + "`" + pp.Suppress('"'))
+        | pp.QuotedString("'", escChar="`", escQuote="''", multiline=True, convertWhitespaceEscapes=False)
+        | pp.QuotedString('"', escChar="`", escQuote='""', multiline=True, convertWhitespaceEscapes=False)
     )
-    variable = (
-        '$' + pp.oneOf(_VARIABLE_LOOKUP.keys(), caseless=True)('var')
-    ).setParseAction(lambda t: _VARIABLE_LOOKUP[t.var.lower()])
+    variable = ("$" + pp.oneOf(_VARIABLE_LOOKUP.keys(), caseless=True)("var")).setParseAction(
+        lambda t: _VARIABLE_LOOKUP[t.var.lower()]
+    )
 
-    _string = (
-        pp.Suppress(pp.Optional('[' + pp.CaselessKeyword('string') + ']'))
-        + OptionalParen(
-            pp.Suppress(pp.Optional('[' + pp.CaselessKeyword('string') + ']'))
-            + string | char | variable
-        )
+    _string = pp.Suppress(pp.Optional("[" + pp.CaselessKeyword("string") + "]")) + OptionalParen(
+        pp.Suppress(pp.Optional("[" + pp.CaselessKeyword("string") + "]")) + string | char | variable
     )
     concat_string = OptionalParen(
-        pp.delimitedList(OptionalParen(_string), delim='+').setParseAction(lambda t: ''.join(t)))
+        pp.delimitedList(OptionalParen(_string), delim="+").setParseAction(lambda t: "".join(t))
+    )
 
     # TODO: Support ranges and other fancy indexing.
-    indexing = (
-        concat_string('data')
-        + '[' + pp.delimitedList(pp.Word(pp.nums))('indices') + ']'
-    ).setParseAction(_indexing)
+    indexing = (concat_string("data") + "[" + pp.delimitedList(pp.Word(pp.nums))("indices") + "]").setParseAction(
+        _indexing
+    )
 
     # Combine used to enforce there is no space between "c" and "replace"
-    _replace_command = pp.Combine(
-        pp.Optional(pp.CaselessLiteral('c')) + pp.CaselessKeyword('replace')
-    )('command')
+    _replace_command = pp.Combine(pp.Optional(pp.CaselessLiteral("c")) + pp.CaselessKeyword("replace"))("command")
     string_replace = (
-        concat_string('data')
+        concat_string("data")
         + pp.OneOrMore(
             pp.Group(
-                (pp.Combine('-' + _replace_command) + concat_string('old') + ',' + concat_string('new'))
-                | ('.' + ("'" + _replace_command + "'" | '"' + _replace_command + '"' | _replace_command)
-                   + '(' + concat_string('old') + ',' + concat_string('new') + ')')
-        ))('replace')
+                (pp.Combine("-" + _replace_command) + concat_string("old") + "," + concat_string("new"))
+                | (
+                    "."
+                    + ("'" + _replace_command + "'" | '"' + _replace_command + '"' | _replace_command)
+                    + ("(" + concat_string("old") + "," + concat_string("new") + ")")
+                )
+            )
+        )("replace")
     ).setParseAction(_string_replace)
 
     string_format = (
-        concat_string('format_string')
-        + pp.OneOrMore(
-            pp.Group(pp.CaselessKeyword('-f') + pp.delimitedList(concat_string)('params'))
-        )('format')
+        concat_string("format_string")
+        + pp.OneOrMore(pp.Group(pp.CaselessKeyword("-f") + pp.delimitedList(concat_string)("params")))("format")
     ).setParseAction(_string_format)
 
     split = (
-        concat_string('data')
+        concat_string("data")
         + pp.OneOrMore(
             pp.Group(
-                (pp.CaselessKeyword('-split') + concat_string('delimiters'))
-                | ('.' + pp.CaselessKeyword('split') + '(' + concat_string('delimiters') + ')')
+                (pp.CaselessKeyword("-split") + concat_string("delimiters"))
+                | ("." + pp.CaselessKeyword("split") + "(" + concat_string("delimiters") + ")")
             )
-        )('split')
+        )("split")
     ).setParseAction(_split)
 
     join = (
-        OptionalParen(pp.delimitedList(concat_string)('string_list'))
-        + pp.CaselessKeyword('-join') + concat_string('join_string')
+        OptionalParen(pp.delimitedList(concat_string)("string_list"))
+        + pp.CaselessKeyword("-join")
+        + concat_string("join_string")
     ).setParseAction(lambda t: t.join_string.join(t.string_list))
 
     join_unary = (
-            (pp.CaselessKeyword('-join') | pp.CaselessKeyword('[string]::join'))
-            + '(' + OptionalParen(pp.delimitedList(concat_string)('string_list')) + ')'
-    ).setParseAction(lambda t: ''.join(t.string_list))
+        (pp.CaselessKeyword("-join") | pp.CaselessKeyword("[string]::join"))
+        + "("
+        + OptionalParen(pp.delimitedList(concat_string)("string_list"))
+        + ")"
+    ).setParseAction(lambda t: "".join(t.string_list))
 
-
-    # Names added for help debugging.
+    # fmt: off
     poss_elements = OptionalParen(
         string_format
         | string_replace
@@ -244,6 +241,7 @@ def _gen_parser():
         | indexing
         | concat_string
     )
+    # fmt: on
 
     return poss_elements
 
@@ -261,7 +259,7 @@ def _format_code_string(string):
     return code_string
 
 
-def deobfuscate(code, depth=32, recursive=False):
+def deobfuscate(code, depth=32, recursive=False) -> Tuple[str, List[str]]:
     """
     Deobfuscates strings found in powershell code.
 
@@ -273,8 +271,11 @@ def deobfuscate(code, depth=32, recursive=False):
     returns: tuple containing -- (deobfuscate code, list of strings found)
     """
     if depth <= 0:
-        raise ValueError('Depth must be a positive number.')
+        raise ValueError("Depth must be a positive number.")
     orig_depth = depth
+
+    if isinstance(code, bytes):
+        code = code.decode("latin1")
 
     # Generate parser on first run.
     global _PARSER
@@ -284,7 +285,7 @@ def deobfuscate(code, depth=32, recursive=False):
 
     # Continuously run code through string deobfuscation until we don't get anything new.
     # (This is necessary because pyparsing is not a true recursive descent parser)
-    prev_code = ''
+    prev_code = ""
     strings = []
     while depth and prev_code != code:
         depth -= 1
@@ -303,20 +304,20 @@ def deobfuscate(code, depth=32, recursive=False):
                 strings.extend(result)
 
             # replace obfuscated code with less obfuscated code.
-            code_string = ', '.join(map(_format_code_string, result))
+            code_string = ", ".join(map(_format_code_string, result))
             # Only wrap parenthesis if more than one string.
             if len(result) > 1:
-                code_string = '({})'.format(code_string)
+                code_string = "({})".format(code_string)
 
             code_replacements.append((start, end, code_string))
 
         # Replace code with new code.
-        new_code = ''
+        new_code = ""
         index = 0
         for start, end, code_string in code_replacements:
             # Sometimes pyparsing includes whitespace at the end of the parsed string for some reason...
             try:
-                while code[end - 1] in ('\r', '\n', ' '):
+                while code[end - 1] in ("\r", "\n", " "):
                     end -= 1
             except IndexError:
                 pass
@@ -325,25 +326,24 @@ def deobfuscate(code, depth=32, recursive=False):
         new_code += code[index:]
         code = new_code
 
-
     return code, strings
 
 
 def main():
     """CLI interface"""
-    arg_parser = argparse.ArgumentParser('Powershell Deobfuscator')
-    arg_parser.add_argument('INPUT', help='Input file (or code) to deobfuscate')
-    arg_parser.add_argument('OUTPUT', nargs='?', help='Deobfuscated file (default: stdout)')
+    arg_parser = argparse.ArgumentParser("Powershell Deobfuscator")
+    arg_parser.add_argument("INPUT", help="Input file (or code) to deobfuscate")
+    arg_parser.add_argument("OUTPUT", nargs="?", help="Deobfuscated file (default: stdout)")
 
     args = arg_parser.parse_args()
 
     if args.OUTPUT:
-        output = open(args.OUTPUT, 'wb')
+        output = open(args.OUTPUT, "w")
     else:
         output = sys.stdout
 
     try:
-        with open(args.INPUT, 'rb') as fo:
+        with open(args.INPUT, "r") as fo:
             deob_code, _ = deobfuscate(fo.read())
             output.write(deob_code)
     finally:
@@ -351,5 +351,5 @@ def main():
             output.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

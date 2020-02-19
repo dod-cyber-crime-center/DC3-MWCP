@@ -28,25 +28,54 @@ from mwcp.utils.stringutils import convert_to_unicode, sanitize_filename
 from mwcp.utils import logutil
 
 logger = logging.getLogger(__name__)
-ascii_writer = codecs.getwriter('ascii')
+ascii_writer = codecs.getwriter("ascii")
 
 PY3 = sys.version_info > (3,)
 
 # pefile is now strictly optional, loaded down below so we can use
 # reporter for error reporting
 
-INFO_FIELD_ORDER = ['inputfilename', 'md5', 'sha1', 'sha256', 'compiletime']
-STANDARD_FIELD_ORDER = ["c2_url", "c2_socketaddress", "c2_address",
-                        "proxy", "proxy_credential", "proxy_username", "proxy_password",
-                        "proxy_socketaddress", "proxy_address", "proxyport",
-                        "url", "urlpath",
-                        "socketaddress", "address", "port", "listenport",
-                        "credential", "username", "password",
-                        "missionid", "useragent", "interval", "version", "mutex",
-                        "service", "servicename", "servicedisplayname", "servicedescription",
-                        "serviceimage", "servicedll", "injectionprocess",
-                        "filepath", "directory", "filename",
-                        "registrykeyvalue", "registrykey", "registryvalue", "key"]
+INFO_FIELD_ORDER = ["inputfilename", "md5", "sha1", "sha256", "compiletime"]
+STANDARD_FIELD_ORDER = [
+    "c2_url",
+    "c2_socketaddress",
+    "c2_address",
+    "proxy",
+    "proxy_credential",
+    "proxy_username",
+    "proxy_password",
+    "proxy_socketaddress",
+    "proxy_address",
+    "proxyport",
+    "url",
+    "urlpath",
+    "socketaddress",
+    "address",
+    "port",
+    "listenport",
+    "credential",
+    "username",
+    "password",
+    "missionid",
+    "useragent",
+    "interval",
+    "version",
+    "mutex",
+    "service",
+    "servicename",
+    "servicedisplayname",
+    "servicedescription",
+    "serviceimage",
+    "servicedll",
+    "injectionprocess",
+    "filepath",
+    "directory",
+    "filename",
+    "registrykeyvalue",
+    "registrykey",
+    "registryvalue",
+    "key",
+]
 
 
 class ReporterLogHandler(logging.Handler):
@@ -93,17 +122,19 @@ class Reporter(object):
             use debug instead
 
     """
+
     URL_RE = re.compile(r"[a-z\.-]{1,40}://(?P<address>\[?[^/]+\]?)(?P<path>/[^?]+)?")
     PORT_RE = re.compile(r"[0-9]{1,5}")
-    SHA1_RE = re.compile('[0-9a-fA-F]{40}')
+    SHA1_RE = re.compile("[0-9a-fA-F]{40}")
 
-    def __init__(self,
-                 outputdir=None,
-                 tempdir=None,
-                 disable_output_files=False,
-                 disable_temp_cleanup=False,
-                 base64_output_files=False,
-                 ):
+    def __init__(
+        self,
+        outputdir=None,
+        tempdir=None,
+        disable_output_files=False,
+        disable_temp_cleanup=False,
+        base64_output_files=False,
+    ):
         """
         Initializes the Reporter object
 
@@ -124,13 +155,13 @@ class Reporter(object):
         self.input_file = None
 
         self._managed_tempdir = None
-        self._output_dir = outputdir or ''
+        self._output_dir = outputdir or ""
 
         self._disable_output_files = disable_output_files
         self._disable_temp_cleanup = disable_temp_cleanup
         self._base64_output_files = base64_output_files
 
-        with open(config.get('FIELDS_PATH'), 'rb') as f:
+        with open(config.get("FIELDS_PATH"), "rb") as f:
             self.fields = json.load(f)
 
     @property
@@ -141,8 +172,7 @@ class Reporter(object):
         """
 
         if not self._managed_tempdir:
-            self._managed_tempdir = tempfile.mkdtemp(
-                dir=self.tempdir, prefix="mwcp-managed_tempdir-")
+            self._managed_tempdir = tempfile.mkdtemp(dir=self.tempdir, prefix="mwcp-managed_tempdir-")
 
             if self._disable_temp_cleanup:
                 logger.info("Using managed temp dir: {}".format(self._managed_tempdir))
@@ -155,7 +185,7 @@ class Reporter(object):
             return
         value = convert_to_unicode(value)
         obj = self.metadata.setdefault(key, [])
-        if key == 'debug' or value not in obj:
+        if key == "debug" or value not in obj:
             obj.append(value)
 
         if key == "filepath":
@@ -177,9 +207,8 @@ class Reporter(object):
         if key == "serviceimage":
             # we use tactic of looking for first .exe in value. This is
             # not guaranteed to be reliable
-            if '.exe' in value:
-                self.add_metadata("filepath", value[
-                                              0:value.find('.exe') + 4])
+            if ".exe" in value:
+                self.add_metadata("filepath", value[0 : value.find(".exe") + 4])
 
         if key == "servicedll":
             self.add_metadata("filepath", value)
@@ -201,11 +230,11 @@ class Reporter(object):
                 self.add_metadata("urlpath", match.group("path"))
 
             if match.group("address"):
-                address = match.group("address").rstrip(': ')
+                address = match.group("address").rstrip(": ")
                 if address.startswith("["):
                     # ipv6--something like
                     # [fe80::20c:1234:5678:9abc]:80
-                    domain, found, port = address[1:].partition(']:')
+                    domain, found, port = address[1:].partition("]:")
                 else:
                     domain, found, port = address.partition(":")
 
@@ -226,11 +255,11 @@ class Reporter(object):
     def _add_metadata_listofstringtuples(self, key, values):
         # Pad values that allow for shorter versions.
         expected_size = {
-            'proxy': 5,
-            'rsa_private_key': 8,
+            "proxy": 5,
+            "rsa_private_key": 8,
         }
         if key in expected_size:
-            values = tuple(values) + ('',) * (expected_size[key] - len(values))
+            values = tuple(values) + ("",) * (expected_size[key] - len(values))
 
         values = list(map(convert_to_unicode, values))
 
@@ -250,7 +279,7 @@ class Reporter(object):
                 if _value:
                     self.add_metadata(subfield, _value)
             if len(values) != len(subfields):
-                logger.warn("Expected {} values in type {}, received {}".format(len(subfields), key, len(values)))
+                logger.warning("Expected {} values in type {}, received {}".format(len(subfields), key, len(values)))
 
         # Special case validation.
         if key == "c2_socketaddress":
@@ -263,33 +292,28 @@ class Reporter(object):
 
         if key == "socketaddress":
             if len(values) != 3:
-                logger.warn(
-                    "Expected three values in type socketaddress, received %i" % len(values))
+                logger.warning("Expected three values in type socketaddress, received %i" % len(values))
             self.add_metadata("address", values[0])
             self.add_metadata("port", values[1:])
 
         if key in ("port", "listenport"):
             if len(values) != 2:
-                logger.warn("Expected two values in type %s, received %i" % (
-                    key, len(values)))
+                logger.warning("Expected two values in type %s, received %i" % (key, len(values)))
             # check for integer number and valid proto?
             match = self.PORT_RE.search(values[0])
             if match:
-                portnum = int(values[0])
+                portnum = int(match.group(0))
                 if portnum < 0 or portnum > 65535:
-                    logger.warn(
-                        "Expected port to be number between 0 and 65535")
+                    logger.warning("Expected port to be number between 0 and 65535")
             else:
-                logger.warn(
-                    "Expected port to be number between 0 and 65535")
+                logger.warning("Expected port to be number between 0 and 65535")
             if len(values) >= 2:
                 if values[1] not in ["tcp", "udp", "icmp"]:
-                    logger.warn(
-                        "Expected port type to be tcp or udp (or icmp)")
+                    logger.warning("Expected port type to be tcp or udp (or icmp)")
 
         if key == "proxy":
             if len(values) != 5:
-                logger.warn("Expected 5 values in type %s, received %i" % (key, len(values)))
+                logger.warning("Expected 5 values in type %s, received %i" % (key, len(values)))
             self.add_metadata("credential", values[:2])
             if len(values[2:]) == 1:
                 self.add_metadata("proxy_address", values[2])
@@ -298,18 +322,18 @@ class Reporter(object):
 
         if key == "ftp":
             if len(values) != 3:
-                logger.warn("Expected 3 values in type %s, received %i" % (key, len(values)))
+                logger.warning("Expected 3 values in type %s, received %i" % (key, len(values)))
             self.add_metadata("credential", values[:2])
             if len(values) >= 3:
                 self.add_metadata("url", values[2])
 
         if key == "rsa_public_key":
             if len(values) != 2:
-                logger.warn("Expected 3 values in type %s, received %i" % (key, len(values)))
+                logger.warning("Expected 3 values in type %s, received %i" % (key, len(values)))
 
         if key == "rsa_private_key":
             if len(values) != 8:
-                logger.warn("Expected 8 values in type %s, received %i" % (key, len(values)))
+                logger.warning("Expected 8 values in type %s, received %i" % (key, len(values)))
 
     def _add_metadata_dictofstrings(self, key, value):
         # check for type of other?
@@ -332,8 +356,10 @@ class Reporter(object):
                     obj[subkey] = subvalue
             else:
                 # TODO: support inserts of lists (assuming members are strings)?
-                logger.warn("Could not add object of %s to metadata under other using key %s" % (
-                    str(type(subvalue[subkey])), subkey))
+                logger.warning(
+                    "Could not add object of %s to metadata under other using key %s"
+                    % (str(type(subvalue[subkey])), subkey)
+                )
 
     def add_metadata(self, key, value):
         """
@@ -348,13 +374,16 @@ class Reporter(object):
         """
         keyu = convert_to_unicode(key)
         if value is None or all(not _value for _value in value):
-            logger.warn("no values provided for %s, skipping" % key)
+            logger.warning("no values provided for %s, skipping" % key)
             return
 
         if keyu not in self.fields:
-            raise KeyError('Invalid field name: {}'.format(keyu))
+            raise KeyError("Invalid field name: {}".format(keyu))
 
-        fieldtype = self.fields[keyu]['type']
+        if isinstance(value, bytes):
+            value = value.decode("latin1")
+
+        fieldtype = self.fields[keyu]["type"]
 
         try:
             if fieldtype == "listofstrings":
@@ -381,9 +410,10 @@ class Reporter(object):
         # TODO: Remove all traces of the input file in the reporter!!
         #  (kept around for now because tool.py uses it for pulling file info)
         if file_path:
-            with open(file_path, 'rb') as f:
+            with open(file_path, "rb") as f:
                 self.input_file = mwcp.FileObject(
-                    f.read(), self, file_name=os.path.basename(file_path), output_file=False)
+                    f.read(), self, file_name=os.path.basename(file_path), output_file=False
+                )
                 self.input_file.file_path = file_path
         else:
             self.input_file = mwcp.FileObject(data, self, output_file=False)
@@ -396,15 +426,18 @@ class Reporter(object):
                     try:
                         parser.parse(self.input_file, self)
                     except (Exception, SystemExit):
-                        logger.exception("Error running parser {}:{} on {}".format(
-                            source.name, parser.name, file_path or self.input_file.md5))
+                        logger.exception(
+                            "Error running parser {}:{} on {}".format(
+                                source.name, parser.name, file_path or self.input_file.md5
+                            )
+                        )
 
                 if not found:
-                    logger.error('Could not find parsers with name: {}'.format(name))
+                    logger.error("Could not find parsers with name: {}".format(name))
         finally:
             self.__cleanup()
 
-    def output_file(self, data, filename, description=''):
+    def output_file(self, data, filename, description=""):
         """
         Report a file created by the parser
 
@@ -419,8 +452,7 @@ class Reporter(object):
         md5 = hashlib.md5(data).hexdigest()
 
         if self._base64_output_files:
-            self.add_metadata(
-                "outputfile", [filename, description, md5, base64.b64encode(data)])
+            self.add_metadata("outputfile", [filename, description, md5, base64.b64encode(data)])
         else:
             self.add_metadata("outputfile", [filename, description, md5])
 
@@ -428,7 +460,7 @@ class Reporter(object):
             return None
 
         # Create a safe filename that won't have any name collisions.
-        safe_filename = '{}_{}'.format(md5[:5], sanitize_filename(filename))
+        safe_filename = "{}_{}".format(md5[:5], sanitize_filename(filename))
         full_path = os.path.join(self._output_dir, safe_filename)
 
         # Make directory if it doesn't exist.
@@ -439,27 +471,27 @@ class Reporter(object):
         try:
             with open(full_path, "wb") as f:
                 f.write(data)
-            logger.debug('Output file: {}'.format(full_path))
+            logger.debug("Output file: {}".format(full_path))
             return full_path
         except Exception as e:
-            logger.error('Failed to write output file {} with error: {}'.format(full_path, e))
+            logger.error("Failed to write output file {} with error: {}".format(full_path, e))
             return None
 
     # TODO: Deprecate this function, we should be interfacing with FileObject instead.
-    def report_tempfile(self, filename, description=''):
+    def report_tempfile(self, filename, description=""):
         """
         load filename from filesystem and report using output_file
         """
         warnings.warn(
-            'report_tempfile() is deprecated. Please output files using FileObject.output() instead.',
-            DeprecationWarning)
+            "report_tempfile() is deprecated. Please output files using FileObject.output() instead.",
+            DeprecationWarning,
+        )
         if os.path.isfile(filename):
             with open(filename, "rb") as f:
                 data = f.read()
             self.output_file(data, os.path.basename(filename), description)
         else:
-            logger.info(
-                "Could not output file because it could not be found: %s" % filename)
+            logger.info("Could not output file because it could not be found: %s" % filename)
 
     def format_list(self, values, key=None):
 
@@ -476,12 +508,12 @@ class Reporter(object):
         elif key == "service" and len(values) == 5:
             return ", ".join(values)
         else:
-            return ' '.join(values)
+            return " ".join(values)
 
     def print_keyvalue(self, key, value):
         print(
             self.get_printable_key_value(key, value),
-            file=ascii_writer(getattr(sys.stdout, 'buffer', sys.stdout), 'backslashreplace')
+            file=ascii_writer(getattr(sys.stdout, "buffer", sys.stdout), "backslashreplace"),
         )
 
     def print_report(self):
@@ -490,10 +522,7 @@ class Reporter(object):
         """
         # Use sys.stdout.buffer if it exists, which is the case for Python 3 and is required
         # for writing a bytes string. Otherwise just write to whatever is at sys.stdout
-        print(
-            self.get_output_text(),
-            file=ascii_writer(getattr(sys.stdout, 'buffer', sys.stdout), 'backslashreplace')
-        )
+        print(self.get_output_text(), file=ascii_writer(getattr(sys.stdout, "buffer", sys.stdout), "backslashreplace"))
 
     def get_printable_key_value(self, key, value):
         output = u""
@@ -520,12 +549,11 @@ class Reporter(object):
         infoorderlist = INFO_FIELD_ORDER
         fieldorderlist = STANDARD_FIELD_ORDER
 
-        if 'inputfilename' in self.metadata:
+        if "inputfilename" in self.metadata:
             output += u"\n----File Information----\n\n"
             for key in infoorderlist:
                 if key in self.metadata:
-                    output += self.get_printable_key_value(
-                        key, self.metadata[key])
+                    output += self.get_printable_key_value(key, self.metadata[key])
 
         output += u"\n----Standard Metadata----\n\n"
 
@@ -542,8 +570,7 @@ class Reporter(object):
         if "other" in self.metadata:
             output += u"\n----Other Metadata----\n\n"
             for key in sorted(list(self.metadata["other"])):
-                output += self.get_printable_key_value(
-                    key, self.metadata["other"][key])
+                output += self.get_printable_key_value(key, self.metadata["other"][key])
 
         # TODO: Should we still be showing these debug logs?
         if "debug" in self.metadata:
@@ -554,8 +581,7 @@ class Reporter(object):
         if "outputfile" in self.metadata:
             output += u"\n----Output Files----\n\n"
             for value in self.metadata["outputfile"]:
-                output += self.get_printable_key_value(
-                    value[0], (value[1], value[2]))
+                output += self.get_printable_key_value(value[0], (value[1], value[2]))
 
         if self.errors:
             output += u"\n----Errors----\n\n"
@@ -619,9 +645,8 @@ class Reporter(object):
                 try:
                     shutil.rmtree(self._managed_tempdir, ignore_errors=True)
                 except Exception as e:
-                    logger.error("Failed to purge temp dir: %s, %s" %
-                                 (self._managed_tempdir, str(e)))
-                self._managed_tempdir = ''
+                    logger.error("Failed to purge temp dir: %s, %s" % (self._managed_tempdir, str(e)))
+                self._managed_tempdir = ""
         self._managed_tempdir = None
 
     def __del__(self):

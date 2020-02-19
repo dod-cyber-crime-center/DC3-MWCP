@@ -9,7 +9,10 @@ import pytest
 from mwcp.utils import construct
 
 
-@pytest.mark.skipif(sys.version_info[0] != 2, reason="Doctests designed for Python 2")
+@pytest.mark.xfail(
+    raises=ValueError,
+    reason="Doctest is producing a 'wrapper loop when unwrapping obj_' error"
+)
 def test_helpers():
     """Tests that the doctests for the helpers work."""
     helper_modules = [

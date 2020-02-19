@@ -208,8 +208,8 @@ def main():
     # Configure test object
     tester = Tester(
         reporter=reporter, results_dir=args.test_case_dir, parser_names=parsers, nprocs=args.nprocs,
-        field_names=filter(None, args.field_names.split(",")),
-        ignore_field_names=filter(None, args.exclude_field_names.split(","))
+        field_names=[_f for _f in args.field_names.split(",") if _f],
+        ignore_field_names=[_f for _f in args.exclude_field_names.split(",") if _f]
     )
 
     # Gather all our input files

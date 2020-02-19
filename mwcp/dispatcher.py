@@ -18,12 +18,14 @@ class UnableToParse(Exception):
     This exception can be thrown if a parser that has been correctly identified has failed to parse
     the file and you would like other parsers to be tried.
     """
+
     pass
 
 
 class UnidentifiedFile(Parser):
     """Describes an unidentified file. This parser will hit on any FileObject."""
-    DESCRIPTION = 'Unidentified file'
+
+    DESCRIPTION = "Unidentified file"
 
     @classmethod
     def identify(cls, file_object):
@@ -52,8 +54,18 @@ class Dispatcher(object):
 
     """
 
-    def __init__(self, name, author='', description='', parsers=None, greedy=False, default=UnidentifiedFile,
-                 output_unidentified=True, overwrite_descriptions=False, embedded=False):
+    def __init__(
+        self,
+        name,
+        author="",
+        description="",
+        parsers=None,
+        greedy=False,
+        default=UnidentifiedFile,
+        output_unidentified=True,
+        overwrite_descriptions=False,
+        embedded=False,
+    ):
         """
         Initializes the Dispatcher with the given parsers to run.
 
@@ -96,7 +108,7 @@ class Dispatcher(object):
         self.knowledge_base = {}
 
     def __repr__(self):
-        return '{}({})'.format(self.name, ', '.join(repr(parser) for parser in self.parsers))
+        return "{}({})".format(self.name, ", ".join(repr(parser) for parser in self.parsers))
 
     def identify(self, file_object):
         """
@@ -121,10 +133,13 @@ class Dispatcher(object):
         if not file_object.parent:
             file_object.parent = self._current_file_object
             if self._current_file_object:
-                logger.info(u'{} dispatched residual file: {}'.format(
-                    self._current_file_object.file_name, file_object.file_name))
+                logger.info(
+                    u"{} dispatched residual file: {}".format(
+                        self._current_file_object.file_name, file_object.file_name
+                    )
+                )
                 if file_object.description:
-                    logger.info(u'File {} described as {}'.format(file_object.file_name, file_object.description))
+                    logger.info(u"File {} described as {}".format(file_object.file_name, file_object.description))
 
         self._fifo_buffer.appendleft(file_object)
 
@@ -137,11 +152,10 @@ class Dispatcher(object):
         :yields: Identified Parser class or another Dispatcher that can be run
         """
         for parser in self.parsers:
-            logger.debug(u'Identifying {} with {!r}.'.format(file_object.file_name, parser))
+            logger.debug(u"Identifying {} with {!r}.".format(file_object.file_name, parser))
             if parser.identify(file_object):
-                logger.info(
-                    u'File {} identified as {}.'.format(file_object.file_name, parser.DESCRIPTION))
-                logger.debug(u'{} identified with {!r}'.format(file_object.file_name, parser))
+                logger.info(u"File {} identified as {}.".format(file_object.file_name, parser.DESCRIPTION))
+                logger.debug(u"{} identified with {!r}".format(file_object.file_name, parser))
                 yield parser
 
     def _parse(self, file_object, parser, reporter):
@@ -155,8 +169,7 @@ class Dispatcher(object):
 
         # If a description wasn't set for the file, use the parser's
         # (But ignore setting it for sub dispatchers)
-        if (not file_object.description or self._overwrite_descriptions) \
-                and not isinstance(parser, Dispatcher):
+        if (not file_object.description or self._overwrite_descriptions) and not isinstance(parser, Dispatcher):
             file_object.description = parser.DESCRIPTION
 
         # Set parser class used in order to keep a history.
@@ -166,11 +179,12 @@ class Dispatcher(object):
             parser.parse(file_object, reporter, dispatcher=self)
         except UnableToParse as exception:
             logger.info(
-                u'File {} was misidentified as {}, due to: ({}) '
-                u'Trying other parsers...'.format(file_object.file_name, parser.DESCRIPTION, exception))
+                u"File {} was misidentified as {}, due to: ({}) "
+                u"Trying other parsers...".format(file_object.file_name, parser.DESCRIPTION, exception)
+            )
             raise
         except Exception:
-            logger.exception(u'{} dispatch parser failed'.format(parser.name))
+            logger.exception(u"{} dispatch parser failed".format(parser.name))
 
     def parse(self, file_object, reporter, dispatcher=None):
         """
@@ -222,7 +236,7 @@ class Dispatcher(object):
                 # If no parsers match and developer didn't set a description,
                 # mark as unidentified file and run default.
                 if not file_object.description:
-                    logger.info(u'Supplied file {} was not identified.'.format(file_object.file_name))
+                    logger.info(u"Supplied file {} was not identified.".format(file_object.file_name))
                     if self.default:
                         try:
                             self._parse(file_object, self.default, reporter)

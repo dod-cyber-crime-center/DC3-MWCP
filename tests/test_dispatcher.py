@@ -1,6 +1,5 @@
 """Tests the Dispatcher and FileObject functionality."""
 
-import codecs
 import os
 
 import pytest

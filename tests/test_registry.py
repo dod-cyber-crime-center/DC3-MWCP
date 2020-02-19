@@ -1,15 +1,15 @@
 """Tests parser registration functionality."""
 
-import collections
 import os
+
+import pytest
 
 import mwcp
 from mwcp import registry
 
 
-def test_register_parser_directory(monkeypatch, Sample_parser):
-    # Monkey patch parsers registration so previous test runs don't muck with this.
-    monkeypatch.setattr('mwcp.registry._sources', {})
+def test_register_parser_directory(Sample_parser):
+    registry.clear()
 
     parser_path, config_path = Sample_parser
     parser_dir = str(parser_path.dirname)
@@ -33,9 +33,8 @@ def test_register_parser_directory(monkeypatch, Sample_parser):
     assert len(parsers) == 1
     
     
-def test_register_parser_directory2(monkeypatch, Sample_parser):
-    # Monkey patch parsers registration so previous test runs don't muck with this.
-    monkeypatch.setattr('mwcp.registry._sources', {})
+def test_register_parser_directory2(Sample_parser):
+    registry.clear()
 
     parser_path, config_path = Sample_parser
     parser_dir = str(parser_path.dirname)
@@ -59,8 +58,83 @@ def test_register_parser_directory2(monkeypatch, Sample_parser):
     assert len(parsers) == 1
 
 
-def test_iter_parsers(monkeypatch, Sample_parser):
-    monkeypatch.setattr('mwcp.registry._sources', {})
+def test_missing_parser_class(Sample_parser, tmpdir):
+    """Tests error handling for a missing parser class."""
+    registry.clear()
+
+    parser_path, config_file = Sample_parser
+    parser_dir = str(parser_path.dirname)
+
+    config_file.write_text(u'''
+
+Sample:
+    description: A test parser
+    author: Mr. Tester
+    parsers:
+        - .Downloader
+        - .Implant
+        - .NoExist
+
+    ''', 'utf8')
+    mwcp.register_parser_directory(parser_dir, config_file_path=str(config_file), source_name='ACME')
+
+    with pytest.raises(RuntimeError) as exec_info:
+        list(mwcp.iter_parsers('Sample'))
+    assert 'Unable to find Sample.NoExist' in str(exec_info.value)
+
+
+def test_non_importable_module(Sample_parser, tmpdir):
+    """Tests error handling for non importable module."""
+    registry.clear()
+
+    parser_path, config_file = Sample_parser
+    parser_dir = str(parser_path.dirname)
+
+    # Add garbage so that the module will have an import error
+    parser_path.write('\nimport dummy\n', mode='w+')
+
+    mwcp.register_parser_directory(parser_dir, config_file_path=str(config_file), source_name='ACME')
+
+    with pytest.raises(ImportError) as exec_info:
+        list(mwcp.iter_parsers('Sample'))
+    assert "No module named 'dummy'" in str(exec_info.value)
+
+
+def test_recursive_error(Sample_parser, tmpdir):
+    """Tests error handling for a recursive parser."""
+    registry.clear()
+
+    parser_path, config_file = Sample_parser
+    parser_dir = str(parser_path.dirname)
+
+    config_file.write_text(u'''
+
+Sample:
+    description: A test parser
+    author: Mr. Tester
+    parsers:
+        - .Downloader
+        - .Implant
+        - Sample2
+        
+Sample2:
+    description: A test parser 2
+    author: Mr. Tester
+    parsers:
+        - Sample.Downloader  # This one should be fine.
+        - Sample             # It should complain about this.
+
+    ''', 'utf8')
+    mwcp.register_parser_directory(parser_dir, config_file_path=str(config_file), source_name='ACME')
+
+    with pytest.raises(RuntimeError) as exec_info:
+        list(mwcp.iter_parsers('Sample'))
+    assert 'Detected recursive loop: Sample2 -> Sample' in str(exec_info.value)
+
+
+def test_iter_parsers(Sample_parser):
+    registry.clear()
+
     parser_path, config_path = Sample_parser
     source = os.path.abspath(str(parser_path.dirname))
     mwcp.register_parser_directory(source, config_file_path=str(config_path))
@@ -92,8 +166,9 @@ def test_iter_parsers(monkeypatch, Sample_parser):
     assert parsers[2][1] == implant_parser
 
 
-def test_parsers_descriptions(monkeypatch, Sample_parser):
-    monkeypatch.setattr('mwcp.registry._sources', {})
+def test_parsers_descriptions(Sample_parser):
+    registry.clear()
+
     parser_path, config_path = Sample_parser
     source = os.path.abspath(str(parser_path.dirname))
     mwcp.register_parser_directory(source, config_file_path=str(config_path))

@@ -1,8 +1,9 @@
 import io
 import logging
 
-import mwcp
 import pytest
+
+import mwcp
 from mwcp.tools.server import create_app
 
 
