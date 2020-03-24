@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Remove deprecated `decoderdir` variable from `file_object.run_kordesii_decoder()` and add `kordesii.register_entry_points()`
+
 
 ## [3.0.0] - 2020-02-20
 
