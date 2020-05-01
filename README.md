@@ -10,7 +10,6 @@ large-scale automated execution, utilizing either the native python API, a REST 
 command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 
 - [Install](#install)
-- [No-install Method](#no-install-method)
 - [DC3-Kordesii Support](#dc3-kordesii-support)
 - [Testing](#testing)
 - [Usage](#usage)
@@ -50,16 +49,6 @@ For a development mode use the `-e` flag to install in editable mode:
 > pip install -e ./DC3-MWCP
 ```
 
-## No-install Method
-You can also use MWCP without installing using the *mwcp-\*.py* scripts.
-However, you will need to manually install all the dependencies.
-You can find the dependencies listed in the `setup.py` file.
-
-*This method is not recommended and is only here for backwards compatibility.*
-
-```
-python mwcp-tool.py -h
-```
 
 ## DC3-Kordesii Support
 DC3-MWCP optionally supports [DC3-Kordesii](https://github.com/Defense-Cyber-Crime-Center/kordesii)

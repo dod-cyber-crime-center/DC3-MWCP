@@ -1,26 +1,14 @@
 #!/usr/bin/env python
 """
-DC3-MWCP: A framework malware configuration parsers. The main focus is standardizing malware parsers and their output.
+A framework for malware configuration parsers.
 """
-import os
 
 from setuptools import setup, find_packages
 
-
-def read(fname):
-    with open(os.path.join(os.path.dirname(__file__), fname), 'r') as fo:
-        return fo.read()
-
-
-
-
 setup(
     name="mwcp",
-    version="3.0.0",
     author="DC3",
     author_email="dcci@dc3.mil",
-    description=__doc__,
-    long_description=read("README.md"),
     keywords="malware",
     url="http://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/",
     packages=find_packages(),
@@ -29,7 +17,7 @@ setup(
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
-        'License :: MIT License",'
+        'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
     ],
