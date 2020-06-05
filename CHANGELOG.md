@@ -2,7 +2,7 @@
 All notable changes to this project will be documented in this file.
 
     
-## [Unreleased]
+## [3.1.0] - 2020-06-05
 
 ### Added
 - Added `children` and `siblings` attributes to `FileObject` class.
@@ -260,7 +260,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.0.1...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.1.0...HEAD
+[3.1.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.0.1...3.1.0
 [3.0.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.0.0...3.0.1
 [3.0.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.2.0...3.0.0
 [2.2.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.2.0...2.2.0
