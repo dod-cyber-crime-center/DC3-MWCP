@@ -121,25 +121,28 @@ class Dispatcher(object):
         """
         return any(parser.identify(file_object) for parser in self.parsers)
 
-    def add_to_queue(self, file_object):
+    def add_to_queue(self, file_object: FileObject, parent: FileObject = None):
         """
         Add a FileObject to the FIFO queue for processing.
         :param file_object: a FileObject object requiring processing.
+        :param parent: original parent for given file_object.
+            If not provided, the parent is assumed to be the file being currently
+            processed. (which should be true most of the time)
+
         :return:
         """
+        if not parent:
+            parent = self._current_file_object
         assert isinstance(file_object, FileObject), "Not a FileObject: {!r}".format(file_object)
         # If we already have a parent, this means this file is trickling up from a sub-dispatcher.
         # Don't duplicate logs or change the parent.
         if not file_object.parent:
-            file_object.parent = self._current_file_object
-            if self._current_file_object:
-                logger.info(
-                    u"{} dispatched residual file: {}".format(
-                        self._current_file_object.file_name, file_object.file_name
-                    )
-                )
+            file_object.parent = parent
+            if parent:
+                parent.children.append(file_object)
+                logger.info(f"{parent.name} dispatched residual file: {file_object.name}")
                 if file_object.description:
-                    logger.info(u"File {} described as {}".format(file_object.file_name, file_object.description))
+                    logger.info(f"File {file_object.name} described as {file_object.description}")
 
         self._fifo_buffer.appendleft(file_object)
 
@@ -152,10 +155,10 @@ class Dispatcher(object):
         :yields: Identified Parser class or another Dispatcher that can be run
         """
         for parser in self.parsers:
-            logger.debug(u"Identifying {} with {!r}.".format(file_object.file_name, parser))
+            logger.debug(u"Identifying {} with {!r}.".format(file_object.name, parser))
             if parser.identify(file_object):
-                logger.info(u"File {} identified as {}.".format(file_object.file_name, parser.DESCRIPTION))
-                logger.debug(u"{} identified with {!r}".format(file_object.file_name, parser))
+                logger.info(u"File {} identified as {}.".format(file_object.name, parser.DESCRIPTION))
+                logger.debug(u"{} identified with {!r}".format(file_object.name, parser))
                 yield parser
 
     def _parse(self, file_object, parser, reporter):

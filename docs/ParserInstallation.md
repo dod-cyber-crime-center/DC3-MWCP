@@ -26,7 +26,7 @@ make sure to include `__init__.py` files so Python can see them as packages.
 ```console
 > mwcp --parser-dir=C:\my_parsers parse <name> <input_file>
 # OR
-> mwcp-server --parserdir=C:\my_parsers
+> mwcp --parser-dir=C:\my_parsers serve
 ```
 
 You should then find your parsers available alongside the default parsers that come with MWCP using

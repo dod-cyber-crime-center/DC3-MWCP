@@ -1,6 +1,20 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+    
+## [Unreleased]
+
+### Added
+- Added `children` and `siblings` attributes to `FileObject` class.
+- Added `--prefix/--no-prefix` command line flag allowing the removal of the first 5
+    characters of the md5 prefixed on output files.
+    - WARNING: If disabled, unique files with the same file name will be overwritten.
+    
+
+### Removed
+- Removed deprecated `requirements.txt` file.
+
+
 ## [3.0.1] - 2020-05-01
 
 ### Changed

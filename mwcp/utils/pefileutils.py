@@ -4,7 +4,6 @@ python version: 2.7.8
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import List, Optional
 

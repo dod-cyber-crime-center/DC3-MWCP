@@ -134,6 +134,7 @@ class Reporter(object):
         disable_output_files=False,
         disable_temp_cleanup=False,
         base64_output_files=False,
+        prefix_output_files=True,
     ):
         """
         Initializes the Reporter object
@@ -160,6 +161,7 @@ class Reporter(object):
         self._disable_output_files = disable_output_files
         self._disable_temp_cleanup = disable_temp_cleanup
         self._base64_output_files = base64_output_files
+        self._prefix_output_files = prefix_output_files
 
         with open(config.get("FIELDS_PATH"), "rb") as f:
             self.fields = json.load(f)
@@ -181,7 +183,7 @@ class Reporter(object):
 
     def _add_metatadata_listofstrings(self, key, value):
         if not value:
-            logger.info("no values provided for {}, skipping".format(key))
+            logger.debug("no values provided for {}, skipping".format(key))
             return
         value = convert_to_unicode(value)
         obj = self.metadata.setdefault(key, [])
@@ -374,7 +376,7 @@ class Reporter(object):
         """
         keyu = convert_to_unicode(key)
         if value is None or all(not _value for _value in value):
-            logger.warning("no values provided for %s, skipping" % key)
+            logger.debug("no values provided for %s, skipping" % key)
             return
 
         if keyu not in self.fields:
@@ -460,7 +462,9 @@ class Reporter(object):
             return None
 
         # Create a safe filename that won't have any name collisions.
-        safe_filename = "{}_{}".format(md5[:5], sanitize_filename(filename))
+        safe_filename = sanitize_filename(filename)
+        if self._prefix_output_files:
+            safe_filename = f"{md5[:5]}_{safe_filename}"
         full_path = os.path.join(self._output_dir, safe_filename)
 
         # Make directory if it doesn't exist.

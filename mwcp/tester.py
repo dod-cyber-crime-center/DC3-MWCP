@@ -177,17 +177,17 @@ class Tester(object):
         Parses and validates the JSON results file and returns the parsed results_dict.
         """
         if not os.path.exists(results_file_path):
-            results_dict = []
+            results = []
         else:
             with open(results_file_path) as results_file:
-                results_dict = json.load(results_file)
+                results = json.load(results_file)
 
         # The results file results_dict is expected to be a list of metadata dictionaries
-        if not isinstance(results_dict, list) or not all(isinstance(a, dict) for a in results_dict):
+        if not isinstance(results, list) or not all(isinstance(a, dict) for a in results):
             raise ValueError("Results file is invalid: {}".format(results_file_path))
 
         # Resolve input file paths.
-        for testcase in results_dict:
+        for testcase in results:
             input_file_path = testcase[INPUT_FILE_PATH]
             # expand environment variables
             input_file_path = os.path.expandvars(input_file_path)
@@ -198,7 +198,7 @@ class Tester(object):
             input_file_path = os.path.abspath(input_file_path)
             testcase[INPUT_FILE_PATH] = input_file_path
 
-        return results_dict
+        return results
 
     def write_results_file(self, results_list, file_path):
         """
@@ -266,12 +266,12 @@ class Tester(object):
                 results_file_path = self.get_results_filepath(parser_name)
                 results_list = self.read_results_file(results_file_path)
                 input_files = self._list_test_files(results_list)
+
                 if file_path in input_files and not update:
                     logger.warning("Test case for {} already exists in {}".format(file_path, results_file_path))
                     continue
 
                 new_results = self.gen_results(parser_name, file_path)
-                file_path = new_results[INPUT_FILE_PATH]  # Replace with unicode file path.
                 if not new_results:
                     logger.warning("Empty results for {} in {}, not adding.".format(file_path, results_file_path))
                     continue

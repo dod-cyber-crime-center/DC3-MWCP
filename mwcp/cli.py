@@ -287,6 +287,11 @@ def _parse_file(reporter, file_path, parser, include_filename=False):
     "--cleanup/--no-cleanup", default=True, show_default=True, help="Whether to cleanup temporary files after parsing."
 )
 @click.option(
+    "--prefix/--no-prefix", default=True, show_default=True,
+    help="Whether to prefix output filenames with the first 5 characters of the md5. "
+         "If turned off, unique files with the same file name will be overwritten."
+)
+@click.option(
     "-i",
     "--include-filename",
     is_flag=True,
@@ -294,7 +299,7 @@ def _parse_file(reporter, file_path, parser, include_filename=False):
 )
 @click.argument("parser", required=True)
 @click.argument("input", nargs=-1, type=click.Path())
-def parse(parser, input, format, output_dir, output_files, cleanup, include_filename):
+def parse(parser, input, format, output_dir, output_files, cleanup, prefix, include_filename):
     """
     Parses given input with given parser.
 
@@ -331,6 +336,7 @@ def parse(parser, input, format, output_dir, output_files, cleanup, include_file
                 outputdir=os.path.join(output_dir, os.path.basename(path) + "_mwcp_output"),
                 disable_output_files=not output_files,
                 disable_temp_cleanup=not cleanup,
+                prefix_output_files=prefix,
             )
             logger.info("Parsing: {}".format(path))
             result = _parse_file(reporter, path, parser, include_filename=include_filename)

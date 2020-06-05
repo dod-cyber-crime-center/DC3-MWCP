@@ -6,6 +6,7 @@ import hashlib
 import io
 import logging
 import os
+from typing import List
 
 import pefile
 from mwcp.utils import elffileutils, pefileutils
@@ -72,6 +73,7 @@ class FileObject(object):
         self._kordesii_cache = {}
         self.parent = None  # Parent FileObject from which FileObject was extracted from (this is set externally).
         self.parser = None  # This will be set by the dispatcher.
+        self.children = []  # List of residual FileObject
         self.file_data = file_data
         self.reporter = reporter
         self.description = description
@@ -106,6 +108,13 @@ class FileObject(object):
     def __exit__(self, *args):
         self._open_file.close()
 
+    @property
+    def siblings(self) -> List["FileObject"]:
+        """List of FileObjects that came from the same parent."""
+        if not self.parent:
+            return []
+        return [fo for fo in self.parent.children if fo is not self]
+
     # TODO: Deprecate "file_data" name in exchange for "data"?
     @property
     def data(self):
@@ -132,6 +141,14 @@ class FileObject(object):
         if self._file_name != value:
             logger.info("Renamed {} to {}".format(self._file_name, value))
         self._file_name = value
+
+    @property
+    def name(self):
+        return self.file_name
+
+    @name.setter
+    def name(self, value):
+        self.file_name = value
 
     @property
     def parser_history(self):

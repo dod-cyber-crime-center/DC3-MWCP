@@ -19,7 +19,7 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
     entry_points={
         'console_scripts': [
@@ -55,6 +55,6 @@ setup(
         'tox',
     ],
     extras_require={
-        'kordesii': ['kordesii>=1.4.0'],
+        'kordesii': ['kordesii>=2.0.0'],
     }
 )

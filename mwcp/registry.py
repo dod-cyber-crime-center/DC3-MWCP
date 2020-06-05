@@ -2,7 +2,6 @@
 Interface for registering and accessing parsers.
 """
 import imp
-import types
 from collections import namedtuple
 import hashlib
 import importlib
@@ -11,8 +10,8 @@ import importlib.util
 import logging
 import os
 import pkgutil
+import pkg_resources
 
-import six
 from ruamel.yaml import YAML
 
 yaml = YAML()
@@ -24,10 +23,6 @@ logger = logging.getLogger(__name__)
 
 Source = namedtuple("Source", ("name", "path", "config", "is_pkg"))
 ParserInfo = namedtuple("ParserInfo", ("name", "source", "author", "description"))
-
-
-class ParserNotFoundError(Exception):
-    """This exception gets thrown if a parser can't be found."""
 
 
 class ParserNotFoundError(Exception):
@@ -76,14 +71,6 @@ def register_entry_points():
     Registers parsers found in entry_point: "mwcp.parsers"
     :return:
     """
-    # global _PARSERS
-    # if pkg_resources is not available, we are not going to use this feature.
-    # resorting on only to parsers registered manually.
-    try:
-        import pkg_resources
-    except ImportError:
-        logger.warning('pkg_resources could not be imported. "mwcp.parsers" entry points will not be registered.')
-        return
     for entry in pkg_resources.iter_entry_points("mwcp.parsers"):
         package = entry.load()
         register_parser_package(package, source_name=entry.name)

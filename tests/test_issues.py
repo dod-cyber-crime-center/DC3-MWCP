@@ -1,6 +1,5 @@
 """Tests for found bugs/issues."""
 
-
 import csv
 import io
 import sys
