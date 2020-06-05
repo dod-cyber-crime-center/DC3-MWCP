@@ -48,13 +48,13 @@ setup(
         # For the server and API
         'flask~=1.1.0',
         'pygments~=2.2.0',
-
-        # Testing
-        'pytest',
-        'pytest-console-scripts',
-        'tox',
     ],
     extras_require={
         'kordesii': ['kordesii>=2.0.0'],
+        'testing': [
+            'pytest',
+            'pytest-console-scripts',
+            'nox',
+        ],
     }
 )
