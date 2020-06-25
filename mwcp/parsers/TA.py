@@ -8,7 +8,7 @@ from pathlib import Path
 from mwcp import Parser
 from mwcp.resources import RATDecoders
 
-RAT_DECODERS = [decoder.stem for decoder in Path(RATDecoders.__file__).parent.glob("/[!_]*.py")]
+RAT_DECODERS = [decoder.stem for decoder in Path(RATDecoders.__file__).parent.glob("[!_]*.py")]
 
 
 def run(self):
