@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2020-06-26
+
+### Fixed
+-	Fixed glob pattern in Techanarchy wrapper. (@cccs-aa)
     
 ## [3.1.0] - 2020-06-05
 
