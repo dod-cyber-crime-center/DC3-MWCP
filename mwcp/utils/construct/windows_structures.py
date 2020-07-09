@@ -128,7 +128,7 @@ IMAGE_OPTIONAL_HEADER = construct.Struct(
     "BaseOfCode" / construct.Int32ul,
     "BaseOfData" / construct.If(this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul),
     "ImageBase" / construct.IfThenElse(
-        this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul, construct.Int64ul
+        this.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC, construct.Int64ul, construct.Int32ul
     ),
     "SectionAlignment" / construct.Int32ul,
     "FileAlignment" / construct.Int32ul,
@@ -173,16 +173,16 @@ IMAGE_OPTIONAL_HEADER = construct.Struct(
         IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE=0x8000,
     ),
     "SizeOfStackReserve" / construct.IfThenElse(
-        this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul, construct.Int64ul
+        this.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC, construct.Int64ul, construct.Int32ul
     ),
     "SizeOfStackCommit" / construct.IfThenElse(
-        this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul, construct.Int64ul
+        this.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC, construct.Int64ul, construct.Int32ul
     ),
     "SizeOfHeapReserve" / construct.IfThenElse(
-        this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul, construct.Int64ul
+        this.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC, construct.Int64ul, construct.Int32ul
     ),
     "SizeOfHeapCommit" / construct.IfThenElse(
-        this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul, construct.Int64ul
+        this.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC, construct.Int64ul, construct.Int32ul
     ),
     "LoaderFlags" / construct.Int32ul,
     "NumberOfRvaAndSizes" / construct.Rebuild(construct.Int32ul, construct.len_(this.DataDirectory)),
