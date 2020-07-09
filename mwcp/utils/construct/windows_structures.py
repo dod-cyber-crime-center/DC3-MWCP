@@ -126,8 +126,10 @@ IMAGE_OPTIONAL_HEADER = construct.Struct(
     "SizeOfUninitializedData" / construct.Int32ul,
     "AddressOfEntryPoint" / construct.Int32ul,
     "BaseOfCode" / construct.Int32ul,
-    "BaseOfData" / construct.Int32ul,
-    "ImageBase" / construct.Int32ul,
+    "BaseOfData" / construct.If(this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul),
+    "ImageBase" / construct.IfThenElse(
+        this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul, construct.Int64ul
+    ),
     "SectionAlignment" / construct.Int32ul,
     "FileAlignment" / construct.Int32ul,
     "MajorOperatingSystemVersion" / construct.Int16ul,
@@ -158,21 +160,32 @@ IMAGE_OPTIONAL_HEADER = construct.Struct(
     ]),
     "DllCharacteristics" / construct.FlagsEnum(
         construct.Int16ul,
+        IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA=0x0020,
         IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE=0x0040,
         IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY=0x0080,
         IMAGE_DLLCHARACTERISTICS_NX_COMPAT=0x0100,
         IMAGE_DLLCHARACTERISTICS_NO_ISOLATION=0x0200,
         IMAGE_DLLCHARACTERISTICS_NO_SEH=0x0400,
         IMAGE_DLLCHARACTERISTICS_NO_BIND=0x0800,
+        IMAGE_DLLCHARACTERISTICS_APPCONTAINER=0x1000,
         IMAGE_DLLCHARACTERISTICS_WDM_DRIVER=0x2000,
+        IMAGE_DLLCHARACTERISTICS_GUARD_CF=0x4000,
         IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE=0x8000,
     ),
-    "SizeOfStackReserve" / construct.Int32ul,
-    "SizeOfStackCommit" / construct.Int32ul,
-    "SizeOfHeapReserve" / construct.Int32ul,
-    "SizeOfHeapCommit" / construct.Int32ul,
+    "SizeOfStackReserve" / construct.IfThenElse(
+        this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul, construct.Int64ul
+    ),
+    "SizeOfStackCommit" / construct.IfThenElse(
+        this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul, construct.Int64ul
+    ),
+    "SizeOfHeapReserve" / construct.IfThenElse(
+        this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul, construct.Int64ul
+    ),
+    "SizeOfHeapCommit" / construct.IfThenElse(
+        this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul, construct.Int64ul
+    ),
     "LoaderFlags" / construct.Int32ul,
-    "NumberOfRvaAndSizes" / construct.Rebuild(construct.Int32ul, len_(this.DataDirectory)),
+    "NumberOfRvaAndSizes" / construct.Rebuild(construct.Int32ul, construct.len_(this.DataDirectory)),
     "DataDirectory" / construct.Default(IMAGE_DATA_DIRECTORY[this.NumberOfRvaAndSizes], DEFAULT_DATA_DIRECTORIES[:]),
 )
 
@@ -182,8 +195,9 @@ IMAGE_FILE_HEADER = construct.Struct(
     "TimeDateStamp" / construct.Int32ul,
     "PointerToSymbolTable" / construct.Default(construct.Int32ul, 0),
     "NumberOfSymbols" / construct.Default(construct.Int32ul, 0),
+    # TODO: Determine how to accurately set Magic. Hard-coding to enable sizeof to be utilized
     "SizeOfOptionalHeader" / construct.Default(
-        construct.Int16ul, IMAGE_OPTIONAL_HEADER.sizeof(NumberOfRvaAndSizes=16)),
+        construct.Int16ul, IMAGE_OPTIONAL_HEADER.sizeof(Magic=IMAGE_NT_OPTIONAL_HDR32_MAGIC, NumberOfRvaAndSizes=16)),
     "Characteristics" / construct.FlagsEnum(
         construct.Int16ul,
         IMAGE_FILE_RELOCS_STRIPPED=0x0001,
