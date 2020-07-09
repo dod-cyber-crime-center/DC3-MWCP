@@ -109,7 +109,7 @@ IMAGE_EXPORT_DIRECTORY = construct.Struct(
 )
 
 IMAGE_IMPORT_DESCRIPTOR = construct.Struct(
-    "Chracteristics" / construct.Int32ul,
+    "Characteristics" / construct.Int32ul,
     "TimeDateStamp" / construct.Int32ul,
     "ForwarderChain" / construct.Int32ul,
     "Name" / construct.Int32ul,  # rva pointer to the name
