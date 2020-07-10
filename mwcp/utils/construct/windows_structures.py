@@ -126,7 +126,7 @@ IMAGE_OPTIONAL_HEADER = construct.Struct(
     "SizeOfUninitializedData" / construct.Int32ul,
     "AddressOfEntryPoint" / construct.Int32ul,
     "BaseOfCode" / construct.Int32ul,
-    "BaseOfData" / construct.If(this.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC, construct.Int32ul),
+    "BaseOfData" / construct.If(this.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC, construct.Int32ul),
     "ImageBase" / construct.IfThenElse(
         this.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC, construct.Int64ul, construct.Int32ul
     ),

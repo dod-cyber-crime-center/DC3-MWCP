@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] - 2020-06-26
+## [Unreleased]
 
 ### Changed
 - Updated `IMAGE_OPTIONAL_HEADER` to support 64-bit and added missing `DllCharacteristics` Flags. (@ddash-ct)
