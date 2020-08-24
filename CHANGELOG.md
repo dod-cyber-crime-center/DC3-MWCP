@@ -6,10 +6,12 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Updated `IMAGE_OPTIONAL_HEADER` to support 64-bit and added missing `DllCharacteristics` Flags. (@ddash-ct)
 - Updated `IMAGE_FILE_HEADER.SizeOfOptionalHeader` to enable leveraging `sizeof()`. (@ddash-ct)
+- Changed log messages for file identification and misidentification to update phrasing for parsing groups vs parsing components. (@ddash-ct)
 
 ### Fixed
 - Fixed glob pattern in Techanarchy wrapper. (@cccs-aa)
 - Fixed misspelling of "Characteristics" in `IMAGE_IMPORT_DESCRIPTOR`. (@ddash-ct)
+- Fixed infinte loop that can be caused due to a sub-parser throwing an `UnableToParse` exception. (@ddash-ct)
     
 ## [3.1.0] - 2020-06-05
 

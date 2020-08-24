@@ -157,7 +157,11 @@ class Dispatcher(object):
         for parser in self.parsers:
             logger.debug(u"Identifying {} with {!r}.".format(file_object.name, parser))
             if parser.identify(file_object):
-                logger.info(u"File {} identified as {}.".format(file_object.name, parser.DESCRIPTION))
+                if isinstance(parser, Dispatcher):
+                    # Parser is a group, change wording
+                    logger.info(f"File {file_object.name} identified with {parser.DESCRIPTION} parser.")
+                else:
+                    logger.info(f"File {file_object.name} identified as {parser.DESCRIPTION}.")
                 logger.debug(u"{} identified with {!r}".format(file_object.name, parser))
                 yield parser
 
@@ -181,10 +185,17 @@ class Dispatcher(object):
         try:
             parser.parse(file_object, reporter, dispatcher=self)
         except UnableToParse as exception:
-            logger.info(
-                u"File {} was misidentified as {}, due to: ({}) "
-                u"Trying other parsers...".format(file_object.file_name, parser.DESCRIPTION, exception)
-            )
+            if isinstance(parser, Dispatcher):
+                # Parser is a group, change wording
+                logger.info(
+                    f"File {file_object.file_name} was misidentified with {parser.DESCRIPTION} parser, due to: "
+                    f"({exception}) Trying other parsers..."
+                )
+            else:
+                logger.info(
+                    f"File {file_object.file_name} was misidentified as {parser.DESCRIPTION}, due to: "
+                    f"({exception}) Trying other parsers..."
+                )
             raise
         except Exception:
             logger.exception(u"{} dispatch parser failed".format(parser.name))
@@ -219,17 +230,22 @@ class Dispatcher(object):
             identified = False
 
             try:
+                unable_to_parse_error = None
                 # Run any applicable parsers.
                 for parser in self._iter_parsers(file_object):
                     try:
                         self._parse(file_object, parser, reporter)
-                    except UnableToParse:
+                    except UnableToParse as e:
+                        unable_to_parse_error = e
                         continue
                     identified = True
                     if not self.greedy:
                         break
                 if identified:
                     continue
+                elif unable_to_parse_error and dispatcher:
+                    # Pass UnableToParse exception up the chain to notify parent
+                    raise unable_to_parse_error
 
                 # Give it to the parent dispatcher if we can't identify it.
                 if dispatcher:
