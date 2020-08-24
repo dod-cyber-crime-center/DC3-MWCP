@@ -189,12 +189,12 @@ class Dispatcher(object):
                 # Parser is a group, change wording
                 logger.info(
                     f"File {file_object.file_name} was misidentified with {parser.DESCRIPTION} parser, due to: "
-                    f"({exception} Trying other parsers..."
+                    f"({exception}) Trying other parsers..."
                 )
             else:
                 logger.info(
                     f"File {file_object.file_name} was misidentified as {parser.DESCRIPTION}, due to: "
-                    f"({exception} Trying other parsers..."
+                    f"({exception}) Trying other parsers..."
                 )
             raise
         except Exception:
