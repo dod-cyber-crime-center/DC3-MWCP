@@ -219,17 +219,22 @@ class Dispatcher(object):
             identified = False
 
             try:
+                unable_to_parse_error = None
                 # Run any applicable parsers.
                 for parser in self._iter_parsers(file_object):
                     try:
                         self._parse(file_object, parser, reporter)
-                    except UnableToParse:
+                    except UnableToParse as e:
+                        unable_to_parse_error = e
                         continue
                     identified = True
                     if not self.greedy:
                         break
                 if identified:
                     continue
+                elif unable_to_parse_error and dispatcher:
+                    # Pass UnableToParse exception up the chain to notify parent
+                    raise unable_to_parse_error
 
                 # Give it to the parent dispatcher if we can't identify it.
                 if dispatcher:
