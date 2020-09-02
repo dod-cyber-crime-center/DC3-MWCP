@@ -85,3 +85,16 @@ def test_html():
         expected_html_data = fo.read()
 
     assert html_data == expected_html_data
+
+
+def test_base64():
+    """Test the Base64 Adapter with bug associated with unicode encoding on build"""
+    spec = construct.Base64(construct.CString("utf-16le"))
+    data = b'Y\x00W\x00J\x00j\x00Z\x00A\x00=\x00=\x00\x00\x00'
+    assert spec.parse(data) == b"abcd"
+    assert spec.build(b"abcd") == data
+
+    spec = construct.Base64(construct.CString("utf-8"))
+    data = b'YWJjZA==\x00'
+    assert spec.parse(data) == b"abcd"
+    assert spec.build(b"abcd") == data
