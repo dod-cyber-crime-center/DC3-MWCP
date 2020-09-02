@@ -345,7 +345,7 @@ class Base64(Adapter):
         obj = custombase64.b64encode(obj, alphabet=self.custom_alpha)
         # Convert to unicode if wrapped subcon expects it.
         if isinstance(self.subcon, StringEncoded):
-            obj = obj.decode(self.subcon.encoding)
+            obj = obj.decode('utf-8')
         return obj
 
     def _decode(self, obj, context, path):

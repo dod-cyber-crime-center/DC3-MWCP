@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Fixed glob pattern in Techanarchy wrapper. (@cccs-aa)
 - Fixed misspelling of "Characteristics" in `IMAGE_IMPORT_DESCRIPTOR`. (@ddash-ct)
 - Fixed infinte loop that can be caused due to a sub-parser throwing an `UnableToParse` exception. (@ddash-ct)
+- Fixed bug in construct.Base64 adapter for build with unicode encoding types. (@ddash-ct)
     
 ## [3.1.0] - 2020-06-05
 
