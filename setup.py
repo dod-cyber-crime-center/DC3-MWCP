@@ -54,7 +54,6 @@ setup(
         'testing': [
             'pytest',
             'pytest-console-scripts',
-            'nox',
         ],
     }
 )

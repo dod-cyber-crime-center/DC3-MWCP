@@ -566,7 +566,7 @@ def _run_tests(tester, silent=False, show_passed=False):
     is_flag=True,
     help="Display tests case details for passed tests as well." "By default only failed tests are shown.",
 )
-@click.option("-s", "--silent", is_flag=True, help="Limit output to statemtn saying whether all tests passed or not.")
+@click.option("-s", "--silent", is_flag=True, help="Limit output to statement saying whether all tests passed or not.")
 # Parser to process.
 @click.argument("parser", nargs=-1, required=False)
 def test(

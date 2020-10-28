@@ -57,6 +57,7 @@ class Dispatcher(object):
     def __init__(
         self,
         name,
+        source,
         author="",
         description="",
         parsers=None,
@@ -70,6 +71,7 @@ class Dispatcher(object):
         Initializes the Dispatcher with the given parsers to run.
 
         :param str name: Unique name to give to this group of parsers.
+        :param str source: Name of source this group comes from.
         :param str author: Author of the parser.
         :param str description: Description of the parser.
         :param list parsers: A list of parser classes (or other dispatchers) to use for detection and running.
@@ -90,6 +92,7 @@ class Dispatcher(object):
             Ie, this is the equivalent of embedding the listed parsers directly into the parent's list.
         """
         self.name = name
+        self.source = source
         # TODO: Deprecate the author attribute?
         self.AUTHOR = author
         self.DESCRIPTION = description  # In all caps to match Parser interface

@@ -27,7 +27,8 @@ class TProcess(mp.Process):
 
     def __init__(self, group=None, target=None, name=None, args=(), kwargs=None):
         kwargs = kwargs or {}
-        super(TProcess, self).__init__(group, target, name, args, kwargs)
+        # NOTE: Forcing group to be None since BaseProcess asserts it to be None.
+        super(TProcess, self).__init__(group=None, target=target, name=name, args=args, kwargs=kwargs)
         self.queue = logutil.mp_queue
 
     def run(self):

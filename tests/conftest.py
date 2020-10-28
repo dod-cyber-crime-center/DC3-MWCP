@@ -44,16 +44,31 @@ Sample:
 
 
 @pytest.fixture
-def Sample_parser(tmpdir):
-    """Creates and returns the file path to a test parser."""
-    parser_file = tmpdir / 'Sample.py'
-    parser_file.write_text(TEST_PARSER, 'utf8')
+def make_sample_parser(tmpdir):
+    """
+    Creates and returns the a function to generate a sample parser with the
+    given name as the directory (this allows us to make multiple directories if desired.
+    """
 
-    # Parser directories must have an __init__.py
-    init = tmpdir / '__init__.py'
-    init.write_text(u'', 'utf8')
+    def _make_sample_parser(
+            source_name="acme",
+            parser_name="Sample",
+            parser_code=TEST_PARSER,
+            config_text=TEST_PARSER_CONFIG
+    ):
+        directory = tmpdir / source_name
+        directory.mkdir()
 
-    config_file = tmpdir / 'parser_config.yml'
-    config_file.write_text(TEST_PARSER_CONFIG, 'utf8')
+        parser_file = directory / f"{parser_name}.py"
+        parser_file.write_text(parser_code, 'utf8')
 
-    return parser_file, config_file
+        # Parser directories must have an __init__.py
+        init = directory / '__init__.py'
+        init.write_text(u'', 'utf8')
+
+        config_file = directory / 'parser_config.yml'
+        config_file.write_text(config_text, 'utf8')
+
+        return parser_file, config_file
+
+    return _make_sample_parser

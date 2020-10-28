@@ -8,10 +8,10 @@ import mwcp
 from mwcp import registry
 
 
-def test_register_parser_directory(Sample_parser):
+def test_register_parser_directory(make_sample_parser):
     registry.clear()
 
-    parser_path, config_path = Sample_parser
+    parser_path, config_path = make_sample_parser()
     parser_dir = str(parser_path.dirname)
 
     # Test registration
@@ -33,10 +33,10 @@ def test_register_parser_directory(Sample_parser):
     assert len(parsers) == 1
     
     
-def test_register_parser_directory2(Sample_parser):
+def test_register_parser_directory2(make_sample_parser):
     registry.clear()
 
-    parser_path, config_path = Sample_parser
+    parser_path, config_path = make_sample_parser()
     parser_dir = str(parser_path.dirname)
 
     # Test registration
@@ -58,14 +58,12 @@ def test_register_parser_directory2(Sample_parser):
     assert len(parsers) == 1
 
 
-def test_missing_parser_class(Sample_parser, tmpdir):
+def test_missing_parser_class(make_sample_parser):
     """Tests error handling for a missing parser class."""
     registry.clear()
 
-    parser_path, config_file = Sample_parser
-    parser_dir = str(parser_path.dirname)
-
-    config_file.write_text(u'''
+    parser_path, config_file = make_sample_parser(
+        config_text=u'''
 
 Sample:
     description: A test parser
@@ -75,7 +73,10 @@ Sample:
         - .Implant
         - .NoExist
 
-    ''', 'utf8')
+        '''
+    )
+    parser_dir = str(parser_path.dirname)
+
     mwcp.register_parser_directory(parser_dir, config_file_path=str(config_file), source_name='ACME')
 
     with pytest.raises(RuntimeError) as exec_info:
@@ -83,11 +84,11 @@ Sample:
     assert 'Unable to find Sample.NoExist' in str(exec_info.value)
 
 
-def test_non_importable_module(Sample_parser, tmpdir):
+def test_non_importable_module(make_sample_parser):
     """Tests error handling for non importable module."""
     registry.clear()
 
-    parser_path, config_file = Sample_parser
+    parser_path, config_file = make_sample_parser()
     parser_dir = str(parser_path.dirname)
 
     # Add garbage so that the module will have an import error
@@ -100,15 +101,13 @@ def test_non_importable_module(Sample_parser, tmpdir):
     assert "No module named 'dummy'" in str(exec_info.value)
 
 
-def test_recursive_error(Sample_parser, tmpdir):
+def test_recursive_error(make_sample_parser):
     """Tests error handling for a recursive parser."""
     registry.clear()
 
-    parser_path, config_file = Sample_parser
-    parser_dir = str(parser_path.dirname)
-
-    config_file.write_text(u'''
-
+    parser_path, config_file = make_sample_parser(
+        config_text=u'''
+        
 Sample:
     description: A test parser
     author: Mr. Tester
@@ -124,7 +123,11 @@ Sample2:
         - Sample.Downloader  # This one should be fine.
         - Sample             # It should complain about this.
 
-    ''', 'utf8')
+        
+        '''
+    )
+    parser_dir = str(parser_path.dirname)
+
     mwcp.register_parser_directory(parser_dir, config_file_path=str(config_file), source_name='ACME')
 
     with pytest.raises(RuntimeError) as exec_info:
@@ -132,10 +135,72 @@ Sample2:
     assert 'Detected recursive loop: Sample2 -> Sample' in str(exec_info.value)
 
 
-def test_iter_parsers(Sample_parser):
+def test_external_source(make_sample_parser):
+    """Tests importing a parser from an external source."""
     registry.clear()
 
-    parser_path, config_path = Sample_parser
+    parser_path, config_file = make_sample_parser("acme")
+    parser_dir = str(parser_path.dirname)
+
+    parser2_path, config2_file = make_sample_parser(
+        "acme2",
+        parser_name="Sample2",
+        parser_code=u'''
+from mwcp import Parser
+
+class Decoy(Parser):
+    DESCRIPTION = "TestParser2 Decoy"
+        ''',
+        config_text=r'''
+Sample2:
+    description: Another test parser
+    author: Mrs. Tester
+    parsers:
+        - .Decoy
+        - acme:Sample.Downloader  # imports individual component
+        - acme:Sample             # imports parser group
+      
+Sample:
+    description: Another test parser
+    author: Mrs. Tester
+    parsers:
+        - Sample2.Decoy
+        - acme:Sample
+        
+        '''
+    )
+    parser2_dir = str(parser2_path.dirname)
+
+    # Register 2 parsers.
+    mwcp.register_parser_directory(parser_dir, config_file_path=str(config_file), source_name="acme")
+    mwcp.register_parser_directory(parser2_dir, config_file_path=str(config2_file), source_name="acme2")
+
+    # Test that Sample2 has Sample and Sample.Downloader in it's sub-parsers.
+    parsers = list(mwcp.iter_parsers("Sample2"))
+    assert len(parsers) == 1
+    Sample2_parser = parsers[0][1]
+    assert len(Sample2_parser.parsers) == 3
+    assert [(p.name, p.source) for p in Sample2_parser.parsers] == [
+        ("Sample2.Decoy", "acme2"),
+        ("Sample.Downloader", "acme"),
+        ("Sample", "acme"),
+    ]
+
+    # Test we don't hit a recursion error when we reference a parser with the same name.
+    parsers = list(mwcp.iter_parsers("Sample", source="acme2"))
+    assert len(parsers) == 1
+    Sample_parser = parsers[0][1]
+    assert len(Sample_parser.parsers) == 2
+    assert [(p.name, p.source) for p in Sample_parser.parsers] == [
+        ("Sample2.Decoy", "acme2"),
+        ("Sample", "acme"),
+    ]
+
+
+def test_iter_parsers(make_sample_parser):
+    registry.clear()
+
+    parser_path, config_path = make_sample_parser()
     source = os.path.abspath(str(parser_path.dirname))
     mwcp.register_parser_directory(source, config_file_path=str(config_path))
 
@@ -166,10 +231,10 @@ def test_iter_parsers(Sample_parser):
     assert parsers[2][1] == implant_parser
 
 
-def test_parsers_descriptions(Sample_parser):
+def test_parsers_descriptions(make_sample_parser):
     registry.clear()
 
-    parser_path, config_path = Sample_parser
+    parser_path, config_path = make_sample_parser()
     source = os.path.abspath(str(parser_path.dirname))
     mwcp.register_parser_directory(source, config_file_path=str(config_path))
 

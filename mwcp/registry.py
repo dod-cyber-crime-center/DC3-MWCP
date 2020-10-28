@@ -10,6 +10,8 @@ import importlib.util
 import logging
 import os
 import pkgutil
+from typing import Optional, Tuple
+
 import pkg_resources
 
 from ruamel.yaml import YAML
@@ -21,8 +23,38 @@ from mwcp.dispatcher import Dispatcher
 
 logger = logging.getLogger(__name__)
 
-Source = namedtuple("Source", ("name", "path", "config", "is_pkg"))
 ParserInfo = namedtuple("ParserInfo", ("name", "source", "author", "description"))
+
+
+class Source:
+    """Represents a source of parsers."""
+
+    def __init__(self, name, path, config, is_pkg):
+        self.name = name
+        self.path = path
+        self.config = config
+        self.is_pkg = is_pkg
+        self._package = None
+
+    def __getstate__(self):
+        # Modifying __getstate__ in order to null out _package, since that is not picklable.
+        _dict = self.__dict__
+        _dict["_package"] = None
+        return _dict
+
+    @property
+    def package(self):
+        """Imports and returns the Python package for the source."""
+        if not self._package:
+            # Import source on first call.
+            if self.is_pkg:
+                try:
+                    self._package = importlib.import_module(self.path)
+                except ImportError:
+                    raise ValueError("Could not import source: {}".format(self.path))
+            else:
+                self._package = _create_package(self.path)
+        return self._package
 
 
 class ParserNotFoundError(Exception):
@@ -187,13 +219,38 @@ def _is_module_available(module_name):
         return False
 
 
-def _generate_parser(name, config, package_prefix, recursive=True, _visiting=None):
+def _generate_parser_aux(parser_name, group_name, source, _visiting):
+    """
+    Auxiliary function used by _generate_parser() to format the parser_name
+    before running _generate_parser()
+    """
+    orig_parser_name = parser_name
+
+    if parser_name.startswith("."):
+        parser_name = group_name + parser_name
+
+    # Pull out imported source.
+    if ":" in parser_name:
+        source_name, _, parser_name = parser_name.partition(":")
+        if source_name not in _sources:
+            raise RuntimeError(f"Unable to find source: {source_name}")
+        source = _sources[source_name]
+
+    if (parser_name, source.name) in _visiting:
+        raise RuntimeError(f"Detected recursive loop: {group_name} -> {orig_parser_name}")
+
+    try:
+        return _generate_parser(parser_name, source, _visiting=_visiting)
+    except ParserNotFoundError as e:
+        raise RuntimeError(f"Unable to find {parser_name} with error: {e}")
+
+
+def _generate_parser(name: str, source: Source, recursive=True, _visiting=None):
     """
     Generates parser for given name.
 
     :param str name: Name of parser or parser group.
-    :param dict config: Loaded configuration for all parsers.
-    :param str package_prefix: Prefix to add to on-demand imported modules.
+    :param Source source: Source object containing parser.
     :param bool recursive: Recursively generate listed sub parsers.
         (otherwise only top level parsers will be produced)
     :param _visiting: Used internally for recursive loop detection.
@@ -205,18 +262,18 @@ def _generate_parser(name, config, package_prefix, recursive=True, _visiting=Non
     if _visiting is None:
         _visiting = set()
 
-    _visiting.add(name)
+    _visiting.add((name, source.name))
 
     try:
         # First check if parser name is a parser group.
-        options = dict(config[name])
+        options = dict(source.config[name])
     except KeyError:
         logger.debug("Generating parser: {}".format(name))
         if "." not in name:
             raise ParserNotFoundError("Invalid name {}".format(name))
         # If not, find and import the referenced mwcp.Parser class.
         module_name, _, class_name = name.rpartition(".")
-        module_fullname = package_prefix + module_name
+        module_fullname = source.package.__name__ + "." + module_name
 
         logger.debug("Checking existence of {}".format(module_fullname))
         if not _is_module_available(module_fullname):
@@ -234,8 +291,9 @@ def _generate_parser(name, config, package_prefix, recursive=True, _visiting=Non
             raise ParserNotFoundError("{}.{} is not a mwcp.Parser class".format(module_fullname, class_name))
 
         klass.name = name
+        klass.source = source.name
         logger.debug("Created parser: {!r}".format(klass))
-        _visiting.remove(name)
+        _visiting.remove((name, source.name))
         return klass
 
     # Otherwise, instantiate a mwcp.Dispatcher class for the parser group.
@@ -244,28 +302,16 @@ def _generate_parser(name, config, package_prefix, recursive=True, _visiting=Non
     sub_parsers = []
     if recursive:
         for parser_name in parser_names:
-            if parser_name.startswith("."):
-                parser_name = group_name + parser_name
-            if parser_name in _visiting:
-                raise RuntimeError("Detected recursive loop: {} -> {}".format(name, parser_name))
-            try:
-                sub_parsers.append(_generate_parser(parser_name, config, package_prefix, _visiting=_visiting))
-            except ParserNotFoundError as e:
-                # If we can't find a sub-parser, then the whole thing should fail.
-                raise RuntimeError("Unable to find {} with error: {}".format(parser_name, e))
+            sub_parsers.append(_generate_parser_aux(parser_name, group_name, source, _visiting))
 
     # Dereference default parser.
     default = options.pop("default", None)
     if default and recursive:
-        if default.startswith("."):
-            default = group_name + default
-        if default in _visiting:
-            raise RuntimeError("Detected recursive loop: {} -> {}".format(name, default))
-        options["default"] = _generate_parser(default, config, package_prefix, _visiting=_visiting)
+        options["default"] = _generate_parser_aux(default, group_name, source, _visiting)
 
-    parser = Dispatcher(group_name, parsers=sub_parsers, **options)
+    parser = Dispatcher(group_name, source.name, parsers=sub_parsers, **options)
     logger.debug("Created parser group: {!r}".format(parser))
-    _visiting.remove(name)
+    _visiting.remove((name, source.name))
     return parser
 
 
@@ -278,7 +324,7 @@ def _import_all_modules(package):
             _import_all_modules(module)
 
 
-def iter_parsers(name=None, source=None, config_only=True, _recursive=True):
+def iter_parsers(name: str = None, source: str = None, config_only=True, _recursive=True):
     """
     Iterates all registered parsers.
 
@@ -314,21 +360,10 @@ def iter_parsers(name=None, source=None, config_only=True, _recursive=True):
         sources += _sources.items()
 
     for source_name, source in sources:
-        # Import source.
-        if source.is_pkg:
-            try:
-                package = importlib.import_module(source.path)
-            except ImportError:
-                raise ValueError("Could not import source: {}".format(source.path))
-        else:
-            package = _create_package(source.path)
-
-        package_prefix = package.__name__ + "."
-
         # Find list of parser names to generate
         if name:
             try:
-                parser = _generate_parser(name, source.config, package_prefix, recursive=_recursive)
+                parser = _generate_parser(name, source, recursive=_recursive)
                 yield source, parser
             except ParserNotFoundError as e:
                 logger.debug("[{}] {}".format(source_name, e))
@@ -337,16 +372,17 @@ def iter_parsers(name=None, source=None, config_only=True, _recursive=True):
         else:
             # If parser name is not provided provide all parsers from the given source.
             for parser_name in source.config.keys():
-                parser = _generate_parser(parser_name, source.config, package_prefix, recursive=_recursive)
+                parser = _generate_parser(parser_name, source, recursive=_recursive)
                 yield source, parser
 
             # Also list all the component parsers if requested.
             if not config_only:
-                _import_all_modules(package)
+                _import_all_modules(source.package)
+                package_prefix = source.package.__name__ + "."
                 for klass in set(Parser.iter_subclasses()):
                     # Ignore classes without DESCRIPTIONS since they are usually base classes.
                     if klass.DESCRIPTION and klass.__module__.startswith(package_prefix):
-                        parser_name = "{}.{}".format(klass.__module__[len(package_prefix) :], klass.__name__)
+                        parser_name = "{}.{}".format(klass.__module__[len(package_prefix):], klass.__name__)
                         klass.name = parser_name
                         yield source, klass
 

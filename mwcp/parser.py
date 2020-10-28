@@ -24,6 +24,18 @@ class ParserMeta(abc.ABCMeta):
     def name(cls, value):
         cls._name = value
 
+    @property
+    def source(cls):
+        try:
+            return cls._source
+        except AttributeError:
+            module, _, _ = cls.__module__.partition(".")
+            return module
+
+    @source.setter
+    def source(cls, value):
+        cls._source = value
+
     def __repr__(cls):
         return "<{}>".format(cls.name)
 

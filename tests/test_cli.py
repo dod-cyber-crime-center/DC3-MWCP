@@ -146,7 +146,7 @@ def test_add_to_malware_repo(tmpdir):
     assert expected_sample_path.read_binary() == test_file.read_binary()
 
 
-def test_list(tmpdir, script_runner, Sample_parser):
+def test_list(tmpdir, script_runner, make_sample_parser):
     """
     Tests displaying a list of parsers.
 
@@ -161,15 +161,14 @@ def test_list(tmpdir, script_runner, Sample_parser):
     results = json.loads(ret.stdout, encoding='utf8')
     assert len(results) > 1
     for name, source_name, author, description in results:
-        if name == u'foo':
-            assert source_name == u'mwcp'
+        if name == u'foo' and source_name == u'mwcp':
             assert author == u'DC3'
             assert description == u'example parser that works on any file'
             break
     else:
         pytest.fail('Sample parser was not listed.')
 
-    parser_file, config_file = Sample_parser
+    parser_file, config_file = make_sample_parser()
     parser_dir = parser_file.dirname
 
     # Now try adding a the Sample parser using the --parser-dir flag.
@@ -183,6 +182,7 @@ def test_list(tmpdir, script_runner, Sample_parser):
     print(ret.stderr, file=sys.stderr)
     assert ret.success
 
+    # FIXME: This breaks if user has set up a PARSER_SOURCE in the configuration file.
     results = json.loads(ret.stdout, encoding='utf8')
     assert len(results) > 1
     for name, source_name, author, description in results:
@@ -327,7 +327,8 @@ def test_add_testcase(tmpdir, script_runner):
                     u"5eb63bbbe01eeed093cb22bb8f5acdc3"
                 ]
             ],
-            u'inputfilename': u'{MALWARE_REPO}\\fb84\\fb843efb2ffec987db12e72ca75c9ea2',
+            u'inputfilename': os.path.join(
+                '{MALWARE_REPO}', 'fb84', 'fb843efb2ffec987db12e72ca75c9ea2'),
             u"address": [
                 u"127.0.0.1"
             ]
@@ -417,7 +418,7 @@ def test_add_filelist_testcase(tmpdir, script_runner):
     assert ret.success
 
     # Ensure a sample was added for each file and exists in the testcase.
-    test_case_file = test_case_dir / 'Foo.json'
+    test_case_file = test_case_dir / 'foo.json'
     assert test_case_file.exists()
     testcases = json.loads(test_case_file.read_text('utf8'))
     input_files = [testcase[u'inputfilename'] for testcase in testcases]
@@ -426,4 +427,4 @@ def test_add_filelist_testcase(tmpdir, script_runner):
         test_sample = malware_repo / md5[:4] / md5
         assert test_sample.exists()
         assert hashlib.md5(test_sample.read_binary()).hexdigest() == md5
-        assert '{{MALWARE_REPO}}\\{}\\{}'.format(md5[:4], md5) in input_files
+        assert os.path.join('{MALWARE_REPO}', md5[:4], md5) in input_files

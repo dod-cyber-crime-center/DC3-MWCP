@@ -118,6 +118,20 @@ Foo:
 ```
 
 
+You may also reference parser components/groups from external sources using `:` notation.
+
+```yaml
+Foo:
+    description: A Foo parser
+    author: ACME
+    parsers:
+      - LlamaCorp:Decoy        # Imports LlamaCorp's Decoy parser group.
+      - LlamaCorp:Foo.Carrier  # Imports LlamaCorp's Foo.Carrier parser component.
+      - .Downloader
+      - .Implant
+```
+
+
 ### Parser Group Options
 A number of options can be toggled on or off when defining a parser group.
 To set, simply add the option along with the author and description.

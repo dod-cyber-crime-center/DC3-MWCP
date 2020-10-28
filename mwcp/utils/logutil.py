@@ -5,12 +5,14 @@ import logging.config
 import logging.handlers
 import multiprocessing as mp
 import os
+import platform
 import sys
 import threading
 import traceback
 import warnings
 from collections import deque
 
+import appdirs
 import yaml
 
 import mwcp
@@ -49,6 +51,11 @@ class MPRotatingFileHandler(logging.handlers.RotatingFileHandler):
     def __init__(self, filename, **kwargs):
         # Expand and variables and home directories and make path if it doesn't exist.
         filename = os.path.expandvars(os.path.expanduser(filename))
+
+        # If path is relative, add to standard log directory.
+        if not os.path.isabs(filename):
+            filename = os.path.join(appdirs.user_log_dir("mwcp", appauthor=False), filename)
+
         directory = os.path.dirname(filename)
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -165,7 +172,12 @@ def setup_logging(default_level=logging.INFO, queue=None):
     if queue:
         assert mp.current_process().name != "MainProcess"
         logging.root.addHandler(MPChildHandler(queue))
-        logging.root.setLevel(logging.DEBUG)  # Allow all records to pass through.
+        # If on Windows, allow all records to pass through, this is necessary because Windows
+        # subprocesses don't duplicate the global state like posix systems.
+        # Therefore, we have to pass all log messages through since effective
+        # log level is unknown.
+        if "Windows" in platform.platform():
+            logging.root.setLevel(logging.DEBUG)
     else:
         # Allow setting log configuration using 'MWCP_LOG_CFG' environment variable.
         log_config = os.getenv("MWCP_LOG_CFG", None)

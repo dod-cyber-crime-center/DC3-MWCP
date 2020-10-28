@@ -2,10 +2,12 @@
 """Tests the mwcp.Reporter object."""
 
 import os
+import json
 
 import pytest
 
 import mwcp
+from mwcp.reporter import STANDARD_FIELD_ORDER, INFO_FIELD_ORDER
 
 
 def test_managed_tempdir(tmpdir):
@@ -151,3 +153,13 @@ file_1.exe           example output file
 
     reporter.print_report()
     assert capsys.readouterr().out == expected_output + u'\n'
+
+
+def test_standard_field_order():
+    """Tests that STANDARD_FIELD_ORDER is updated to the field.json file."""
+    with open(mwcp.config.get("FIELDS_PATH"), "rb") as f:
+        fields = json.load(f)
+
+    ignore_fields = INFO_FIELD_ORDER + ["debug", "other", "outputfile"]
+
+    assert sorted(STANDARD_FIELD_ORDER) == sorted(set(fields.keys()) - set(ignore_fields))

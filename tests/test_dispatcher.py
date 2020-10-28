@@ -34,7 +34,7 @@ def components():
         def identify(cls, file_object):
             return file_object.file_name == 'B_match.txt'
 
-    dispatcher = mwcp.Dispatcher('my_dispatcher', parsers=[A, B])
+    dispatcher = mwcp.Dispatcher('my_dispatcher', 'acme', parsers=[A, B])
 
     return locals()
 

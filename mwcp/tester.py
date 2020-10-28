@@ -9,6 +9,7 @@ import json
 import multiprocessing as mp
 import logging
 import os
+import pathlib
 import sys
 import traceback
 from timeit import default_timer
@@ -188,7 +189,11 @@ class Tester(object):
 
         # Resolve input file paths.
         for testcase in results:
-            input_file_path = testcase[INPUT_FILE_PATH]
+            # NOTE: Using PureWindowsPath to help convert a Windows path using \
+            #   into / path.
+            #   This helps in-case the test case was originally made with a Windows machine
+            #   but is being tested on Linux.
+            input_file_path = pathlib.PureWindowsPath(testcase[INPUT_FILE_PATH]).as_posix()
             # expand environment variables
             input_file_path = os.path.expandvars(input_file_path)
             # resolve variables

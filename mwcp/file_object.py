@@ -261,13 +261,14 @@ class FileObject(object):
             )
             self._outputted_file = True
 
-    def run_kordesii_decoder(self, decoder_name: str, warn_no_strings=True):
+    def run_kordesii_decoder(self, decoder_name: str, warn_no_strings=True, **run_config):
         """
         Run the specified kordesii decoder against the file data.  The reporter object is returned
         and can be accessed as necessary to obtain output files, etc.
 
         :param decoder_name: name of the decoder to run
         :param warn_no_strings: Whether to produce a warning if no string were found.
+        :param run_config: Run configuration options to pass along to kordesii.run_ida()
 
         :return: Instance of the kordesii_reporter.
 
@@ -286,7 +287,9 @@ class FileObject(object):
 
         kordesii_reporter = kordesii.Reporter(base64outputfiles=True)
 
-        kordesii_reporter.run_decoder(decoder_name, data=self.file_data, log=True)
+        if "log" not in run_config:
+            run_config["log"] = True
+        kordesii_reporter.run_decoder(decoder_name, data=self.file_data, **run_config)
 
         if warn_no_strings:
             decrypted_strings = kordesii_reporter.get_strings()
