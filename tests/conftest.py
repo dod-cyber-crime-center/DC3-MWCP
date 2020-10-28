@@ -46,8 +46,8 @@ Sample:
 @pytest.fixture
 def make_sample_parser(tmpdir):
     """
-    Creates and returns the a function to generate a sample parser with the
-    given name as the directory (this allows us to make multiple directories if desired.
+    Creates and returns a function to generate a sample parser with the
+    given name as the directory (this allows us to make multiple directories if desired.)
     """
 
     def _make_sample_parser(
