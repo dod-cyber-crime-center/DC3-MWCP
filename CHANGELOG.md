@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Fixed bug in construct.Base64 adapter for build with unicode encoding types. (@ddash-ct)
 - General fixes to improve support when running under Linux.
     - Changed log configuration usage of `%LOCALAPPDATA%` for the log directory reported by `appdirs`.
+- Fixed build issue in `pecon` and added option for setting architecture to 64 bit.
 
 
 ## [3.1.0] - 2020-06-05

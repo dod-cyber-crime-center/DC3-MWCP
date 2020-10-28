@@ -195,7 +195,7 @@ IMAGE_FILE_HEADER = construct.Struct(
     "TimeDateStamp" / construct.Int32ul,
     "PointerToSymbolTable" / construct.Default(construct.Int32ul, 0),
     "NumberOfSymbols" / construct.Default(construct.Int32ul, 0),
-    # TODO: Determine how to accurately set Magic. Hard-coding to enable sizeof to be utilized
+    # NOTE: This defaults to assuming a 32-bit PE when building if the SizeOfOptionalHeader isn't provided in the context.
     "SizeOfOptionalHeader" / construct.Default(
         construct.Int16ul, IMAGE_OPTIONAL_HEADER.sizeof(Magic=IMAGE_NT_OPTIONAL_HDR32_MAGIC, NumberOfRvaAndSizes=16)),
     "Characteristics" / construct.FlagsEnum(

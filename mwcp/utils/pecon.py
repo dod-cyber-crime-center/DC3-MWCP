@@ -243,15 +243,37 @@ class Section(Container):
 
 class PE(Container):
 
-    def __init__(self, data=None):
+    def __init__(self, data=None, is_64bit=False):
+        """
+
+        :param data: Data from an existing PE file, if provided, this will be used as the base line.
+        :param is_64bit: Whether to make a 64 bit or 32 bit PE file. Defaults to 32 bit.
+            (NOTE: This is only applicable if not passing in data.)
+        """
+
         super(PE, self).__init__()
 
         if data:
-            # If user provided data, parse it and use it has a base point.
+            # If user provided data, parse it and use it as a base point.
             self._parse(data)
             return
 
         # Otherwise create a default pe.
+
+        _characteristics = [
+            construct.IMAGE_FILE_RELOCS_STRIPPED,
+            construct.IMAGE_FILE_EXECUTABLE_IMAGE,
+            construct.IMAGE_FILE_LINE_NUMS_STRIPPED,
+            construct.IMAGE_FILE_LOCAL_SYMS_STRIPPED,
+        ]
+
+        if is_64bit:
+            _magic = construct.IMAGE_NT_OPTIONAL_HDR64_MAGIC
+            _machine = construct.IMAGE_FILE_MACHINE_AMD64
+        else:
+            _magic = construct.IMAGE_NT_OPTIONAL_HDR32_MAGIC
+            _machine = construct.IMAGE_FILE_MACHINE_I386
+            _characteristics.append(construct.IMAGE_FILE_32BIT_MACHINE)
 
         _dos_header = Container({
             'e_magic': b'MZ',
@@ -275,27 +297,10 @@ class PE(Container):
             'e_lfanew': 224,
         })
 
-        _file_header = Container({
-            'Machine': construct.IMAGE_FILE_MACHINE_I386,
-            'NumberOfSections': 0,
-            'TimeDateStamp': 0,
-            'PointerToSymbolTable': 0,
-            'NumberOfSymbols': 0,
-            'SizeOfOptionalHeader': construct.IMAGE_OPTIONAL_HEADER.sizeof(NumberOfRvaAndSizes=16),
-            'Characteristics': [
-                construct.IMAGE_FILE_RELOCS_STRIPPED,
-                construct.IMAGE_FILE_EXECUTABLE_IMAGE,
-                construct.IMAGE_FILE_LINE_NUMS_STRIPPED,
-                construct.IMAGE_FILE_LOCAL_SYMS_STRIPPED,
-                construct.IMAGE_FILE_32BIT_MACHINE,
-            ],
-        })
-
         _data_directories = DataDirectories()
 
         _optional_header = Container({
-            # TODO: Provide convience for setting 32-bit vs 64-bit.
-            'Magic': construct.IMAGE_NT_OPTIONAL_HDR32_MAGIC,
+            'Magic': _magic,
             'MajorLinkerVersion': 1,
             'MinorLinkerVersion': 71,
             'SizeOfCode': 0,
@@ -326,6 +331,16 @@ class PE(Container):
             'LoaderFlags': 0,
             'NumberOfRvaAndSizes': _data_directories.sizeof(),
             'DataDirectory': _data_directories,
+        })
+
+        _file_header = Container({
+            'Machine': _machine,
+            'NumberOfSections': 0,
+            'TimeDateStamp': 0,
+            'PointerToSymbolTable': 0,
+            'NumberOfSymbols': 0,
+            'SizeOfOptionalHeader': construct.IMAGE_OPTIONAL_HEADER.sizeof(**_optional_header),
+            'Characteristics': _characteristics,
         })
 
         self.DosHeader = Container(_dos_header)
@@ -431,7 +446,7 @@ class PE(Container):
         optional_header = pe.NTHeaders.OptionalHeader
         number_of_rva_and_sizes = len(optional_header.DataDirectory)
         optional_header.NumberOfRvaAndSizes = number_of_rva_and_sizes
-        file_header.SizeOfOptionalHeader = construct.IMAGE_OPTIONAL_HEADER.sizeof(NumberOfRvaAndSizes=number_of_rva_and_sizes)
+        file_header.SizeOfOptionalHeader = construct.IMAGE_OPTIONAL_HEADER.sizeof(**optional_header)
         if isinstance(optional_header.DllCharacteristics, list):
             optional_header.DllCharacteristics = {flag: True for flag in optional_header.DllCharacteristics}
 
