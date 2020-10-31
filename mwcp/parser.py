@@ -122,7 +122,7 @@ class Parser(object):
         else:
             from mwcp import Dispatcher  # Must import here to avoid cyclic import.
 
-            dispatcher = Dispatcher(cls.name, author=cls.AUTHOR, description=cls.DESCRIPTION, parsers=[cls])
+            dispatcher = Dispatcher(cls.name, cls.source, author=cls.AUTHOR, description=cls.DESCRIPTION, parsers=[cls])
             dispatcher.parse(file_object, reporter)
 
     def run(self):
