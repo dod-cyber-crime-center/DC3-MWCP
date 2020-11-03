@@ -1,6 +1,9 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [3.2.1] - 2020-11-03
+- Added source argument to Dispatcher initialization to comply with new method signature
+
 ## [3.2.0] - 2020-10-30
 
 ### Changed
@@ -279,7 +282,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.2.0...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.2.1...HEAD
+[3.2.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.2.1...3.2.0
 [3.2.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.1.0...3.2.0
 [3.1.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.0.1...3.1.0
 [3.0.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.0.0...3.0.1
