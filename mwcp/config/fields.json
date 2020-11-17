@@ -81,7 +81,15 @@
             "Decode failed: detected config location 3735928559 outside file size of 184320"
         ], 
         "type": "listofstrings"
-    }, 
+    },
+    "decrypted_strings": {
+        "description": "Parser extracted decrypted strings",
+        "examples": [
+            "badman",
+            "evilstring"
+        ],
+        "type": "listofstrings"
+    },
     "directory": {
         "description": "directory (dirname) used by malware", 
         "examples": [
@@ -396,7 +404,18 @@
             "pnpsvc"
         ], 
         "type": "listofstrings"
-    }, 
+    },
+    "smtp": {
+        "description": "SMTP credentials (username and password), and full URL with scheme, address, optional port, and optional path",
+        "examples": [
+            [
+                "user",
+                "pass",
+                "mail.badhost.com"
+            ]
+        ],
+        "type": "listofstringtuples"
+    },
     "socketaddress": {
         "description": "An address, port, and proto combination used together", 
         "examples": [
