@@ -1,6 +1,69 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Added `mwcp.run()` as a shortcut for running a parser and getting back its results. (See [documentation](/README.md#python-api))
+- Added ability to provide a `mwcp.Parser` class directly to `mwcp.run()`.
+  This is helpful for quick one-off scripting.
+- Added `--split` option within the `mwcp parse` command, which changes the report to display
+  metadata split by originating file instead of all being consolidating with the initial input file.
+  (This option is only available when `--no-legacy` is enabled.)
+- The `Report` class now includes the following output options for programmatically rendering results in different formats:
+  - `.as_text()` - Renders sectioned tables of results in a simple text format (this is the default format when using the command line).
+  - `.as_markdown()` - Renders sectioned tables of results in markdown.
+  - `.as_html()` - Renders a flat table of results in html.
+  - `.as_csv()` - Renders a flat table of results in csv.
+  - `.as_dataframe()` - Produces a flat table of results in a pandas dataframe.
+  - `.file_tree()` - Renders an ascii tree representing the hierarchy of residual files.
+- Added ability to add tags to metadata elements. (See [documentation](/docs/ParserComponents.md#tagging))
+- Added DecodedString metadata element.
+- Added `.compile_time` attribute to `FileObject`.
+- Added `.architecture` attribute to `FileObject`.
+
+
+### Changed
+- MWCP version can now be accessed from `mwcp.__version__`
+- Updated metadata mechanism to an objected-oriented approach. (See [documentation](/docs/ParserComponents.md#report))
+- `mwcp.Reporter` has been replaced with `mwcp.Runner`. (However, using `mwcp.run()` is now recommended.)
+- Updated json and text report output.
+  - NOTE: To keep backwards compatibility, the schema for the original json output is provided by default.
+  To enable the new schema, you must provide the `--no-legacy` in the command line.
+- `FileObject.data` (and `FileObject.file_data`) has been set to a read-only attribute. 
+- Updated parser testing to support the new metadata schema. To use, provide the `--no-legacy` flag to
+the `mwcp test` command.
+  - Created a new command line tool `mwcp_update_legacy_tests` to update your existing test cases to use the new metadata schema. (See [documentation](/docs/ParserTesting.md#updating-legacy-test-cases))
+  - New parser test cases now use pytest.
+- Updated text report display and added markdown and html formats.
+  - Also added file tree display at the end of the report (for some formats).
+- Updated csv output.
+
+
+### Deprecated
+- `FileObject.file_path` is planned to be changed to only be a non-None value if the `FileObject` 
+instance is backed by a real file on the file system.
+    - The creation of a temporary file path has been moved to `.temp_path()`.
+- Adding metadata is now done using objects found in `mwcp.metadata`. The key/value approach is deprecated
+  and support will be removed in a future major release.
+- `mwcp.Reporter` object is deprecated in favor of using either `mwcp.Runner` or `mwcp.run()`.
+- The `self.reporter` attribute in a parser has been renamed to `self.report` and is now a `mwcp.Report` object.
+  - Interface is currently the same as `mwcp.Reporter`, so your code shouldn't break except for in extreme corner cases.
+- The `.metadata` attribute in `mwcp.Reporter` (now called `mwcp.Report`) is deprecated in favor of using `.as_dict()`.
+    - WARNING: A best attempt was done to keep the results of the `.metadata` attribute the same. However, due to new validation and type coercion mechanisms, you may run into corner cases where the results are slightly different, causing your parser test to fail. 
+- The json schema as described in [fields.txt](mwcp/config/fields.txt) is deprecated in favor
+of the schema described in [`mwcp.metadata`](mwcp/metadata.py).
+- Providing a "reporter" argument to `FileObject.__init__()` is deprecated.
+- `FileObject.output()` and `Reporter.output_file()` is deprecated in favor of adding a `mwcp.metadata.ResidualFile` object to `Report.add()`.
+- Using `FileObject.file_path` to get a temporary file path is deprecated in favor of using `.temp_path()`, which is now a context manager.
+    - (This change is to ensure we have more guaranteed cleanup of temporary files.)
+- `Reporter.managed_tempdir` is deprecated. Instead, the developer should properly create and destroy a temporary directory themselves using Python's builtin library. However, it is best to use `FileObject.temp_path()` or reevaluate if there is a way parsing can be accomplished without writing out a file to the file system if possible.
+- The `-i` flag is no longer supported. Input file information will now always be provided (with the exception of legacy JSON output).
+- Using a `FileObject` instance in a `with` statement directly to get a file stream is now deprecated. Please use `FileObject.open()` instead.
+- `FileObject.file_data` is deprecated in favor of `FileObject.data`.
+- `FileObject.file_name` is deprecated in favor of `FileObject.name`.
+
+
 ## [3.2.1] - 2020-11-03
 - Added source argument to Dispatcher initialization to comply with new method signature
 
@@ -22,7 +85,6 @@ All notable changes to this project will be documented in this file.
 - General fixes to improve support when running under Linux.
     - Changed log configuration usage of `%LOCALAPPDATA%` for the log directory reported by `appdirs`.
 - Fixed build issue in `pecon` and added option for setting architecture to 64 bit.
-
 
 ## [3.1.0] - 2020-06-05
 

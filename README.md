@@ -81,22 +81,44 @@ DC3-MWCP can be used directly from the command line using the `mwcp` command.
 
 ```console
 > mwcp parse foo ./README.md
+----- File: README.md -----
+Field         Value
+------------  ----------------------------------------------------------------
+Parser        foo
+File Path     README.md
+Description   Foo
+Architecture
+MD5           b21df2332fe87c0fae95bdda00b5a3c0
+SHA1          8841a1fff55687ccddc587935b62667173b14bcd
+SHA256        0097c13a3541a440d64155a7f4443d76597409e0f40ce3ae67f73f51f59f1930
+Compile Time
+Tags
 
-----Standard Metadata----
+---- Socket ----
+Tags    Address    Network Protocol
+------  ---------  ------------------
+        127.0.0.1  tcp
 
-url                  http://127.0.0.1
-address              127.0.0.1
+---- URL ----
+Tags    Url               Address    Network Protocol    Application Protocol
+------  ----------------  ---------  ------------------  ----------------------
+        http://127.0.0.1  127.0.0.1  tcp                 http
 
-----Debug----
+---- Residual Files ----
+Tags    Filename           Description          MD5                               Arch    Compile Time
+------  -----------------  -------------------  --------------------------------  ------  --------------
+        fooconfigtest.txt  example output file  5eb63bbbe01eeed093cb22bb8f5acdc3
 
-size of inputfile is 7963 bytes
-outputfile: fooconfigtest.txt
-operating on inputfile README.md
+---- Logs ----
+[+] File README.md identified as Foo.
+[+] size of inputfile is 15560 bytes
+[+] README.md dispatched residual file: fooconfigtest.txt
+[+] File fooconfigtest.txt described as example output file
+[+] operating on inputfile README.md
 
-----Output Files----
-
-fooconfigtest.txt    example output file
-                     5eb63bbbe01eeed093cb22bb8f5acdc3
+----- File Tree -----
+<README.md (b21df2332fe87c0fae95bdda00b5a3c0) : Foo>
+└── <fooconfigtest.txt (5eb63bbbe01eeed093cb22bb8f5acdc3) : example output file>
 ```
 
 see ```mwcp parse -h``` for full set of options
@@ -156,6 +178,90 @@ le-n4mw7uw3\n\n----Output Files----\n\nfooconfigtest.txt    example output file\
 }
 ```
 
+By default, the original legacy json schema will be provided upon request.
+To use the new schema, you must set the `legacy` option in the query section to `False`.
+
+Eventually this new schema will replace the old one entirely. It is recommended to start using this flag
+to help transition your automation platform to use the new schema.
+
+
+```console
+> curl --form data=@README.md http://localhost:8080/run_parser/foo?legacy=False
+```
+
+```json
+[
+    {
+        "type": "report",
+        "tags": [],
+        "input_file": {
+            "type": "input_file",
+            "tags": [],
+            "name": "README.md",
+            "description": "Foo",
+            "md5": "80a3d9b88c956c960d1fea265db0882e",
+            "sha1": "994aa37fd26dd88272b8e661631eec8a5f425920",
+            "sha256": "3bef8d5dc4cd94c0ee92c9b6d7ee47a4794e550d287ee1affde84c2b7bcdf3cb",
+            "architecture": null,
+            "compile_time": null,
+            "file_path": "README.md",
+            "data": null
+        },
+        "parser": "foo",
+        "errors": [],
+        "logs": [
+            "[+] File README.md identified as Foo.",
+            "[+] size of inputfile is 15887 bytes",
+            "[+] README.md dispatched residual file: fooconfigtest.txt",
+            "[+] File fooconfigtest.txt described as example output file",
+            "[+] operating on inputfile README.md"
+        ],
+        "metadata": [
+            {
+                "type": "url",
+                "tags": [],
+                "url": "http://127.0.0.1",
+                "socket": {
+                    "type": "socket",
+                    "tags": [],
+                    "address": "127.0.0.1",
+                    "port": null,
+                    "network_protocol": "tcp",
+                    "c2": null,
+                    "listen": null
+                },
+                "path": null,
+                "query": "",
+                "application_protocol": "http",
+                "credential": null
+            },
+            {
+                "type": "socket",
+                "tags": [],
+                "address": "127.0.0.1",
+                "port": null,
+                "network_protocol": "tcp",
+                "c2": null,
+                "listen": null
+            },
+            {
+                "type": "residual_file",
+                "tags": [],
+                "name": "fooconfigtest.txt",
+                "description": "example output file",
+                "md5": "5eb63bbbe01eeed093cb22bb8f5acdc3",
+                "sha1": "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed",
+                "sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+                "architecture": null,
+                "compile_time": null,
+                "file_path": "README.md_mwcp_output\\5eb63_fooconfigtest.txt",
+                "data": null
+            }
+        ]
+    }
+]
+```
+
 A simple HTML interface is also available at the same address. By default this
 is `http://localhost:8080/`. Individual samples can be submitted and results
 saved as JSON, plain text, or ZIP archives.
@@ -181,21 +287,45 @@ mwcp.register_parser_directory(r'C:\my_parsers')
 # view all available parsers
 print(mwcp.get_parser_descriptions(config_only=False))
 
-
-# create an instance of the Reporter class
-reporter = mwcp.Reporter()
-"""
-The mwcp.Reporter object is the primary DC3-MWCP framework object, containing most input and output data
-and controlling execution of the parser modules.
-"""
-
-# run the dummy config parser, view the output
-reporter.run_parser("foo", "README.md")
-
+# call the run() function to to generate a mwcp.Report object.
+report = mwcp.run("FooParser", "C:\\README.md")
 # alternate, run on provided buffer:
-reporter.run_parser("foo", data="lorem ipsum")
+report = mwcp.run("FooParser", data=b"lorem ipsum")
 
-reporter.print_report()
+# Display report results in a variety of formats:
+print(report.as_dict())
+print(report.as_json())
+print(report.as_text())
+
+# The metadata schema has changed recently. To get the legacy format use the following:
+print(report.as_dict_legacy())
+print(report.as_json_legacy())
+
+# You can also programatically view results of report:
+from mwcp import metadata
+
+# display errors that may occur
+for log in report.errors:
+  print(log)
+
+# display data about original input file
+print(report.input_file)
+
+# get all url's using ftp protocol or has a query
+for url in report.get(metadata.URL):
+  if url.application_protocol == "ftp" or url.query:
+    print(url.url)
+
+# get residual files
+for residual_file in report.get(metadata.ResidualFile):
+  print(residual_file.name)
+  print(residual_file.description)
+  print(residual_file.md5)
+
+# iterate through all metadata elements
+for element in report:
+  print(element)
+
 ```
 
 ## Configuration

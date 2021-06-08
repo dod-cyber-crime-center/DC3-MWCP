@@ -8,6 +8,11 @@ becomes simplified and streamlined.
 
 The `mwcp test` command line utility has been created for users to generate and run test cases.
 
+**UPDATE: To run and create tests using the new metadata schema, please add the flag
+`--no-legacy` to any of the `mwcp test` commands described below.
+Eventually, support for the legacy metadata schema will be removed in a future release.**
+
+- [Updating Legacy Test Cases](#updating-legacy-test-cases)
 - [Executing Existing Test Cases](#executing-existing-test-cases)
 - [Creating or Adding Test Cases](#creating-or-adding-test-cases)
     - [Determining files to use as test cases](#determining-file-to-use-as-test-cases)
@@ -23,6 +28,48 @@ The `mwcp test` command line utility has been created for users to generate and 
 - [Parser Installation](ParserInstallation.md)
 - [Parser Testing](ParserTesting.md)
 - [Python Style Guide](PythonStyleGuide.md)
+
+
+## Updating Legacy Test Cases
+
+As of version 3.3.0, MWCP has updated how it presents its metadata schema. Henceforth, the format of the
+reported json has changed, breaking existing test cases. 
+While initially this change is only in effect if the user provided the `--no-legacy`
+command line flag, this will eventually become default in a future 4.0.0 release.
+Therefore, all existing test cases should eventually be updated to test with the newest schema.
+
+A small command line tool `mwcp_update_legacy_tests` has been created to ease in this transition.
+
+To update your tests run the following command:
+
+```console
+> mwcp_update_legacy_tests
+```
+
+This will create test cases for all installed parsers using the new schema.
+New tests cases are split into subdirectories by parser with each input file having its own json file.
+These tests will be located in the same location as the old test cases.
+
+If you also want the old tests removed, completely replacing the test cases, include the flag `--remove-old`.
+
+By default, the script will first run the legacy test cases to ensure they pass
+before creating the new test cases. This is to ensure your system is creating correct test cases. 
+This can be skipped using the flag `--skip-testing`.
+*NOTE: Tests run in this script isn't multiprocessed like usual, so it may be beneficial
+to run `mwcp test` separately and then enable this flag.*
+
+If a legacy test case fails, the whole script will halt unless the `--continue-on-failure` flag is set.
+In which case, the test case will simply be skipped.
+
+
+If the results file for a new test case already exists, the script will not recreate the test case unless the `--update-existing` flag is set.
+
+
+To convert only a specific parser, provide the name of the parser in the command line:
+
+```console
+> mwcp_update_legacy_tests SuperMalware
+```
 
 
 ## Executing Existing Test Cases
@@ -50,6 +97,53 @@ Please see `mwcp test -h` to view all options.
 The following command line options can also be used to modify how the results are output to the console:
 * `-f / --show-passed` : Display details only for failed test cases
 * `-s / --silent` : Silent. Only display a simple statement saying whether all test cases passed or not.
+
+
+### Using Pytest
+
+DC3-MWCP runs the parser tests using [pytest](https://pytest.org) as the backend for testing the newer
+metadata schema introduced in version 3.3.0. To enable this, include the `--no-legacy` flag when running `mwcp test`
+
+```console
+> mwcp test --no-legacy
+> mwcp test SuperMalware --no-legacy
+```
+
+Since the newer testing utility is backed by pytest, testing is not limited to specific parsers.
+We can now use any valid expression that can be used with the `-k` pytest flag.
+
+For example, to test a specific input file we can provide the all or part of the md5.
+
+```console
+> mwcp test abd3 --no-legacy
+```
+
+Or test parsers from a specific parser source.
+```console
+> mwcp test acme --no-legacy
+```
+
+Or we can even get fancy with exclusionary rules.
+```console
+> mwcp test "SuperMalware and not abd3" --no-legacy
+```
+
+
+As well, pytest can be used directly to handle more advanced configuration.
+
+Use the `parsers` marker to only test parsers and not framework code. Or vise versa.
+
+```console
+> pytest --pyargs mwcp -m parsers
+> pytest --pyargs mwcp -m "not parsers"
+```
+
+The `--malware-repo` and `--testcase-dir` options can also be used directly with pytest.
+
+```console
+> pytest --pyargs mwcp -m parsers --malware-repo="C:/malware" --testcase-dir="C:/mwcp_parser_tests" 
+```
+
 
 ## Creating or Adding test cases
 

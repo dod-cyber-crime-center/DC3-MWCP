@@ -14,6 +14,13 @@ from mwcp.registry import (
     iter_parsers, get_parser_descriptions, set_default_source, clear_default_source,
     ParserNotFoundError
 )
-from mwcp.reporter import Reporter
-from mwcp.dispatcher import Dispatcher, UnableToParse, UnidentifiedFile
+from mwcp.reporter import Reporter  # DEPRECATED
+from mwcp.runner import Runner
+from mwcp.report import Report
+from mwcp.dispatcher import Dispatcher, UnidentifiedFile
 from mwcp.utils.logutil import setup_logging
+from mwcp.core import run
+from mwcp.exceptions import *
+
+
+__version__ = "3.2.1"

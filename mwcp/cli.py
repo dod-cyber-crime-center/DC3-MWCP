@@ -5,6 +5,11 @@ Used for running and testing parsers.
 """
 
 from __future__ import print_function, division
+
+import pathlib
+
+import pandas
+import pytest
 from future.builtins import str, zip
 
 import csv
@@ -28,6 +33,7 @@ import six
 import tabulate
 
 import mwcp
+from mwcp import testing
 from mwcp.tester import Tester
 from mwcp.utils.stringutils import convert_to_unicode
 
@@ -236,44 +242,22 @@ def _write_csv(input_files, results, csv_path=None):
             csvfile.close()
 
 
-def _parse_file(reporter, file_path, parser, include_filename=False):
-    """
-    Parses given file_path with given parser.
-
-    :param reporter: Reporter to use for parsing.
-    :param file_path: File path to parse or "-" for stdin
-    :param parser: Name of parser to run (can use ":" notation)
-    :param include_filename: Whether to include input file metadata in the results.
-    :return: Dictionary of results.
-    """
-    if file_path == "-":
-        reporter.run_parser(parser, data=sys.stdin.read())
-    else:
-        reporter.run_parser(parser, file_path)
-
-    result = reporter.metadata
-    input_file = reporter.input_file
-
-    # TODO: This should just be included by the reporter by default.
-    if include_filename:
-        result["inputfilename"] = file_path
-        result["md5"] = input_file.md5
-        result["sha1"] = input_file.sha1
-        result["sha256"] = input_file.sha256
-        result["parser"] = parser
-        if input_file.pe:
-            result["compiletime"] = datetime.datetime.fromtimestamp(
-                reporter.input_file.pe.FILE_HEADER.TimeDateStamp
-            ).isoformat()
-
-    if reporter.errors:
-        result["errors"] = reporter.errors
-
-    return result
-
-
 @main.command()
-@click.option("-f", "--format", type=click.Choice(["csv", "json"]), help="Displays results in another format.")
+@click.option(
+    "-f", "--format",
+    type=click.Choice(["csv", "json", "simple", "markdown", "html"]),
+    default="simple",
+    show_default=True,
+    help="Displays results in another format.",
+)
+@click.option(
+    "--split/--no-split",
+    default=False,
+    show_default=True,
+    help="Whether to display results by source file the metadata originates from. "
+         "By default, results are only consolidated based on original input file. "
+         "(This feature is only available when --no-legacy is set.)"
+)
 @click.option(
     "-o",
     "--output-dir",
@@ -281,13 +265,21 @@ def _parse_file(reporter, file_path, parser, include_filename=False):
     help="Root output directory to store residual files. (defaults to current directory)",
 )
 @click.option(
-    "--output-files/--no-output-files", default=True, show_default=True, help="Whether to output files to filesystem."
+    "--output-files/--no-output-files",
+    default=True,
+    show_default=True,
+    help="Whether to output files to filesystem."
 )
 @click.option(
-    "--cleanup/--no-cleanup", default=True, show_default=True, help="Whether to cleanup temporary files after parsing."
+    "--cleanup/--no-cleanup",
+    default=True,
+    show_default=True,
+    help="Whether to cleanup temporary files after parsing."
 )
 @click.option(
-    "--prefix/--no-prefix", default=True, show_default=True,
+    "--prefix/--no-prefix",
+    default=True,
+    show_default=True,
     help="Whether to prefix output filenames with the first 5 characters of the md5. "
          "If turned off, unique files with the same file name will be overwritten."
 )
@@ -295,11 +287,18 @@ def _parse_file(reporter, file_path, parser, include_filename=False):
     "-i",
     "--include-filename",
     is_flag=True,
-    help="Include file information such as filename, hashes, and compile time in parser output.",
+    help="Include file information such as filename, hashes, and compile time in parser output. DEPRECATED",
+)
+@click.option(
+    "--legacy/--no-legacy",
+    default=True,
+    show_default=True,
+    help="Whether to present json output using legacy schema. "
+         "(WARNING: This flag will eventually be removed in favor of only supporting the new schema.)"
 )
 @click.argument("parser", required=True)
 @click.argument("input", nargs=-1, type=click.Path())
-def parse(parser, input, format, output_dir, output_files, cleanup, prefix, include_filename):
+def parse(parser, input, format, split, output_dir, output_files, cleanup, prefix, include_filename, legacy):
     """
     Parses given input with given parser.
 
@@ -329,25 +328,54 @@ def parse(parser, input, format, output_dir, output_files, cleanup, prefix, incl
 
     # Run MWCP
     try:
-        results = []
+        reports = []
         for path in input_files:
-            reporter = mwcp.Reporter(
+            runner = mwcp.Runner(
                 # Store output files to a folder with the same name as the input file.
-                outputdir=os.path.join(output_dir, os.path.basename(path) + "_mwcp_output"),
-                disable_output_files=not output_files,
-                disable_temp_cleanup=not cleanup,
+                output_directory=os.path.join(output_dir, os.path.basename(path) + "_mwcp_output")
+                    if output_files else None,
+                cleanup_temp_files=cleanup,
                 prefix_output_files=prefix,
             )
             logger.info("Parsing: {}".format(path))
-            result = _parse_file(reporter, path, parser, include_filename=include_filename)
-            results.append(result)
-            if not format:
-                reporter.print_report()
+            # TODO: This is temporary, make real fix.
+            if path == "-":
+                report = runner.run(parser, data=sys.stdin.read().encode())
+            else:
+                report = runner.run(parser, path)
+            reports.append(report)
 
-        if format == "csv":
-            _write_csv(input_files, results)
+        # TODO: Perhaps split up results with header of input file?
+        if format in ("simple", "markdown"):
+            for report in reports:
+                print(report.as_text(format, split=split))
+
         elif format == "json":
+            if legacy:
+                results = [report.as_dict_legacy(include_filename=include_filename) for report in reports]
+            else:
+                results = []
+                for report in reports:
+                    if split:
+                        results.extend(json.loads(report.as_json(split=True)))
+                    else:
+                        results.append(json.loads(report.as_json()))
             print(json.dumps(results, indent=4))
+
+        elif format in ("csv", "html"):
+            if legacy and format == "csv":
+                _write_csv(input_files, [report.metadata for report in reports])
+            else:
+                # TODO: Determine a more elegant way to handle multiple reports and split/non-split reports
+                #   writing to the same stream/df.
+                if len(reports) == 1:
+                    df = reports[0].as_dataframe(split=split)
+                else:
+                    df = pandas.concat([report.as_dataframe(split=split) for report in reports])
+                if format == "csv":
+                    print(df.to_csv(line_terminator="\n"))
+                else:
+                    print(df.to_html())
 
     except Exception as e:
         error_message = "Error running DC3-MWCP: {}".format(e)
@@ -357,37 +385,6 @@ def parse(parser, input, format, output_dir, output_files, cleanup, prefix, incl
         else:
             print(error_message)
         sys.exit(1)
-
-
-def _get_malware_repo_path(file_path):
-    """
-    Gets file path for a file in the malware_repo based on the md5 of the given file_path.
-    """
-    if not mwcp.config.get("MALWARE_REPO"):
-        raise ValueError("Malware Repository not set.")
-    with open(file_path, "rb") as fo:
-        md5 = hashlib.md5(fo.read()).hexdigest()
-    return os.path.join(mwcp.config["MALWARE_REPO"], md5[0:4], md5)
-
-
-def _add_to_malware_repo(file_path):
-    """
-    Adds the given file path to the malware repo.
-    Returns resulting destination path.
-    """
-    dest_path = _get_malware_repo_path(file_path)
-    dest_dir = os.path.dirname(dest_path)
-
-    if os.path.isfile(dest_path):
-        click.echo("File already exists in malware repo: {}".format(dest_path))
-        return dest_path
-
-    if not os.path.exists(dest_dir):
-        os.makedirs(dest_dir)
-
-    click.echo("Copying {} to {}".format(file_path, dest_path))
-    shutil.copy(file_path, dest_path)
-    return dest_path
 
 
 def _read_input_list(filename):
@@ -515,7 +512,7 @@ def _run_tests(tester, silent=False, show_passed=False):
     "--testcase-dir",
     type=click.Path(file_okay=False),
     help="Directory containing JSON test case files. (defaults to a "
-    '"tests" directory located within the root of the parsers directory)',
+    '"tests" directory located within the parsers directory)',
 )
 @click.option(
     "-m",
@@ -525,7 +522,8 @@ def _run_tests(tester, silent=False, show_passed=False):
 )
 # Arguments used for run test cases.
 @click.option(
-    "-n", "--nprocs", type=int, help="Number of test cases to run simultaneously. [default: 3/4 * logical CPU cores]"
+    "-n", "--nprocs", type=int,
+    help="Number of test cases to run simultaneously. [default: 3/4 * logical CPU cores]"
 )
 # Arguments used to generate and update test cases
 @click.option(
@@ -541,7 +539,8 @@ def _run_tests(tester, silent=False, show_passed=False):
     "--add",
     multiple=True,
     type=click.Path(exists=True, dir_okay=False),
-    help="Adds given file to the test case. (Will first copy file to malware repo if provided.)",
+    help="Adds given file to the test case. "
+         "(Will first copy file to malware repo if provided.)",
 )
 @click.option(
     "-i",
@@ -555,22 +554,41 @@ def _run_tests(tester, silent=False, show_passed=False):
     "--delete",
     multiple=True,
     type=click.Path(exists=True, dir_okay=False),
-    help="Deletes given file from the test case. " "(Note, this does not delete the file if placed in a malware repo.)",
+    help="Deletes given file from the test case. " 
+         "(Note, this does not delete the file if placed in a malware repo.)",
 )
 @click.option("-y", "--yes", is_flag=True, help="Auto confirm questions.")
-@click.option("--force", is_flag=True, help="Force test case add/update when errors are encountered.")
+@click.option(
+    "--force", is_flag=True,
+    help="Force test case to add/update even when errors are encountered."
+)
 # Arguments to configure console output
 @click.option(
     "-f",
     "--show-passed",
     is_flag=True,
-    help="Display tests case details for passed tests as well." "By default only failed tests are shown.",
+    help="Display test case details for passed tests as well."
+         "By default only failed tests are shown.",
 )
 @click.option("-s", "--silent", is_flag=True, help="Limit output to statement saying whether all tests passed or not.")
+@click.option(
+    "--legacy/--no-legacy",
+    default=True,
+    show_default=True,
+    help="Whether to present json output using legacy schema. "
+         "(WARNING: This flag will eventually be removed in favor of only supporting the new schema.)"
+)
+@click.option(
+    "--exit-on-first/--no-exit-on-firat",
+    default=False,
+    show_default=True,
+    help="Whether to exit on the first failed test case. (Only works with --no-legacy)"
+)
 # Parser to process.
 @click.argument("parser", nargs=-1, required=False)
 def test(
-    testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete, yes, force, show_passed, silent, parser
+    testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete, yes, force, show_passed,
+    silent, legacy, exit_on_first, parser
 ):
     """
     Testing utility to create and execute parser test cases.
@@ -596,17 +614,8 @@ def test(
     if malware_repo:
         mwcp.config["MALWARE_REPO"] = malware_repo
 
-    # Configure test object
-    reporter = mwcp.Reporter(disable_output_files=True)
-    tester = Tester(reporter=reporter, parser_names=parser or [None], nprocs=nprocs,)
-
-    # Add/Delete
-    if add or add_filelist or delete:
-        click.echo("Adding new test cases. May take a while...")
-        if not parser:
-            # Don't allow adding a file to ALL test cases.
-            raise click.BadParameter("PARSER must be provided when adding or deleting a file from a test case.")
-
+    # Add files listed in filelist to add option.
+    if add_filelist:
         # Cast tuple to list so we can manipulate.
         add = list(add)
         for filelist in add_filelist:
@@ -614,30 +623,85 @@ def test(
                 for file_path in f.readlines():
                     add.append(file_path.rstrip("\n"))
 
-        for file_path in add:
-            if mwcp.config.get("MALWARE_REPO"):
-                file_path = _add_to_malware_repo(file_path)
-            tester.add_test(file_path, force=force, update=update)
+    # Add/Delete
+    if add or delete:
+        click.echo("Adding new test cases. May take a while...")
+        if not parser:
+            # Don't allow adding a file to ALL test cases.
+            raise click.BadParameter("PARSER must be provided when adding or deleting a file from a test case.")
 
-        for file_path in delete:
-            if mwcp.config.get("MALWARE_REPO"):
-                file_path = _get_malware_repo_path(file_path)
-            tester.remove_test(file_path)
+        if legacy:
+            tester = Tester(parser_names=parser or [None], nprocs=nprocs)
+            for file_path in add:
+                if mwcp.config.get("MALWARE_REPO"):
+                    file_path = str(testing.add_to_malware_repo(file_path))
+                tester.add_test(file_path, force=force, update=update)
+
+            for file_path in delete:
+                if mwcp.config.get("MALWARE_REPO"):
+                    file_path = str(testing.get_path_in_malware_repo(file_path))
+                tester.remove_test(file_path)
+        else:
+            for file_path in add:
+                testing.add_tests(file_path, parsers=parser, force=force, update=update)
+
+            for file_path in delete:
+                testing.remove_tests(file_path, parsers=parser)
 
     # Update
     elif update:
         if not parser and not yes:
             click.confirm("WARNING: About to update test cases for ALL parsers. Continue?", abort=True)
         click.echo("Updating test cases. May take a while...")
-        tester.update_tests(force=force)
+        if legacy:
+            tester = Tester(parser_names=parser or [None], nprocs=nprocs)
+            tester.update_tests(force=force)
+        else:
+            testing.update_tests(parsers=parser, force=force)
 
     # Run tests
     else:
         if not parser and not yes:
             click.confirm("PARSER argument not provided. Run tests for ALL parsers?", default=True, abort=True)
-        # Force ERROR level logs so we don't spam the console.
-        logging.root.setLevel(logging.ERROR)
-        _run_tests(tester, silent, show_passed)
+        if legacy:
+            # Force ERROR level logs so we don't spam the console.
+            logging.root.setLevel(logging.ERROR)
+            tester = Tester(parser_names=parser or [None], nprocs=nprocs)
+            _run_tests(tester, silent, show_passed)
+
+        # Run pytest with "parsers" marker to run parsing tests.
+        else:
+            # Due to bug in pytest, we won't get our custom command line arguments
+            # registered just by using "--pyargs mwcp".
+            # Therefore, we need to explicitly change the directory to the root mwcp path.
+            # TODO: Remove this workaround when github.com/pytest-dev/pytest/issues/1596 is solved.
+            if testcase_dir:
+                testcase_dir = str(pathlib.Path(testcase_dir).resolve())
+            if malware_repo:
+                malware_repo = str(pathlib.Path(malware_repo).resolve())
+            os.chdir(pathlib.Path(mwcp.__file__).parent)
+
+            pytest_args = [
+                "--pyargs", "mwcp",
+                "-m", "parsers",
+                "--disable-pytest-warnings",
+                "--durations", "10",
+            ]
+            if not silent:
+                pytest_args += ["-vv"]
+            if parser:
+                pytest_args += ["-k", " or ".join(parser)]
+            if nprocs != 1:
+                pytest_args += ["-n", str(nprocs) if nprocs else "auto"]
+            if testcase_dir:
+                pytest_args += ["--testcase-dir", testcase_dir]
+            if malware_repo:
+                pytest_args += ["--malware-repo", malware_repo]
+            if exit_on_first:
+                pytest_args += ["-x"]
+
+            logger.debug(f"Running pytest with arguments: {pytest_args}")
+            sys.exit(pytest.main(pytest_args))
 
 
 if __name__ == "__main__":

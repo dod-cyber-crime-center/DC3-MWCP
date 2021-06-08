@@ -1,11 +1,12 @@
 import abc
 import logging
-import six
+from typing import TYPE_CHECKING
+import warnings
 
 # This is here for type hints and autocomplete in PyCharm
 # noinspection PyUnreachableCode
-if False:
-    from mwcp import FileObject
+if TYPE_CHECKING:
+    from mwcp import FileObject, Report
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,7 @@ class ParserMeta(abc.ABCMeta):
         return "<{}>".format(cls.name)
 
 
-@six.add_metaclass(ParserMeta)
-class Parser(object):
+class Parser(metaclass=ParserMeta):
     """
     Interface for all parser objects.
     Either use this as a base for all component parsers, or
@@ -57,20 +57,28 @@ class Parser(object):
     # TODO: Deprecate the AUTHOR field?
     AUTHOR = ""  # Optional
 
-    def __init__(self, file_object, reporter, dispatcher):
+    def __init__(self, file_object, report, dispatcher):
         """
         Initializes the Parser.
 
         :param FileObject file_object: Object containing data about component file.
-        :param mwcp.Reporter reporter: reference to reporter object that executed this parser.
+        :param mwcp.Report report: Report object to be filled in.
         :param Dispatcher dispatcher: reference to the dispatcher object
         """
         if not self.DESCRIPTION:
             raise NotImplementedError("Parser class is missing a DESCRIPTION.")
         self.file_object = file_object
-        self.reporter = reporter
+        self.report = report
         self.dispatcher = dispatcher
         self.logger = logging.getLogger(".".join([self.__class__.__module__, self.__class__.__name__]))
+
+    @property
+    def reporter(self) -> "Report":
+        warnings.warn(
+            "reporter has been renamed to report and is now an instance of mwcp.Report",
+            DeprecationWarning
+        )
+        return self.report
 
     @classmethod
     def get_logger(cls):
@@ -104,18 +112,18 @@ class Parser(object):
         return True  # Default to True to keep backwards compatibility for legacy parsers.
 
     @classmethod
-    def parse(cls, file_object, reporter, dispatcher=None):
+    def parse(cls, file_object, report, dispatcher=None):
         """
         Runs parser on given file_object.
 
         :param FileObject file_object: Object containing data about component file.
-        :param mwcp.Reporter reporter: reference to reporter object that executed this parser.
+        :param mwcp.Report report: reference to report object used to report new metadata.
         :param Dispatcher dispatcher: reference to the dispatcher object. (if used)
         :return:
         """
-        # TODO: Use reporter to output metadata about initial input file.
         if dispatcher:
-            parser_object = cls(file_object, reporter, dispatcher)
+            report.set_file(file_object)
+            parser_object = cls(file_object, report, dispatcher)
             parser_object.run()
 
         # If dispatcher isn't provided, create a dummy one containing only this parser.
@@ -123,7 +131,7 @@ class Parser(object):
             from mwcp import Dispatcher  # Must import here to avoid cyclic import.
 
             dispatcher = Dispatcher(cls.name, cls.source, author=cls.AUTHOR, description=cls.DESCRIPTION, parsers=[cls])
-            dispatcher.parse(file_object, reporter)
+            dispatcher.parse(file_object, report)
 
     def run(self):
         """

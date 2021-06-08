@@ -24,26 +24,34 @@ setup(
     entry_points={
         'console_scripts': [
             'mwcp = mwcp.cli:main',
-            'poshdeob = mwcp.utils.poshdeob:main'
+            'poshdeob = mwcp.utils.poshdeob:main',
+            'mwcp_update_legacy_tests = mwcp.tools.update_legacy_tests:main',
         ],
         'mwcp.parsers': [
             'mwcp = mwcp.parsers',
         ]
     },
     install_requires=[
+        'anytree',
         'appdirs',
+        'attrs>=20.3.0',
+        'cattrs',
         'click',
         'construct==2.9.45',  # pin because parsers are very dependent on this.
         'future',
         'jinja2',  # For construct.html_hex()
+        'pandas',
         'pefile>=2019.4.18',
         'pyelftools',
         'pyparsing==2.3.0',  # 2.4.0 seems to break poshdeob
+        'pytest>=6.0.0',
+        'pytest-console-scripts',
+        'pytest-xdist',
         'pyyaml',
         'requests',
         'ruamel.yaml',
         'six',
-        'tabulate',
+        'tabulate[widechars]',
 
         # For the server and API
         'flask~=1.1.0',
@@ -52,8 +60,6 @@ setup(
     extras_require={
         'kordesii': ['kordesii>=2.0.0'],
         'testing': [
-            'pytest',
-            'pytest-console-scripts',
         ],
     }
 )

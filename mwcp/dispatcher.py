@@ -7,19 +7,12 @@ content to ease maintenance.
 import logging
 from collections import deque
 
+from mwcp import metadata
 from mwcp.file_object import FileObject
 from mwcp.parser import Parser
+from mwcp.exceptions import UnableToParse
 
 logger = logging.getLogger(__name__)
-
-
-class UnableToParse(Exception):
-    """
-    This exception can be thrown if a parser that has been correctly identified has failed to parse
-    the file and you would like other parsers to be tried.
-    """
-
-    pass
 
 
 class UnidentifiedFile(Parser):
@@ -168,7 +161,7 @@ class Dispatcher(object):
                 logger.debug(u"{} identified with {!r}".format(file_object.name, parser))
                 yield parser
 
-    def _parse(self, file_object, parser, reporter):
+    def _parse(self, file_object, parser, report):
         """
         Parse given file_object with given sub parser
 
@@ -186,7 +179,7 @@ class Dispatcher(object):
         file_object.parser = parser
 
         try:
-            parser.parse(file_object, reporter, dispatcher=self)
+            parser.parse(file_object, report, dispatcher=self)
         except UnableToParse as exception:
             if isinstance(parser, Dispatcher):
                 # Parser is a group, change wording
@@ -203,12 +196,12 @@ class Dispatcher(object):
         except Exception:
             logger.exception(u"{} dispatch parser failed".format(parser.name))
 
-    def parse(self, file_object, reporter, dispatcher=None):
+    def parse(self, file_object, report, dispatcher=None):
         """
         Runs dispatcher on given file_object.
 
         :param FileObject file_object: Object containing data about component file.
-        :param mwcp.Reporter reporter: reference to reporter object that executed this parser.
+        :param mwcp.Report report: Report object to be filled in.
         :param Dispatcher dispatcher: reference to the parent dispatcher object that called this parse command.
             (None if this dispatcher is the root)
         :return:
@@ -237,7 +230,7 @@ class Dispatcher(object):
                 # Run any applicable parsers.
                 for parser in self._iter_parsers(file_object):
                     try:
-                        self._parse(file_object, parser, reporter)
+                        self._parse(file_object, parser, report)
                     except UnableToParse as e:
                         unable_to_parse_error = e
                         continue
@@ -261,13 +254,21 @@ class Dispatcher(object):
                     logger.info(u"Supplied file {} was not identified.".format(file_object.file_name))
                     if self.default:
                         try:
-                            self._parse(file_object, self.default, reporter)
+                            self._parse(file_object, self.default, report)
                         except UnableToParse:
                             pass
 
             finally:
-                # Output the file if we identified it or we are the root.
-                # NOTE: We don't want to output the file until the very end, since a parser may want to change
+                # Report the file as residual if we identified it or we are the root parser.
+                # NOTE: We don't want to report the file until the very end, since a parser may want to change
                 # the file's filename or description.
                 if identified or (not dispatcher and self._output_unidentified):
-                    file_object.output()
+                    if file_object.output_file:
+                        # Temporarily set current file back to parent so residual file is
+                        # reported correctly.
+                        report.set_file(file_object.parent)
+                        report.add(metadata.ResidualFile.from_file_object(file_object))
+                        report.set_file(file_object)
+
+                # Cleanup any temporary files the file_object may have created.
+                file_object._cleanup()

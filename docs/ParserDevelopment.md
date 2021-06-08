@@ -117,7 +117,7 @@ MWCP parser for SuperMalware malware family.
 """
 import os
 
-from mwcp import Parser, FileObject
+from mwcp import Parser, FileObject, metadata
 
 
 class Trojan(Parser):
@@ -141,7 +141,7 @@ class Trojan(Parser):
         Extract metdata from Foo Trojan.
         """
         ip_address = self._extract_ip_address()
-        self.reporter.add_metadata("c2_address", ip_address)
+        self.report.add(metadata.C2Address(ip_address))
 
 
 class Dropper(Parser):
@@ -158,24 +158,23 @@ class Dropper(Parser):
 
         :return: Boolean value indicating if file is a Foo Trojan.
         """
-        return file_object.pe and file_object.pe.is_dll() and self.file_object.file_name.endswith('FooD.dll')
+        return file_object.pe and file_object.pe.is_dll() and file_object.name.endswith('FooD.dll')
 
     def run(self):
         """
         Extract metadata and implant from SuperMalware Dropper.
         """
         # Decrypt and report implant.
-        key = self._extract_rc4_key(self.file_object.file_data)
+        key = self._extract_rc4_key(self.file_object.data)
         if key:
             self.logger.info('Found RC4 key.')
             # Report key.
-            self.reporter.add_metadata('key', key.encode('hex'))
-            self.reporter.add_metadata('other', {'rc4_key': key.encode('hex'))
+            self.report.add(metadata.EncryptionKey(key, algorithm="rc4"))
 
             # Decrypt and dispatch implant.
-            implant_data = self._decrypt_implant(key, self.file_object.file_data)
+            implant_data = self._decrypt_implant(key, self.file_object.data)
             if implant_data:
-                implant_file_object = FileObject(implant_data, reporter=self.reporter)
+                implant_file_object = FileObject(implant_data)
                 self.dispatcher.add_to_queue(implant_file_object)
         else:
             self.logger.warning('Unable to find RC4 key!')
@@ -213,7 +212,7 @@ The `mwcp.UnableToParse` exception can be thrown if a parser that has been corre
 This can be useful if identification would require heavy computation that you do not want to run twice.
 
 ```python
-from mwcp import Parser, UnableToParse
+from mwcp import Parser, UnableToParse, metadata
 
 
 class Trojan(Parser):
@@ -244,7 +243,7 @@ class Trojan(Parser):
             # and we want other component parsers to be tried.
             raise UnableToParse("Configuration not found. File was miss-identified.")
 
-        self.reporter.add_metadata("c2_address", config.c2_address)
+        self.report.add(metadata.C2Address(config.c2_address))
 ```
 
 
@@ -266,7 +265,7 @@ For example:
 import os
 import re
 
-from mwcp import Parser, FileObject
+from mwcp import Parser, FileObject, metadata
 from mwcp.utils import construct
 from construct import this
 
@@ -324,15 +323,15 @@ class Dropper(Parser):
         config = info.config
 
         # report metadata
-        self.reporter.add_metadata('c2_address', config.c2_address)
-        self.reporter.add_metadata('mutex', config.mutex)
+        self.report.add(metadata.C2Address(config.c2_address))
+        self.report.add(metadata.Mutex(config.mutex))
 
         # decrypt implant.
-        self.reporter.add_metadata('key', hex(config.key))
-        implant = self._decrypt(key, config.encrypted_data)
+        self.report.add(metadata.EncryptionKey(config.key, algorithm="xor"))
+        implant_data = self._decrypt(config.key, config.encrypted_data)
 
         # dispatch implant to be picked up by another parser.
-        self.dispatcher.add_to_queue(FileObject(implant, self.reporter))
+        self.dispatcher.add_to_queue(FileObject(implant_data))
 ```
 
 
@@ -354,10 +353,16 @@ After executing the parser, check for issues in data mappings or format. Adjust 
 the following CyberGate specific condition was added to address malformed output in the original techanarchy parser:
 
 ```python
+from mwcp import metadata
+
 if scriptname == "CyberGate":
-    reporter.add_metadata("c2_socketaddress", (data['Domain'].rstrip("|"), data['Port'].rstrip("|"), "tcp"))
+    report.add(metadata.Socket(
+        address=data["Domain"].rstrip("|"), port=data["Port"].rstrip("|"), network_protocol="tcp", c2=True
+    ))
 else:
-    reporter.add_metadata("c2_socketaddress", (data['Domain'], data['Port'], "tcp"))
+    report.add(metadata.Socket(
+        address=data["Domain"], port=data["Port"], network_protocol="tcp", c2=True
+    ))
 ```
 
 

@@ -1,0 +1,69 @@
+{
+    "type": "report",
+    "tags": [],
+    "mwcp_version": "3.2.1",
+    "input_file": {
+        "type": "input_file",
+        "tags": [],
+        "name": "f144899b86766688991c5d0d10902f4a.bin",
+        "description": "Foo",
+        "md5": "f144899b86766688991c5d0d10902f4a",
+        "sha1": "bdca4e5c28a89d3b5281cc189f5910eaad16395a",
+        "sha256": "8a599bf73a83c1d32a1b426ed736488ae34991fda6ac4cd27cc0597e21cd8420",
+        "architecture": null,
+        "compile_time": null,
+        "file_path": null,
+        "data": null
+    },
+    "parser": "mwcp:foo",
+    "errors": [],
+    "logs": [
+        "[+] File f144899b86766688991c5d0d10902f4a.bin identified as Foo.",
+        "[+] size of inputfile is 15765 bytes",
+        "[+] f144899b86766688991c5d0d10902f4a.bin dispatched residual file: fooconfigtest.txt",
+        "[+] File fooconfigtest.txt described as example output file",
+        "[+] operating on inputfile f144899b86766688991c5d0d10902f4a.bin"
+    ],
+    "metadata": [
+        {
+            "type": "url",
+            "tags": [],
+            "url": "http://127.0.0.1",
+            "socket": {
+                "type": "socket",
+                "tags": [],
+                "address": "127.0.0.1",
+                "port": null,
+                "network_protocol": "tcp",
+                "c2": null,
+                "listen": null
+            },
+            "path": null,
+            "query": "",
+            "application_protocol": "http",
+            "credential": null
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": "127.0.0.1",
+            "port": null,
+            "network_protocol": "tcp",
+            "c2": null,
+            "listen": null
+        },
+        {
+            "type": "residual_file",
+            "tags": [],
+            "name": "fooconfigtest.txt",
+            "description": "example output file",
+            "md5": "5eb63bbbe01eeed093cb22bb8f5acdc3",
+            "sha1": "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed",
+            "sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+            "architecture": null,
+            "compile_time": null,
+            "file_path": null,
+            "data": null
+        }
+    ]
+}

@@ -4,7 +4,7 @@ Parsers are created by inheriting from the `mwcp.Parser` class. An instance of t
 components to assist in parsing a file:
 
 - [self.file_object](#fileobject) - The file currently being parsed.
-- [self.reporter](#reporter) - Used to report on parsed configuration data.
+- [self.report](#report) - Used to report on parsed configuration data.
 - [self.dispatcher](#dispatcher) - Used to add new embedded files to the processing queue.
 - [self.logger](#logger) - Used to log debugging, informational, and error messages.
 
@@ -21,9 +21,10 @@ The file being processed by a parser is accessible via `self.file_object`, which
 `mwcp.FileObject` class. This class contains a variety of useful attributes describing the file.
 
 It contains the following attributes:
-- `file_data` - The raw data of the file.
-- `file_name` - Name of the file (or a auto generated stub)
-- `file_path` - A full path to the file which can be used for external utilities that require it.
+- `data` - The raw data of the file.
+- `name` - Name of the file (or an auto-generated stub)
+- `file_path` - The actual file path as found in the file system (if backed by a real file).
+  - (This is prmarily used for the initial input file.)
 - `md5`, `sha1`, `sha256` - Hashes of the given file.
 - `pe` - A `PEFile` object of the file or `None` if file is not a PE.
 - `resources` - List of PE resources (if a PE)
@@ -32,41 +33,81 @@ It contains the following attributes:
 - `parent` - The `mwcp.FileObject` object that this file was extracted from or None if this is the original input file.
 
 
-You can also access a file-like object (a `io.BytesIO` object) if you wrap the object using a `with` statement.
+A file-like object can be generated in a context manager using `.open()`.
+This can be helpful if a file stream is needed.
 
 ```python
-for self.file_object as fo:
+with self.file_object.open() as fo:
     fo.read(10)
 ```
 
-## Reporter
-You can report configuration data using `self.reporter`, which is an instance of a `mwcp.Reporter` class.
-
-You can add metadata via the `add_metadata(key, value)` function
-- `key` is the field name of the metadata item. This should be one of the standardized fields reported in [mwcp/resources/fields.json](../mwcp/resources/fields.json).
-- `value` is the actual value to report.
-   - For a "listofstrings" type, this is simply the string to report.
-   - For a "listofstringtuples" type, this is a tuple or list.
-   - For a "dictofstrings" type, this is a dictionary with string values.
-- Malware specific metadata that does not fit one of the standard fields can be added to the "other" field, passing in a dictionary containing the key:value pair for this custom metadata item.
-- All strings provided to the add_metadata function should either be a Unicode string or a UTF-8 encoded byte string. If a string contains characters that cannot be decoded as UTF-8, they will be replaced with the Unicode replacement character (�).
+A temporary file path can be generated in a context manager using `.temp_path()`.
+This can be helpful for external utilities that require a real file path.
 
 ```python
-    key = self._extract_rc4_key(self.file_object.file_data)
-    if key:
-        # Report key.
-        hex_key = binascii.hexlify(key)
-        self.reporter.add_metadata('key', hex_key)
-        self.reporter.add_metadata('other', {'rc4_key': hex_key})
+with self.file_object.temp_path() as file_path:
+    _some_library_that_needs_a_path(file_path)
 ```
 
-### Guidance on standardized fields
 
-When possible, use the most comprehensive field possible. Ex. if you have an address and a tcp port, report the socketaddress instead of the address and port separately
+## Report
+You can report configuration data into `self.report`, which is an instance of a `mwcp.Report` class.
 
- Subfields are parsed automatically. They can be reported, but it is not necessary. Ex. if you report a socketaddress, reporting the address and port is redundant and not necessary
+You can add metadata via the `add()` function, which takes a metadata element defined in `mwcp.metadata`.
 
-Remember that the standardized fields are designed to encompass data in a standardized format, not necessarily to match exactly how data is encoded in the malware being analyzed. The "other" fields are designed to capture specimen and family specific nuances.
+Malware specific metadata that does not fit one of the defined metadata elements can be added using the `Other` element, passing in a key/value pair for this custom metadata item.
+Remember that the metadata elements are designed to encompass data in a standardized format, not necessarily to match exactly how data is encoded in the malware being analyzed. The `Other` element is designed to capture specimen and family specific nuances.
+
+```python
+from mwcp import metadata
+
+...
+
+# Report key.
+key = self._extract_rc4_key(self.file_object.data)
+if key:
+    self.report.add(metadata.EncryptionKey(key=key, algorithm="rc4"))
+
+# Report mutex.
+mutex = self._extract_mutex(self.file_object.data)
+if mutex:
+    self.report.add(metadata.Mutex(mutex))
+
+# Report non-standard element.
+config_display_name = self._extract_config_display_name(self.file_object.data)
+if config_display_name:
+    self.report.add(metadata.Other("config_display_name", config_display_name))
+```
+
+### Tagging
+Tags can be added to any produced metadata element or file object.
+To add a tag, simply call `add_tag()` with a provided sequence of tags.
+These tags provide an easy way to add context to the results based on your own
+defined standard such as actor set, technique, artifact location, etc.
+
+The `add_tag()` function will return the instance of the element it is
+being added to, allowing for easy addition of tags within existing code.
+
+```python
+from mwcp import metadata
+
+
+# Report key and provide context that is was use for the implant.
+key = self._extract_rc4_key(self.file_object.data)
+if key:
+    self.report.add(metadata.EncryptionKey(key=key, algorithm="rc4").add_tag("implant"))
+
+# Add embedded implant and add tag that it came from overlay.
+self.dispatcher.add_to_queue(FileObject(implant_data).add_tag("overlay"))
+
+# Attach a tag for known actor set after positive identification.
+@classmethod
+def identify(cls, file_object):
+    if "MAGIC" in file_object.data:
+        file_object.add_tag("SuperActor")
+        return True
+    return False
+```
 
 
 ## Dispatcher
@@ -94,7 +135,7 @@ using the `add_to_queue()` function.
             # Decrypt and dispatch implant.
             implant_data = self._decrypt_implant(key, self.file_object.file_data)
             if implant_data:
-                implant_file_object = FileObject(implant_data, reporter=self.reporter, description='Decrypted Implant')
+                implant_file_object = FileObject(implant_data, description='Decrypted Implant')
                 self.dispatcher.add_to_queue(implant_file_object)
 ```
 

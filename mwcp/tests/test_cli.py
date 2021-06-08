@@ -15,94 +15,87 @@ import mwcp
 from mwcp import cli
 
 
-
 def test_parse(tmpdir, script_runner):
     """Test running a parser"""
     test_file = tmpdir / 'test.txt'
     test_file.write_binary(b'This is some test data!')
     test_file = test_file.basename
-    cwd = str(tmpdir)
+    cwd = tmpdir
 
     # Run the foo parser on the test input file.
-    ret = script_runner.run('mwcp', 'parse', 'foo', test_file, cwd=cwd)
+    ret = script_runner.run('mwcp', 'parse', 'foo', test_file, cwd=str(cwd), encoding="utf-8")
     print(ret.stdout)
     print(ret.stderr, file=sys.stderr)
     assert ret.success
     assert ret.stdout == \
-'''
-----Standard Metadata----
+f'''\
+----- File: {test_file} -----
+Field         Value
+------------  ----------------------------------------------------------------
+Parser        foo
+File Path     {test_file}
+Description   Foo
+Architecture
+MD5           fb843efb2ffec987db12e72ca75c9ea2
+SHA1          5e90c4c2be31a7a0be133b3dbb4846b0434bc2ab
+SHA256        fe5af8c641835c24f3bbc237a659814b96ed64d2898fae4cb3d2c0ac5161f5e9
+Compile Time
+Tags
 
-url                  http://127.0.0.1
-address              127.0.0.1
+---- Socket ----
+Tags    Address    Network Protocol
+------  ---------  ------------------
+        127.0.0.1  tcp
 
-----Debug----
+---- URL ----
+Tags    Url               Address    Network Protocol    Application Protocol
+------  ----------------  ---------  ------------------  ----------------------
+        http://127.0.0.1  127.0.0.1  tcp                 http
 
+---- Residual Files ----
+Tags    Filename           Description          MD5                               Arch    Compile Time
+------  -----------------  -------------------  --------------------------------  ------  --------------
+        fooconfigtest.txt  example output file  5eb63bbbe01eeed093cb22bb8f5acdc3
+
+---- Logs ----
 [+] File test.txt identified as Foo.
 [+] size of inputfile is 23 bytes
-[+] operating on inputfile {}
+[+] test.txt dispatched residual file: fooconfigtest.txt
+[+] File fooconfigtest.txt described as example output file
+[+] operating on inputfile test.txt
 
-----Output Files----
+----- File Tree -----
+<test.txt (fb843efb2ffec987db12e72ca75c9ea2) : Foo>
+└── <fooconfigtest.txt (5eb63bbbe01eeed093cb22bb8f5acdc3) : example output file>
 
-fooconfigtest.txt    example output file
-                     5eb63bbbe01eeed093cb22bb8f5acdc3
 
-'''.format(test_file)
-
-    # Test the "-i" flag.
-    ret = script_runner.run('mwcp', 'parse', '-i', 'foo', test_file, cwd=cwd)
-    print(ret.stdout)
-    print(ret.stderr, file=sys.stderr)
-    assert ret.success
-    assert ret.stdout == \
 '''
-----File Information----
-
-inputfilename        {0}
-md5                  fb843efb2ffec987db12e72ca75c9ea2
-sha1                 5e90c4c2be31a7a0be133b3dbb4846b0434bc2ab
-sha256               fe5af8c641835c24f3bbc237a659814b96ed64d2898fae4cb3d2c0ac5161f5e9
-
-----Standard Metadata----
-
-url                  http://127.0.0.1
-address              127.0.0.1
-
-----Debug----
-
-[+] File test.txt identified as Foo.
-[+] size of inputfile is 23 bytes
-[+] operating on inputfile {0}
-
-----Output Files----
-
-fooconfigtest.txt    example output file
-                     5eb63bbbe01eeed093cb22bb8f5acdc3
-
-'''.format(test_file)
 
     # Check that the output file was created
-    output_file = os.path.join(cwd, '{}_mwcp_output'.format(test_file), '5eb63_fooconfigtest.txt')
-    assert os.path.isfile(output_file)
+    output_file = cwd / f"{test_file}_mwcp_output" / "5eb63_fooconfigtest.txt"
+    assert output_file.exists()
 
     # Test the "--no-output-files" flag.
     os.unlink(output_file)
     assert not os.path.isfile(output_file)
-    ret = script_runner.run('mwcp', 'parse', '--no-output-files', 'foo', test_file, cwd=cwd)
+    ret = script_runner.run('mwcp', 'parse', '--no-output-files', 'foo', test_file, cwd=str(cwd))
     assert ret.success
     # We should still not have the output file
     assert not os.path.isfile(output_file)
 
     # Test the json formating
-    ret = script_runner.run('mwcp', 'parse', '-f', 'json', 'foo', test_file, cwd=cwd)
+    ret = script_runner.run('mwcp', 'parse', '-f', 'json', 'foo', test_file, cwd=str(cwd))
     print(ret.stdout)
     print(ret.stderr, file=sys.stderr)
     assert ret.success
     assert json.loads(ret.stdout) == [
         {
             "debug": [
-                "[+] File {} identified as Foo.".format(test_file),
+                f"[+] File {test_file} identified as Foo.",
                 "[+] size of inputfile is 23 bytes",
-                "[+] operating on inputfile {}".format(test_file)
+                f"[+] {test_file} dispatched residual file: fooconfigtest.txt",
+                "[+] File fooconfigtest.txt described as example output file",
+                f"[+] operating on inputfile {test_file}",
             ],
             "url": [
                 "http://127.0.0.1"
@@ -119,31 +112,6 @@ fooconfigtest.txt    example output file
             ]
         }
     ]
-
-
-def test_get_malware_repo_path(tmpdir):
-    """Tests generating malware repo path."""
-    malware_repo = tmpdir.mkdir('malware_repo')
-    test_file = tmpdir / 'test.txt'
-    test_file.write_binary(b'This is some test data!')
-
-    mwcp.config['MALWARE_REPO'] = str(malware_repo)
-    sample_path = cli._get_malware_repo_path(str(test_file))
-    assert sample_path == str(malware_repo / 'fb84' / 'fb843efb2ffec987db12e72ca75c9ea2')
-
-
-def test_add_to_malware_repo(tmpdir):
-    """Tests adding a file to the malware repo."""
-    malware_repo = tmpdir.mkdir('malware_repo')
-    test_file = tmpdir / 'test.txt'
-    test_file.write_binary(b'This is some test data!')
-
-    mwcp.config['MALWARE_REPO'] = str(malware_repo)
-    sample_path = cli._add_to_malware_repo(str(test_file))
-    expected_sample_path = malware_repo / 'fb84' / 'fb843efb2ffec987db12e72ca75c9ea2'
-    assert sample_path == str(expected_sample_path)
-    assert expected_sample_path.exists()
-    assert expected_sample_path.read_binary() == test_file.read_binary()
 
 
 def test_list(tmpdir, script_runner, make_sample_parser):
@@ -272,11 +240,13 @@ def test_csv_cli(tmpdir, script_runner):
 
     expected = (
         'scan_date,inputfilename,outputfile.name,outputfile.description,outputfile.md5,address,debug,url\n'
-        '[TIMESTAMP],{0},fooconfigtest.txt,example output file,5eb63bbbe01eeed093cb22bb8f5acdc3,127.0.0.1,'
+        f'[TIMESTAMP],{test_file},fooconfigtest.txt,example output file,5eb63bbbe01eeed093cb22bb8f5acdc3,127.0.0.1,'
         '"[+] File test.txt identified as Foo.\n'
         '[+] size of inputfile is 23 bytes\n'
-        '[+] operating on inputfile {0}'
-        '",http://127.0.0.1\n'.format(test_file)
+        '[+] test.txt dispatched residual file: fooconfigtest.txt\n'
+        '[+] File fooconfigtest.txt described as example output file\n'
+        f'[+] operating on inputfile {test_file}'
+        '",http://127.0.0.1\n'
     )
     results = ret.stdout
     # Replace timestamp.
@@ -312,24 +282,26 @@ def test_add_testcase(tmpdir, script_runner):
     assert test_case_file.exists()
     expected_results = [
         {
-            u"debug": [
-                u"[+] File {} identified as Foo.".format(test_sample.basename),
-                u"[+] size of inputfile is 23 bytes",
-                u"[+] operating on inputfile {}".format(test_sample.basename)
+            "debug": [
+                f"[+] File {test_sample.basename} identified as Foo.",
+                "[+] size of inputfile is 23 bytes",
+                "[+] fb843efb2ffec987db12e72ca75c9ea2 dispatched residual file: fooconfigtest.txt",
+                "[+] File fooconfigtest.txt described as example output file",
+                f"[+] operating on inputfile {test_sample.basename}",
             ],
-            u"url": [
-                u"http://127.0.0.1"
+            "url": [
+                "http://127.0.0.1"
             ],
-            u"outputfile": [
+            "outputfile": [
                 [
-                    u"fooconfigtest.txt",
-                    u"example output file",
-                    u"5eb63bbbe01eeed093cb22bb8f5acdc3"
+                    "fooconfigtest.txt",
+                    "example output file",
+                    "5eb63bbbe01eeed093cb22bb8f5acdc3"
                 ]
             ],
-            u'inputfilename': os.path.join(
+            "inputfilename": os.path.join(
                 '{MALWARE_REPO}', 'fb84', 'fb843efb2ffec987db12e72ca75c9ea2'),
-            u"address": [
+            "address": [
                 u"127.0.0.1"
             ]
         }

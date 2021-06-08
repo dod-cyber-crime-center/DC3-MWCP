@@ -12,7 +12,7 @@ import os
 import zipfile
 from copy import copy
 
-import flask as f
+import flask
 import mwcp
 import mwcp.parsers
 import pygments
@@ -24,7 +24,7 @@ from pygments.lexers.data import JsonLexer
 from pygments.lexers.special import TextLexer
 from werkzeug.utils import secure_filename
 
-bp = f.Blueprint("mwcp", __name__)
+bp = flask.Blueprint("mwcp", __name__)
 
 
 def init_app(app):
@@ -72,13 +72,13 @@ def run_parsers(parsers):
     dep_warning = (
         "Running multiple parsers in a single request will be changed future version."
     )
-    f.current_app.logger.warning(dep_warning)
+    flask.current_app.logger.warning(dep_warning)
     output.setdefault("errors", []).append(dep_warning)
 
-    datafile = f.request.files.get("data")
+    datafile = flask.request.files.get("data")
     if datafile:
         data = datafile.read()
-        f.current_app.logger.info(
+        flask.current_app.logger.info(
             "run_parsers %s %s %s",
             parsers,
             datafile.filename,
@@ -89,8 +89,8 @@ def run_parsers(parsers):
                 output[parser] = _run_parser(parser, data=data)
     else:
         output.setdefault("errors", []).append("No input file provided")
-        f.current_app.logger.error("run_parsers %s no input file", parsers)
-    return f.jsonify(output)
+        flask.current_app.logger.error("run_parsers %s no input file", parsers)
+    return flask.jsonify(output)
 
 
 @bp.route("/parsers")
@@ -101,27 +101,27 @@ def parsers_list():
     Normally an HTML table, but if `application/json` is the best mimetype set
     in the `Accept` header, the response will be in JSON.
     """
-    name_filter = f.request.args.get("name", type=str)
-    source_filter = f.request.args.get("source", type=str)
+    name_filter = flask.request.args.get("name", type=str)
+    source_filter = flask.request.args.get("source", type=str)
 
     headers = ("Name", "Source", "Author", "Description")
     parsers_info = mwcp.get_parser_descriptions(name=name_filter, source=source_filter)
 
-    if f.request.accept_mimetypes.best == "application/json":
-        return f.jsonify(
+    if flask.request.accept_mimetypes.best == "application/json":
+        return flask.jsonify(
             {"parsers": [parser_info._asdict() for parser_info in parsers_info]}
         )
 
-    f.g.title = "Parsers"
-    return f.render_template("parsers.html", headers=headers, parsers=parsers_info)
+    flask.g.title = "Parsers"
+    return flask.render_template("parsers.html", headers=headers, parsers=parsers_info)
 
 
 @bp.route("/upload")
 def upload():
     """Upload page"""
-    f.g.title = "Upload"
+    flask.g.title = "Upload"
     parsers_info = mwcp.get_parser_descriptions()
-    return f.render_template("upload.html", parsers=parsers_info)
+    return flask.render_template("upload.html", parsers=parsers_info)
 
 
 @bp.route("/descriptions")
@@ -131,7 +131,7 @@ def descriptions():
     This is for backwards compatibility purposes.
     Always a JSON response.
     """
-    return f.jsonify(
+    return flask.jsonify(
         [
             (parser_info.name, parser_info.author, parser_info.description)
             for parser_info in mwcp.get_parser_descriptions()
@@ -149,19 +149,19 @@ def logs():
     This can be disabled with the ``DISABLE_LOGS_ENDPOINT`` key
     in the app config.
     """
-    if f.current_app.config.get("DISABLE_LOGS_ENDPOINT"):
+    if flask.current_app.config.get("DISABLE_LOGS_ENDPOINT"):
         return (
-            f.jsonify({"errors": ["Logs endpoint has been disabled by configuration"]}),
+            flask.jsonify({"errors": ["Logs endpoint has been disabled by configuration"]}),
             403,
         )
 
     handler = _get_existing_handler()
     if not handler:
         return (
-            f.jsonify({"errors": ["No 'mwcp_server' handler defined on root logger."]}),
+            flask.jsonify({"errors": ["No 'mwcp_server' handler defined on root logger."]}),
             500,
         )
-    return f.jsonify({"logs": handler.messages})
+    return flask.jsonify({"logs": handler.messages})
 
 
 @bp.route("/")
@@ -169,29 +169,45 @@ def default():
     """
     Homepage endpoint.
     """
-    return f.render_template("base.html")
+    return flask.render_template("base.html")
 
 
-class RequestFilter(object):
+class RequestFilter(logging.Filter):
     """
     Filter to lock a handler to a specific request.
 
     This is required for multi-threading the server.
     """
 
-    def __init__(self, request=None):
+    def __init__(self, request):
+        super().__init__("request_filter")
         # The `request` is usually a proxy to the real request
         if hasattr(request, "_get_current_object"):
             request = request._get_current_object()
-
         self._request = request
 
     def filter(self, record):
         # Ensure the proxied request is our locked request
         # And the record is created in a request context to begin with
-        if not f.has_request_context():
+        if not flask.has_request_context():
             return False
-        return f.request == self._request
+        return flask.request == self._request
+
+
+def _legacy():
+    """Whether we are using legacy or new metadata schema."""
+    legacy = flask.request.values.get("legacy", default=True)
+    if isinstance(legacy, str):
+        legacy = legacy.lower() == "true"
+    return legacy
+
+
+def _include_logs():
+    """Whether to include logs in parse resport."""
+    include_logs = flask.request.values.get("include_logs", default=True)
+    if isinstance(include_logs, str):
+        include_logs = include_logs.lower() == "true"
+    return include_logs
 
 
 def _get_existing_handler(handler_name="mwcp_server"):
@@ -218,11 +234,11 @@ def _get_log_handler(handler_name="mwcp_server"):
             new_handler = copy(handler)
             new_handler.clear()
             return new_handler
-        f.current_app.logger.warning(
+        flask.current_app.logger.warning(
             "Root handler '{}' is not a ListHandler.".format(handler_name)
         )
 
-    f.current_app.logger.info(
+    flask.current_app.logger.info(
         "No 'mwcp_server' handler defined on root logger. Using default."
     )
     list_handler = logutil.ListHandler()
@@ -250,7 +266,7 @@ def _highlight(data, is_json=True):
     formatter = HtmlFormatter()
     highlight = pygments.highlight(data, lexer, formatter)
 
-    return f.render_template(
+    return flask.render_template(
         "results.html", highlight=highlight, extra_css=formatter.get_style_defs()
     )
 
@@ -281,8 +297,18 @@ def _build_zip(parser_results):
     :rtype: io.BytesIO
     """
     zip_buf = io.BytesIO()
+    legacy = _legacy()
 
-    encoded_files = parser_results.pop("outputfile", [])
+    if legacy:
+        encoded_files = parser_results.pop("outputfile", [])
+    else:
+        encoded_files = []
+        metadata_list = list(parser_results["metadata"])
+        for element in metadata_list:
+            if element["type"] == "residual_file":
+                encoded_files.append(element)
+                parser_results["metadata"].remove(element)
+
     output_text = parser_results.pop("output_text", "")
 
     zf = zipfile.ZipFile(
@@ -290,8 +316,12 @@ def _build_zip(parser_results):
     )
     with zf:
         for file_obj in encoded_files:
-            filename = file_obj[0]
-            base64_data = file_obj[3]
+            if legacy:
+                filename = file_obj[0]
+                base64_data = file_obj[3]
+            else:
+                filename = file_obj["name"]
+                base64_data = file_obj["data"]
             file_data = base64.b64decode(base64_data)
             zf.writestr(os.path.join("files", filename), file_data)
 
@@ -316,17 +346,17 @@ def _build_parser_response(parser=None, **kwargs):
         URL parameter or form field if not specified.
     :return: Flask response object
     """
-    output = kwargs.get("output", "") or f.request.values.get("output", "json")
+    output = kwargs.get("output", "") or flask.request.values.get("output", "json")
     output = output.lower()
     if output not in ("json", "text", "zip"):
-        f.current_app.logger.warning(
+        flask.current_app.logger.warning(
             "Unknown output type received: '{}'".format(output)
         )
         output = "json"
-    highlight = kwargs.get("highlight") or f.request.values.get("highlight")
+    highlight = kwargs.get("highlight") or flask.request.values.get("highlight")
 
     if not highlight:
-        json_response = f.jsonify
+        json_response = flask.jsonify
     else:
         json_response = _highlight
 
@@ -337,14 +367,13 @@ def _build_parser_response(parser=None, **kwargs):
 
     # A ZIP returns both JSON and plain text, and has no highlighting
     if output == "zip":
-        filename = secure_filename(f.request.files.get("data").filename)
+        filename = secure_filename(flask.request.files.get("data").filename)
         zip_buf = _build_zip(parser_results)
-        return f.send_file(
+        return flask.send_file(
             zip_buf, "application/zip", True, "{}_mwcp_output.zip".format(filename)
         )
 
     if highlight:
-        parser_results.pop("outputfile", [])
         output_text = parser_results.pop("output_text", "")
         if output == "text":
             return _highlight(output_text, False)
@@ -373,13 +402,13 @@ def _run_parser_request(parser=None, upload_name="data", output_text=True):
     """
     errors = []
 
-    parser = parser or f.request.values.get("parser")
+    parser = parser or flask.request.values.get("parser")
     if not parser:
         errors.append("No parser specified")
 
-    uploaded_file = f.request.files.get(upload_name)
+    uploaded_file = flask.request.files.get(upload_name)
     if not uploaded_file:
-        f.current_app.logger.error(
+        flask.current_app.logger.error(
             "Error running parser '{}' no input file".format(parser)
         )
         errors.append("No input file provided")
@@ -389,7 +418,7 @@ def _run_parser_request(parser=None, upload_name="data", output_text=True):
         return {"errors": errors}, 400
 
     data = uploaded_file.read()
-    f.current_app.logger.info(
+    flask.current_app.logger.info(
         "Request for parser '%s' on '%s' %s",
         parser,
         secure_filename(uploaded_file.filename),
@@ -415,24 +444,36 @@ def _run_parser(name, data=b"", append_output_text=True):
     """
     output = {}
     mwcp_logger = logging.getLogger("mwcp")
-    list_handler = _get_log_handler()
+    list_handler = None
     try:
-        # Record only records created in the context of this request
-        list_handler.addFilter(RequestFilter(request=f.request))
-        mwcp_logger.addHandler(list_handler)
+        include_logs = _include_logs()
+        if include_logs:
+            # Record only records created in the context of this request
+            # TODO: Determine if this is necessary.
+            list_handler = _get_log_handler()
+            list_handler.addFilter(RequestFilter(flask.request))
+            mwcp_logger.addHandler(list_handler)
 
-        reporter = mwcp.Reporter(base64_output_files=True)
-        reporter.run_parser(name, data=data)
-        output = reporter.metadata
+        # Tell mwcp to not include logs, since we are going to collect them.
+        report = mwcp.run(name, data=data, include_file_data=True, include_logs=include_logs)
 
-        output["debug"] = [msg for msg in list_handler.messages]
+        # Replace logs with our filtered out ones.
+        if list_handler:
+            report.logs = [msg for msg in list_handler.messages]
+
+        if _legacy():
+            output = report.as_dict_legacy()
+        else:
+            # FIXME: bit of a hack here since what the server really wants is a
+            #   json serializable dictionary, which we don't get with .as_dict()
+            output = json.loads(report.as_json())
 
         if append_output_text:
-            output["output_text"] = reporter.get_output_text()
+            output["output_text"] = report.as_text()
     except Exception as e:
         output = {"errors": [str(e)]}
-        if f.has_app_context():
-            f.current_app.logger.exception(
+        if flask.has_app_context():
+            flask.current_app.logger.exception(
                 "Error running parser '%s': %s", name, str(e)
             )
     finally:

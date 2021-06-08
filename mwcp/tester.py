@@ -2,9 +2,7 @@
 Test case support for DC3-MWCP. Parser output is stored in a json file per parser. To run test cases,
 parser is re-run and compared to previous results.
 """
-from __future__ import print_function
 
-# Standard imports
 import json
 import multiprocessing as mp
 import logging
@@ -14,20 +12,17 @@ import sys
 import traceback
 from timeit import default_timer
 
-logger = logging.getLogger(__name__)
-
-from future.builtins import str
-
-from io import open
-
-import mwcp
-from mwcp.utils.stringutils import convert_to_unicode
-from mwcp.utils import multi_proc
-
 try:
     import pkg_resources
 except ImportError:
     pkg_resources = None
+
+import mwcp
+from mwcp import config
+from mwcp.utils.stringutils import convert_to_unicode
+from mwcp.utils import multi_proc
+
+logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_EXCLUDE_FIELDS = (u"debug",)
@@ -51,13 +46,12 @@ class Tester(object):
     """DC3-MWCP Tester class"""
 
     def __init__(
-        self, reporter, parser_names=None, nprocs=None, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS
+        self, parser_names=None, nprocs=None, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS,
     ):
         """
 
         Run tests and compare produced results to expected results.
 
-        :param mwcp.Reporter reporter: MWCP reporter object
         :param [str] parser_names:
                 A list of parser names to run tests for. If the list is empty (default),
                 then test cases for all parsers will be run.
@@ -67,7 +61,6 @@ class Tester(object):
                 ignore_field_names will be compared.
         :param int nprocs: Number of processes to use. (defaults to (3*num_cores)/4)
         """
-        self.reporter = reporter
         self.parser_names = parser_names or [None]
         self.field_names = field_names or []
         self.ignore_field_names = ignore_field_names
@@ -115,7 +108,6 @@ class Tester(object):
                         for expected_results in self.read_results_file(results_file_path):
                             self._test_cases.append(
                                 TestCase(
-                                    self.reporter,
                                     full_parser_name,
                                     expected_results,
                                     field_names=self.field_names,
@@ -140,9 +132,10 @@ class Tester(object):
         """
         Generate JSON results for the given file using the given parser name.
         """
-        self.reporter.run_parser(parser_name, input_file_path)
-        self.reporter.metadata[INPUT_FILE_PATH] = convert_to_unicode(input_file_path)
-        return self.reporter.metadata
+        report = mwcp.run(parser_name, input_file_path)
+        results = report.metadata
+        results[INPUT_FILE_PATH] = convert_to_unicode(input_file_path)
+        return report, results
 
     def _list_test_files(self, results_list):
         """
@@ -215,6 +208,7 @@ class Tester(object):
         malware_repo = mwcp.config.get("MALWARE_REPO", None)
         if malware_repo:
             for results in results_list:
+                # TODO: Refactor this
                 input_file_path = results[INPUT_FILE_PATH]
                 if input_file_path.startswith(malware_repo):
                     input_file_path = "{MALWARE_REPO}" + input_file_path[len(malware_repo) :]
@@ -241,11 +235,11 @@ class Tester(object):
                     continue
                 results_list = self.read_results_file(results_file_path)
                 for index, file_path in enumerate(self._list_test_files(results_list)):
-                    new_results = self.gen_results(parser_name, file_path)
+                    report, new_results = self.gen_results(parser_name, file_path)
                     if not new_results:
                         logger.warning("Empty results for {} in {}, not updating.".format(file_path, results_file_path))
                         continue
-                    if self.reporter.errors and not force:
+                    if report.errors and not force:
                         logger.warning("Results for {} has errors, not updating.".format(file_path))
                         continue
 
@@ -276,11 +270,11 @@ class Tester(object):
                     logger.warning("Test case for {} already exists in {}".format(file_path, results_file_path))
                     continue
 
-                new_results = self.gen_results(parser_name, file_path)
+                report, new_results = self.gen_results(parser_name, file_path)
                 if not new_results:
                     logger.warning("Empty results for {} in {}, not adding.".format(file_path, results_file_path))
                     continue
-                if self.reporter.errors and not force:
+                if report.errors and not force:
                     logger.warning("Results for {} has errors, not adding.".format(file_path))
                     continue
 
@@ -314,8 +308,7 @@ class Tester(object):
 
 
 class TestCase(object):
-    def __init__(self, reporter, parser, expected_results, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
-        self._reporter = reporter
+    def __init__(self, parser, expected_results, field_names=None, ignore_field_names=DEFAULT_EXCLUDE_FIELDS):
         self.input_file_path = expected_results[INPUT_FILE_PATH]
         self.filename = os.path.basename(self.input_file_path)
         self.parser = parser
@@ -328,9 +321,13 @@ class TestCase(object):
         """Run test case."""
         start_time = default_timer()
 
-        self._reporter.run_parser(self.parser, self.input_file_path)
-        self._reporter.metadata[INPUT_FILE_PATH] = convert_to_unicode(self.input_file_path)
-        results = self._reporter.metadata
+        # Clear any existing loggers to ensure the only logs present are in
+        # the report.
+        logging.root.handlers.clear()
+
+        report = mwcp.run(self.parser, self.input_file_path, log_level=logging.INFO)
+        results = report.metadata
+        results[INPUT_FILE_PATH] = convert_to_unicode(self.input_file_path)
 
         comparer_results = self._compare_results(self.expected_results, results)
         passed = all(comparer.passed for comparer in comparer_results)
@@ -342,8 +339,8 @@ class TestCase(object):
             parser=self.parser,
             input_file_path=self.input_file_path,
             passed=passed,
-            errors=self._reporter.errors,
-            debug=self._reporter.metadata.get("debug", None),
+            errors=report.errors,
+            debug=report.logs or None,
             results=comparer_results,
             run_time=run_time,
         )
@@ -404,8 +401,13 @@ class TestCase(object):
         except:
             raise Exception("Failed to convert field name '{}' to unicode.".format(field_name))
 
+        # Stolen from Reporter/Runner.
+        # TODO: Look into refactoring to use pytest entirely?
+        with open(config.get("FIELDS_PATH"), "rb") as f:
+            fields = json.load(f)
+
         try:
-            field_type = self._reporter.fields[field_name_u]["type"]
+            field_type = fields[field_name_u]["type"]
         except:
             raise Exception("Key error. Field name '{}' was not identified as a standardized field.".format(field_name))
 

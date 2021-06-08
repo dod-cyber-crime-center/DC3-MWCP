@@ -2,7 +2,7 @@
 import logging
 import os
 
-from mwcp import Parser
+from mwcp import Parser, FileObject, metadata
 
 logger = logging.getLogger(__name__)
 
@@ -13,14 +13,15 @@ class Foo(Parser):
     @classmethod
     def identify(cls, file_object):
         # identifies if the parser can parse the given file.
-        return True
+        # checking filename to avoid infinite loop.
+        return file_object.name != "fooconfigtest.txt"
 
     def run(self):
         # retrieve input file
         input_file = self.file_object
 
         # standardized metadata
-        self.reporter.add_metadata("url", u"http://127.0.0.1")
+        self.report.add(metadata.URL("http://127.0.0.1"))
 
         # demonstrate access to sample
         logger.info("size of inputfile is {} bytes".format(len(input_file.file_data)))
@@ -28,18 +29,19 @@ class Foo(Parser):
         # other, non-standardized metadata
         # also demonstrate use of pefile object
         if input_file.pe:
-            self.reporter.add_metadata("other", {"section0": input_file.pe.sections[0].Name.rstrip(b"\x00")})
+            self.report.add(metadata.Other(
+                "section0", input_file.pe.sections[0].Name.rstrip(b"\x00")
+            ))
 
-        # demonstrate file output
-        self.reporter.output_file(b"hello world", "fooconfigtest.txt", "example output file")
+        # Dispatch residual files to also be processed.
+        self.dispatcher.add_to_queue(FileObject(
+            b"hello world", file_name="fooconfigtest.txt", description="example output file"
+        ))
+        #  Alternatively we can manually report a residual file without being processed.
+        if False:
+            self.report.add(metadata.ResidualFile(
+                "fooconfigtest.txt", description="example output file", data=b"hello world"
+            ))
 
         # demonstrate use of filename()
-        logger.info("operating on inputfile {}".format(input_file.file_name))
-
-        # demonstrate use of managed tempdir
-        with open(os.path.join(self.reporter.managed_tempdir, "footmp.txt"), "w") as f:
-            f.write(
-                "This is a temp file created in a directory that will be managed by the mwcp framework. \
-                The directory will initially be empty, so there is no worry about name collisions. \
-                The directory is deleted after this module run ends, unless tempcleanup is disabled."
-            )
+        logger.info(f"operating on inputfile {input_file.name}")
