@@ -1,6 +1,6 @@
 import abc
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union, Tuple, Any
 import warnings
 
 # This is here for type hints and autocomplete in PyCharm
@@ -93,7 +93,7 @@ class Parser(metaclass=ParserMeta):
                 yield _subclass
 
     @classmethod
-    def identify(cls, file_object):
+    def identify(cls, file_object: "FileObject") -> Union[bool, Tuple[bool, Any]]:
         """
         Determines if this parser is identified to support the given file_object.
         This function must be overwritten in order to support identification.
@@ -107,33 +107,49 @@ class Parser(metaclass=ParserMeta):
         :type file_object: dispatcher.FileObject
 
         :return bool: Boolean indicating if this parser supports the file_object
+            Extra arguments to pass into the run() function can also be provided.
         """
         logger.warning("Missing identify() function for: {}.{}".format(cls.__module__, cls.__name__))
         return True  # Default to True to keep backwards compatibility for legacy parsers.
 
+    @staticmethod
+    def unpack_identify(result) -> Tuple[bool, Any]:
+        """
+        Helper function to normalize identify results to always produce a tuple of identification result and extras.
+        """
+        if isinstance(result, tuple) and isinstance(result[0], bool):
+            identified, *rest = result
+            rest = tuple(rest)
+        else:
+            identified = bool(result)
+            rest = tuple()
+        return (identified, *rest)
+
     @classmethod
-    def parse(cls, file_object, report, dispatcher=None):
+    def parse(cls, file_object, report, *run_args, dispatcher=None):
         """
         Runs parser on given file_object.
 
         :param FileObject file_object: Object containing data about component file.
         :param mwcp.Report report: reference to report object used to report new metadata.
+        :param run_args: Extra arguments returned from identify() to pass to run() function.
         :param Dispatcher dispatcher: reference to the dispatcher object. (if used)
         :return:
         """
         if dispatcher:
             report.set_file(file_object)
             parser_object = cls(file_object, report, dispatcher)
-            parser_object.run()
+            parser_object.run(*run_args)
 
         # If dispatcher isn't provided, create a dummy one containing only this parser.
+        # This is necessary to ensure identification is run first.
         else:
             from mwcp import Dispatcher  # Must import here to avoid cyclic import.
 
             dispatcher = Dispatcher(cls.name, cls.source, author=cls.AUTHOR, description=cls.DESCRIPTION, parsers=[cls])
-            dispatcher.parse(file_object, report)
+            dispatcher.parse(file_object, report, *run_args)
 
-    def run(self):
+    def run(self, *args):
         """
         This function can be overwritten. It is called to run the parser.
         You don't have to overwrite this method if you only want to identify/output the file.

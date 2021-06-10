@@ -18,12 +18,13 @@ def components():
     file_A = mwcp.FileObject(b'This is file A', file_name='A_match.txt', output_file=False)
     file_B = mwcp.FileObject(b'This is file B', file_name='B_match.txt', output_file=False)
     file_C = mwcp.FileObject(b'This is file C', file_name='no_match.txt', output_file=False)
+    file_D = mwcp.FileObject(b'This is file D', file_name='D_match.txt', output_file=False)
 
     class A(mwcp.Parser):
         DESCRIPTION = 'A Component'
         @classmethod
         def identify(cls, file_object):
-            return file_object.file_name == 'A_match.txt'
+            return file_object.name == 'A_match.txt'
 
         def run(self):
             self.dispatcher.add_to_queue(file_B)
@@ -33,9 +34,15 @@ def components():
         DESCRIPTION = 'B Component'
         @classmethod
         def identify(cls, file_object):
-            return file_object.file_name == 'B_match.txt'
+            return file_object.name == 'B_match.txt'
 
-    dispatcher = mwcp.Dispatcher('my_dispatcher', 'acme', parsers=[A, B])
+    class D(mwcp.Parser):
+        DESCRIPTION = 'D Component'
+        @classmethod
+        def identify(cls, file_object):
+            return file_object.name == 'D_match.txt', {"some other": "content"}
+
+    dispatcher = mwcp.Dispatcher('my_dispatcher', 'acme', parsers=[A, B, D])
 
     return locals()
 
@@ -43,15 +50,19 @@ def components():
 def test_identify_file(components):
     """Tests the _identify_file"""
     dispatcher = components['dispatcher']
-    assert list(dispatcher._iter_parsers(components['file_A'])) == [components['A']]
-    assert list(dispatcher._iter_parsers(components['file_B'])) == [components['B']]
-    assert list(dispatcher._iter_parsers(components['file_C'])) == []
+    assert list(dispatcher._identify_parsers(components['file_A'])) == [(components['A'], tuple())]
+    assert list(dispatcher._identify_parsers(components['file_B'])) == [(components['B'], tuple())]
+    assert list(dispatcher._identify_parsers(components['file_C'])) == []
+    assert list(dispatcher._identify_parsers(components['file_D'])) == [
+        (components['D'], ({"some other": "content"},))
+    ]
 
 
 @pytest.mark.parametrize("input_file,expected", [
-    ('file_A', {'file_A': 'A Component', 'file_B': 'B Component', 'file_C': 'Unidentified file'}),
-    ('file_B', {'file_A': None, 'file_B': 'B Component', 'file_C': None}),
-    ('file_C', {'file_A': None, 'file_B': None, 'file_C': 'Unidentified file'}),
+    ('file_A', {'file_A': 'A Component', 'file_B': 'B Component', 'file_C': 'Unidentified file', 'file_D': None}),
+    ('file_B', {'file_A': None, 'file_B': 'B Component', 'file_C': None, 'file_D': None}),
+    ('file_C', {'file_A': None, 'file_B': None, 'file_C': 'Unidentified file', 'file_D': None}),
+    ('file_D', {'file_A': None, 'file_B': None, 'file_C': None, 'file_D': 'D Component'})
 ])
 def test_dispatch(components, input_file, expected):
     """Test dispatching files."""

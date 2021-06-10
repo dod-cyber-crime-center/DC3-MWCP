@@ -286,7 +286,7 @@ class Runner:
         )
         return self._report.as_text()
 
-    # TODO: Remove when we remove support for managed_tempdir.
+    # TODO: Remove when we remote support for managed_tempdir.
     def __cleanup(self):
         """
         Cleanup things

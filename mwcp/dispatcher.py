@@ -8,9 +8,10 @@ import logging
 from collections import deque
 
 from mwcp import metadata
+from mwcp.exceptions import UnableToParse
 from mwcp.file_object import FileObject
 from mwcp.parser import Parser
-from mwcp.exceptions import UnableToParse
+from mwcp.report import Report
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,10 @@ class Dispatcher(object):
     can be initialized by itself.
     When used as a mixin, the dispatcher will automatically add the file in the reporter
     to the queue and run dispatch() when run() is called.
-
     """
+
+    # Caches results for identification to improve speed.
+    _identify_cache = {}
 
     def __init__(
         self,
@@ -115,7 +118,7 @@ class Dispatcher(object):
 
         :return bool: Boolean indicating if this dispatcher supports the file_object
         """
-        return any(parser.identify(file_object) for parser in self.parsers)
+        return any(self._identify_parsers(file_object))
 
     def add_to_queue(self, file_object: FileObject, parent: FileObject = None):
         """
@@ -142,26 +145,36 @@ class Dispatcher(object):
 
         self._fifo_buffer.appendleft(file_object)
 
-    def _iter_parsers(self, file_object):
+    def _identify_parsers(self, file_object: FileObject):
         """
-        Generator that detects and yields applicable parsers to run based on given file_object.
+        Generator that detects and yields identified parsers to run based on given file_object.
 
-        :param FileObject file_object: file object that needs to be identified
+        :param file_object: file object that needs to be identified
 
         :yields: Identified Parser class or another Dispatcher that can be run
         """
         for parser in self.parsers:
             logger.debug(u"Identifying {} with {!r}.".format(file_object.name, parser))
-            if parser.identify(file_object):
-                if isinstance(parser, Dispatcher):
-                    # Parser is a group, change wording
-                    logger.info(f"File {file_object.name} identified with {parser.DESCRIPTION} parser.")
-                else:
-                    logger.info(f"File {file_object.name} identified as {parser.DESCRIPTION}.")
-                logger.debug(u"{} identified with {!r}".format(file_object.name, parser))
-                yield parser
 
-    def _parse(self, file_object, parser, report):
+            # First see if result has been cached.
+            key = (parser, file_object)
+            if key in self._identify_cache:
+                ret = self._identify_cache[key]
+            else:
+                ret = parser.identify(file_object)
+                self._identify_cache[key] = ret
+
+            if isinstance(ret, tuple) and isinstance(ret[0], bool):
+                identified, *rest = ret
+                rest = tuple(rest)
+            else:
+                identified = ret
+                rest = tuple()
+
+            if identified:
+                yield parser, rest
+
+    def _parse(self, file_object, parser, report, *run_args):
         """
         Parse given file_object with given sub parser
 
@@ -179,7 +192,7 @@ class Dispatcher(object):
         file_object.parser = parser
 
         try:
-            parser.parse(file_object, report, dispatcher=self)
+            parser.parse(file_object, report, *run_args, dispatcher=self)
         except UnableToParse as exception:
             if isinstance(parser, Dispatcher):
                 # Parser is a group, change wording
@@ -196,47 +209,55 @@ class Dispatcher(object):
         except Exception:
             logger.exception(u"{} dispatch parser failed".format(parser.name))
 
-    def parse(self, file_object, report, dispatcher=None):
+    def parse(self, file_object: FileObject, report: Report, *run_args, dispatcher: "Dispatcher" = None):
         """
         Runs dispatcher on given file_object.
 
-        :param FileObject file_object: Object containing data about component file.
-        :param mwcp.Report report: Report object to be filled in.
-        :param Dispatcher dispatcher: reference to the parent dispatcher object that called this parse command.
+        :param file_object: Object containing data about component file.
+        :param report: Report object to be filled in.
+        :param run_args: Extra arguments returned from identify() to pass to run() function.
+        :param dispatcher: reference to the parent dispatcher object that called this parse command.
             (None if this dispatcher is the root)
         :return:
         """
-        # TODO: Use reporter to output metadata about initial input file.
+        orig_file_object = file_object
         self.add_to_queue(file_object)
 
         # Pull knowledge_base from previous dispatcher.
         if dispatcher:
             self.knowledge_base = dispatcher.knowledge_base
 
-        first = True
         while self._fifo_buffer:
             file_object = self._fifo_buffer.pop()
+            first = file_object is orig_file_object
 
             # If this dispatcher is embedded, simply pass any dispatched files to the parent.
             if self._embedded and dispatcher and not first:
                 dispatcher.add_to_queue(file_object)
                 continue
 
-            first = False
             identified = False
+            unable_to_parse_error = None
 
             try:
-                unable_to_parse_error = None
-                # Run any applicable parsers.
-                for parser in self._iter_parsers(file_object):
+                # Run applicable parsers.
+                for parser, _run_args in self._identify_parsers(file_object):
+                    if isinstance(parser, Dispatcher):
+                        # Parser is a group, change wording
+                        logger.info(f"File {file_object.name} identified with {parser.DESCRIPTION} parser.")
+                    else:
+                        logger.info(f"File {file_object.name} identified as {parser.DESCRIPTION}.")
+                    logger.debug(u"{} identified with {!r}".format(file_object.name, parser))
+
                     try:
-                        self._parse(file_object, parser, report)
+                        self._parse(file_object, parser, report, *_run_args)
                     except UnableToParse as e:
                         unable_to_parse_error = e
                         continue
                     identified = True
                     if not self.greedy:
                         break
+
                 if identified:
                     continue
                 elif unable_to_parse_error and dispatcher:

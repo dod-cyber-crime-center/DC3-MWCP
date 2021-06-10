@@ -7,6 +7,9 @@ Please also review the [Python Style Guide](PythonStyleGuide.md). There is the e
 
 - [Steps](#steps)
 - [Example Parser](#example-parser)
+- [Error Handling](#error-handling)
+- [Raising UnableToParse error](#raising-unabletoparse-error)
+- [Passing Identify Results](#passing-identify-results)
 - [Using The Construct Library](#using-the-construct-library)
 - [Tech Anarchy Bridge](#tech-anarchy-bridge)
 - [Parser Development Tips](#parser-development-tips)
@@ -244,6 +247,39 @@ class Trojan(Parser):
             raise UnableToParse("Configuration not found. File was miss-identified.")
 
         self.report.add(metadata.C2Address(config.c2_address))
+```
+
+
+## Passing Identify Results
+If the `identify()` function contains computationally heavy processing, it may be beneficial to
+pass the produced results over to the `run()` function to avoid re-running it.
+This can be done by returning extra arguments after the boolean result.
+These extra arguments will then be unpacked and passed into the `run()` function if identification is successful.
+(This is usually helpful to prevent having to redo regular expression searches.)
+
+*NOTE: If providing extra arguments, you must ensure that the first entry in the returned tuple is a boolean.
+Otherwise, the returned result will just be used to check its truthiness and not be passed into `run()`.*
+
+*As well, the `run()` function's signature must accept the extra arguments.*
+
+```python
+# file: acme/SuperMalware.py
+from mwcp import Parser
+
+
+class Implant(Parser):
+    DESCRIPTION = 'SuperMalware Implant'
+
+    @classmethod
+    def identify(cls, file_object):
+        if file_object.pe and file_object.pe.is_exe():
+            result = cls._some_heavy_computation(file_object)
+            if result:
+                return True, result  # passing along result so we don't have to recompute it.
+        return False
+
+    def run(self, result):  # ensure signature matches what can be returned from identify()
+        self._using_result_to_continue_processing(result)
 ```
 
 

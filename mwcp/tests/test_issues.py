@@ -11,7 +11,9 @@ def test_csv_row_bug(script_runner, tmpdir, test_dir):
     Occurs when outputting csv and input file is a directory.
     """
     ret = script_runner.run(
-        'mwcp', 'parse', 'foo', '--format', 'csv', str(test_dir / '*')
+        'mwcp', 'parse', 'foo',
+        '--format', 'csv', str(test_dir / '*'),
+        '--no-output-files',
     )
     print(ret.stdout)
     print(ret.stderr, file=sys.stderr)

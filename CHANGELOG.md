@@ -21,7 +21,7 @@ All notable changes to this project will be documented in this file.
 - Added DecodedString metadata element.
 - Added `.compile_time` attribute to `FileObject`.
 - Added `.architecture` attribute to `FileObject`.
-
+- Added ability to pass results from `Parser.identify()` into the `Parser.run()` function. (See [documentation](/docs/ParserDevelopment.md#passing-identify-results))
 
 ### Changed
 - MWCP version can now be accessed from `mwcp.__version__`
@@ -38,7 +38,7 @@ the `mwcp test` command.
 - Updated text report display and added markdown and html formats.
   - Also added file tree display at the end of the report (for some formats).
 - Updated csv output.
-
+- Results from `Parser.identify()` are now cached to prevent repeated processing of the same file.
 
 ### Deprecated
 - `FileObject.file_path` is planned to be changed to only be a non-None value if the `FileObject` 
