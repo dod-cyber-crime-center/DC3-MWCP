@@ -24,7 +24,7 @@ It contains the following attributes:
 - `data` - The raw data of the file.
 - `name` - Name of the file (or an auto-generated stub)
 - `file_path` - The actual file path as found in the file system (if backed by a real file).
-  - (This is prmarily used for the initial input file.)
+  - (This is primarily used for the initial input file.)
 - `md5`, `sha1`, `sha256` - Hashes of the given file.
 - `pe` - A `PEFile` object of the file or `None` if file is not a PE.
 - `resources` - List of PE resources (if a PE)
