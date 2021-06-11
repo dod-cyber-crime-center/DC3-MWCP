@@ -491,7 +491,6 @@ class Report:
     def as_dict(self) -> dict:
         """
         Returns dictionary representation of the report (merged).
-
         """
         return self._report_model.as_dict()
 

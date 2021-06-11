@@ -579,7 +579,7 @@ def _run_tests(tester, silent=False, show_passed=False):
          "(WARNING: This flag will eventually be removed in favor of only supporting the new schema.)"
 )
 @click.option(
-    "--exit-on-first/--no-exit-on-firat",
+    "--exit-on-first/--no-exit-on-first",
     default=False,
     show_default=True,
     help="Whether to exit on the first failed test case. (Only works with --no-legacy)"

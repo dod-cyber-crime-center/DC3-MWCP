@@ -105,7 +105,7 @@ def set_default_source(source_name: str):
     If this is not set, all sources will be considered.
 
     :param source_name: The name of the source to set.
-    :raises ValueError: If given source name is not a register source.
+    :raises ValueError: If given source name is not a registered source.
     """
     global _default_source
     if source_name not in _sources:

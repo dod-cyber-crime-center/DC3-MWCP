@@ -74,7 +74,7 @@ from mwcp import testing        # new interface
 )
 @click.option(
     "--skip-testing", is_flag=True,
-    help="Run original test cases before updating."
+    help="Don't run original test cases before updating."
 )
 @click.argument("parser", required=False)
 def main(debug, verbose, config_path, parser_dir, parser_config, parser_source,

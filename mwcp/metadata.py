@@ -43,7 +43,7 @@ def _cast(value: Any, type_: Type[T]) -> T:
     :param value: Value to cast.
     :param type_: Type to cast to.
         (For things like Union, it will try each type listed
-        withing, until one works.)
+        within, until one works.)
     :return: Converted value.
     """
     # Convert bytes to string, Python 2 style!
@@ -51,7 +51,7 @@ def _cast(value: Any, type_: Type[T]) -> T:
         return value.decode("latin1")
 
     # cattr doesn't handle Unions very nicely, so we'll recursively
-    # handle the inards of Union types instead.
+    # handle the innards of Union types instead.
     # NOTE: Based on documentation, the cattr devs will eventually provide
     # better support for Unions in the future.
     if hasattr(type_, "__origin__") and type_.__origin__ is Union:
@@ -168,7 +168,7 @@ class Element:
 
     def post_processing(self, report):
         """
-        Performs and extra additions to the Report when the Element gets created.
+        Performs and adds extra additions to the Report when the Element gets created.
         :param report: mwcp Report used to add metadata.
         """
 
@@ -826,7 +826,7 @@ class Other(Element):
 @attr.s(auto_attribs=True, field_transformer=_auto_convert)
 class Pipe(Element):
     r"""
-    Named, one-way or duplex pipe for communication between the pipe server and onr or more pipe clients.
+    Named, one-way or duplex pipe for communication between the pipe server and one or more pipe clients.
 
     e.g.
         Pipe("\\.\\pipe\\namedpipe")
@@ -1057,7 +1057,7 @@ class _File(Element):
     :var description: Description of the file.
     :var md5: MD5 hash of the file represented as a hex string.
     :var sha1: SHA1 hash of the file represented as a hex string.
-    :var sha256: SHA256 has of the file represented as a hex string.
+    :var sha256: SHA256 hash of the file represented as a hex string.
     :var architecture: Type of architecture of the file (if applicable)
     :var compile_time: UTC Timestamp the file was compiled as reported (if applicable)
     :var file_path: Path where the file exists or has been written out to on the local file system.

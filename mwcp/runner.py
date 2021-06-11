@@ -132,7 +132,7 @@ class Runner:
 
     def output_file(self, *args, **kwargs):
         warnings.warn(
-            ".output_file() is deprecated in favor of adding a ResidualFile metadata element to a Report.add()",
+            ".output_file() is deprecated in favor of adding a ResidualFile metadata element to Report.add()",
             DeprecationWarning
         )
         if not self._report:
@@ -212,7 +212,7 @@ class Runner:
         elif data is not None:
             input_file = mwcp.FileObject(data, output_file=False)
         else:
-            raise ValueError("Either file_")
+            raise ValueError("Either a file_path or data must be provided.")
 
         if isinstance(parser, str):
             parser_name = parser
