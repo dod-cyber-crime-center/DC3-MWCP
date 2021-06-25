@@ -188,7 +188,7 @@ def _gen_parser():
     )
 
     # Combine used to enforce there is no space between "c" and "replace"
-    _replace_command = pp.Combine(pp.Optional(pp.CaselessLiteral("c")) + pp.CaselessKeyword("replace"))("command")
+    _replace_command = pp.Combine(pp.Optional(pp.CaselessLiteral("c")) + pp.CaselessLiteral("replace"))("command")
     string_replace = (
         concat_string("data")
         + pp.OneOrMore(

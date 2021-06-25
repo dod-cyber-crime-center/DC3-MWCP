@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Added support for providing a custom logging filter when running a parser.
 
+### Changed
+- Updated `poshdeob` utility to work with the latest version of pyparsing.
+  - Removed version pinning for pyparsing dependency.
+
 ### Fixed
 - Fixed "can't set attribute" error occurring when using web server.
 

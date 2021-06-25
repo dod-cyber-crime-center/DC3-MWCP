@@ -43,7 +43,7 @@ setup(
         'pandas',
         'pefile>=2019.4.18',
         'pyelftools',
-        'pyparsing==2.3.0',  # 2.4.0 seems to break poshdeob
+        'pyparsing',
         'pytest>=6.0.0',
         'pytest-console-scripts',
         'pytest-xdist',
