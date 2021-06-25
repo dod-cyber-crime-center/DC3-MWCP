@@ -1,3 +1,4 @@
+import logging
 import pathlib
 from typing import Union, Type
 
@@ -16,6 +17,7 @@ def run(
         prefix_output_files: bool = True,
         include_logs: bool = True,
         log_level: int = None,
+        log_filter: logging.Filter = None,
 ) -> Report:
     """
     Runs a specified parser on a given file path or data.
@@ -36,6 +38,8 @@ def run(
     :param include_logs: Whether to include error and debug logs in the generated report.
     :param log_level: If including logs, the logging level to be collected.
         (Defaults to currently set effective log level)
+    :param log_filter: If including logs, this can be used to pass in a custom filter for the logs.
+        Should be a valid argument for logging.Handler.addFilter()
 
     :return: mwcp.Report object containing parse results.
     """
@@ -47,5 +51,6 @@ def run(
         prefix_output_files=prefix_output_files,
         include_logs=include_logs,
         log_level=log_level,
+        log_filter=log_filter,
     )
     return runner.run(parser, file_path=file_path, data=data)

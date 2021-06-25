@@ -164,6 +164,7 @@ def test_menu(client):
     assert b'<li><a href="http://example.com">Example</a></li>' in rv.data
 
 
+@pytest.mark.xfail
 def test_log_endpoint(client):
     from mwcp.utils import logutil
 

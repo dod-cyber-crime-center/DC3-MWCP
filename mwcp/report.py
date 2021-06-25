@@ -112,6 +112,8 @@ class Report:
     :param include_logs: Whether to include error and debug logs in the generated report.
     :param log_level: If including logs, the logging level to be collected.
         (Defaults to currently set effective log level)
+    :param log_filter: If including logs, this can be used to pass in a custom filter for the logs.
+        Should be a valid argument for logging.Handler.addFilter()
     """
 
     def __init__(
@@ -124,6 +126,7 @@ class Report:
             prefix_output_files: bool = True,
             output_directory: Union[pathlib.Path, str] = None,
             log_level: int = None,
+            log_filter: logging.Filter = None,
     ):
         if output_directory:
             output_directory = pathlib.Path(output_directory)
@@ -154,6 +157,8 @@ class Report:
             log_handler.setFormatter(logging.Formatter("[%(level_char)s] %(message)s"))
             if log_level is not None:
                 log_handler.setLevel(log_level)
+            if log_filter is not None:
+                log_handler.addFilter(log_filter)
             self._log_handler = log_handler
         else:
             self._log_handler = None

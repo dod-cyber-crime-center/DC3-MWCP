@@ -56,6 +56,7 @@ class Runner:
         prefix_output_files: bool = True,
         include_logs: bool = True,
         log_level: int = None,
+        log_filter: logging.Filter = None,
     ):
         """
         Initializes the Reporter object
@@ -76,6 +77,8 @@ class Runner:
         :param include_logs: Whether to include error and debug logs in the generated report.
         :param log_level: If including logs, the logging level to be collected.
             (Defaults to currently set effective log level)
+        :param log_filter: If including logs, this can be used to pass in a custom filter for the logs.
+            Should be a valid argument for logging.Handler.addFilter()
         """
 
         # defaults
@@ -95,6 +98,7 @@ class Runner:
             "prefix_output_files": prefix_output_files,
             "output_directory": self._output_dir,  # TODO: does runner still need output_dir?
             "log_level": log_level,
+            "log_filter": log_filter,
         }
 
         self._cleanup_temp_files = cleanup_temp_files

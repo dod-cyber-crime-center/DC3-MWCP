@@ -155,13 +155,7 @@ def logs():
             403,
         )
 
-    handler = _get_existing_handler()
-    if not handler:
-        return (
-            flask.jsonify({"errors": ["No 'mwcp_server' handler defined on root logger."]}),
-            500,
-        )
-    return flask.jsonify({"logs": handler.messages})
+    return flask.jsonify({"errors": ["Logs endpoint is no longer supported."]})
 
 
 @bp.route("/")
@@ -203,51 +197,11 @@ def _legacy():
 
 
 def _include_logs():
-    """Whether to include logs in parse resport."""
+    """Whether to include logs in parse report."""
     include_logs = flask.request.values.get("include_logs", default=True)
     if isinstance(include_logs, str):
         include_logs = include_logs.lower() == "true"
     return include_logs
-
-
-def _get_existing_handler(handler_name="mwcp_server"):
-    """
-    Retrieve an existing ListHandler by name from the root logger.
-    """
-    for handler in logging.root.handlers:
-        if handler.name == handler_name and isinstance(handler, logutil.ListHandler):
-            return handler
-
-
-def _get_log_handler(handler_name="mwcp_server"):
-    """
-    Get the handler for the parser running.
-
-    Attempts to get 'mwcp_server' handler from the root logger, and create
-    a clean copy, keeping any formatters and level settings.
-
-    If the handler does not exist, create a default handler.
-    """
-    handler = _get_existing_handler(handler_name)
-    if handler:
-        if isinstance(handler, logutil.ListHandler):
-            new_handler = copy(handler)
-            new_handler.clear()
-            return new_handler
-        flask.current_app.logger.warning(
-            "Root handler '{}' is not a ListHandler.".format(handler_name)
-        )
-
-    flask.current_app.logger.info(
-        "No 'mwcp_server' handler defined on root logger. Using default."
-    )
-    list_handler = logutil.ListHandler()
-    list_handler.setFormatter(
-        logging.Formatter("[%(level_char)s] (%(name)s): %(message)s")
-    )
-    list_handler.addFilter(logutil.LevelCharFilter())
-
-    return list_handler
 
 
 def _highlight(data, is_json=True):
@@ -443,23 +397,14 @@ def _run_parser(name, data=b"", append_output_text=True):
     :rtype: dict
     """
     output = {}
-    mwcp_logger = logging.getLogger("mwcp")
-    list_handler = None
+    log_filter = None
     try:
         include_logs = _include_logs()
         if include_logs:
-            # Record only records created in the context of this request
-            # TODO: Determine if this is necessary.
-            list_handler = _get_log_handler()
-            list_handler.addFilter(RequestFilter(flask.request))
-            mwcp_logger.addHandler(list_handler)
+            log_filter = RequestFilter(flask.request)
 
         # Tell mwcp to not include logs, since we are going to collect them.
-        report = mwcp.run(name, data=data, include_file_data=True, include_logs=include_logs)
-
-        # Replace logs with our filtered out ones.
-        if list_handler:
-            report.logs = [msg for msg in list_handler.messages]
+        report = mwcp.run(name, data=data, include_file_data=True, include_logs=include_logs, log_filter=log_filter)
 
         if _legacy():
             output = report.as_dict_legacy()
@@ -477,5 +422,4 @@ def _run_parser(name, data=b"", append_output_text=True):
                 "Error running parser '%s': %s", name, str(e)
             )
     finally:
-        mwcp_logger.removeHandler(list_handler)
         return output

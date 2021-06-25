@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Added support for providing a custom logging filter when running a parser.
+
+### Fixed
+- Fixed "can't set attribute" error occurring when using web server.
+
+
 ## [3.3.0] - 2021-06-10
 
 *NOTE: This release may require updating setuptools to successfully install.*
@@ -25,6 +34,7 @@ All notable changes to this project will be documented in this file.
 - Added `.architecture` attribute to `FileObject`.
 - Added ability to pass results from `Parser.identify()` into the `Parser.run()` function. (See [documentation](/docs/ParserDevelopment.md#passing-identify-results))
 
+
 ### Changed
 - MWCP version can now be accessed from `mwcp.__version__`
 - Updated metadata mechanism to an objected-oriented approach. (See [documentation](/docs/ParserComponents.md#report))
@@ -41,6 +51,7 @@ the `mwcp test` command.
   - Also added file tree display at the end of the report (for some formats).
 - Updated csv output.
 - Results from `Parser.identify()` are now cached to prevent repeated processing of the same file.
+
 
 ### Deprecated
 - `FileObject.file_path` is planned to be changed to only be a non-None value if the `FileObject` 

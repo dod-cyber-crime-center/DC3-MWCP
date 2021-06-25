@@ -83,7 +83,7 @@ class FileObject(object):
             raise TypeError("file_data must be a bytes string.")
 
         self._file_path = file_path
-        self._exists = bool(file_path)  # Indicates if the user provided the path and exists on the host file system.
+        self._exists = bool(file_path)  # Indicates if the user provided the path and the file exists on the host file system.
         self._temp_path = None
         self._temp_path_ctx = None
         self._md5 = None
