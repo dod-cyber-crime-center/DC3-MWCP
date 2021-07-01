@@ -14,7 +14,7 @@
                 "5eb63bbbe01eeed093cb22bb8f5acdc3"
             ]
         ], 
-        "inputfilename": "..\\..\\..\\README.md",
+        "inputfilename": ".\\foo.json",
         "address": [
             "127.0.0.1"
         ]

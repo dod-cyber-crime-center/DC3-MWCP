@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Fixed test case path for `foo` parser, changed to a path which will always exist since input file is irrelevant. (@ddash-ct)
+
+
 ## [3.3.1] - 2021-06-28
 
 ### Added
