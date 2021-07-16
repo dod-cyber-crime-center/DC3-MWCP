@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [3.3.2] - 2021-07-19
 
 ### Added
 - Added `mode` attribute for EncryptionKey to report on block cipher mode.
@@ -383,7 +383,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.1...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.2...HEAD
+[3.3.2]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.1...3.3.2
 [3.3.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.0...3.3.1
 [3.3.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.2.1...3.3.0
 [3.2.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.2.0...3.2.1
