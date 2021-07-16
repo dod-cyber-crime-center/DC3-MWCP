@@ -61,13 +61,15 @@ class Tester(object):
                 ignore_field_names will be compared.
         :param int nprocs: Number of processes to use. (defaults to (3*num_cores)/4)
         """
-        self.parser_names = parser_names or [None]
         self.field_names = field_names or []
         self.ignore_field_names = ignore_field_names
         self._test_cases = None
         self._results = []  # Cached results.
         self._processed = False
         self._nprocs = nprocs or (3 * mp.cpu_count()) // 4
+        if not parser_names or parser_names == [None]:
+            parser_names = [f"{source.name}:{parser.name}" for source, parser in mwcp.iter_parsers()]
+        self.parser_names = parser_names
 
     def __iter__(self):
         return self._iter_results()
@@ -229,9 +231,10 @@ class Tester(object):
         logging.root.setLevel(logging.INFO)  # Force info level logs so test cases stay consistent.
         try:
             for parser_name in self.parser_names:
+                logger.info(f"Updating test for parser: {parser_name}")
                 results_file_path = self.get_results_filepath(parser_name)
                 if not os.path.isfile(results_file_path):
-                    logger.warning("No test case file found for parser: {}")
+                    logger.warning(f"No test case file found for parser: {results_file_path}")
                     continue
                 results_list = self.read_results_file(results_file_path)
                 for index, file_path in enumerate(self._list_test_files(results_list)):

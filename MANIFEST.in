@@ -4,5 +4,6 @@ include mwcp/parser_config.yml
 recursive-include mwcp/resources *.json *.txt
 recursive-include mwcp/config *
 recursive-include mwcp/parsers/tests *
+graft mwcp/tests
 graft mwcp/tools/server
 include mwcp/utils/construct/construct_template.html

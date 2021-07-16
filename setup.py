@@ -46,12 +46,13 @@ setup(
         'pyparsing',
         'pytest>=6.0.0',
         'pytest-console-scripts',
+        'pytest-datadir',
         'pytest-xdist',
         'pyyaml',
         'requests',
         'ruamel.yaml',
         'six',
-        'tabulate[widechars]',
+        'tabulate[widechars]<1.0.0',
 
         # For the server and API
         'flask~=1.1.0',

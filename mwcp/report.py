@@ -108,7 +108,6 @@ class Report:
     :param prefix_output_files: Whether to include a prefix of the first 5 characters
         of the md5 on output files. This is to help avoid overwriting multiple
         output files with the same name.
-    :param split: Whether to split metadata results by source file.
     :param include_logs: Whether to include error and debug logs in the generated report.
     :param log_level: If including logs, the logging level to be collected.
         (Defaults to currently set effective log level)
@@ -121,7 +120,6 @@ class Report:
             input_file: mwcp.FileObject = None,
             parser: str = None,
             include_logs: bool = True,
-            split: bool = False,
             include_file_data: bool = False,
             prefix_output_files: bool = True,
             output_directory: Union[pathlib.Path, str] = None,
@@ -134,7 +132,6 @@ class Report:
         self._output_directory = output_directory
         self._write_output_files = bool(output_directory)
 
-        self._split = split
         self._include_logs = include_logs
         self._include_file_data = include_file_data
         self._prefix_output_files = prefix_output_files
@@ -146,6 +143,7 @@ class Report:
         # Holds metadata per file.
         self._metadata = collections.defaultdict(list)
         self._current_file = input_file  # type: FileObject
+        self._history = [input_file]  # type: List[FileObject]
         self.finalized = False
 
         # Setup a log handler to add errors and debug messages to the report.
@@ -342,7 +340,8 @@ class Report:
                 if element._raw_string:
                     key = key.decode("utf-8")
                 else:
-                    key = f"0x{key.hex()}"  # TODO
+                    # Display key as hex string for old display.
+                    key = f"0x{key.hex()}"
                 results["key"].append(key)
                 if element.algorithm:
                     # noinspection PyTypeChecker
@@ -458,7 +457,6 @@ class Report:
         report_model = metadata.Report(
             input_file=metadata.InputFile.from_file_object(input_file) if input_file else None,
             parser=(input_file.parser and input_file.parser.name) if source else self.parser,
-            # TODO: need to split logs based on current file.
             errors=self.get_logs(source, errors_only=True),
             logs=self.get_logs(source),
             metadata=deepcopy(metadata_entries),
@@ -490,7 +488,7 @@ class Report:
         """
         return [
             self._build_report_model(source=file_object)
-            for file_object in self._metadata.keys()
+            for file_object in sorted(self._metadata.keys(), key=lambda fo: self._history.index(fo))
         ]
 
     def as_dict(self) -> dict:
@@ -666,7 +664,6 @@ class Report:
             raise RuntimeError("Report has already been finalized. Metadata can no longer be added.")
 
         metadata_list = self._metadata[self._current_file]
-        # TODO: Create a separation of metadata based on current file being parsed?
         if element not in metadata_list:
             element.validate()
             metadata_list.append(element)
@@ -676,8 +673,9 @@ class Report:
         """
         Sets the file currently being parsed.
         """
-        # TODO: Also change installed logger handler to allow us to separate log messages.
         self._current_file = file_object
+        if file_object not in self._history:
+            self._history.append(file_object)
 
     def add_metadata(self, field_name_or_element: Union[str, Element], value=None):
         """
@@ -812,10 +810,15 @@ class Report:
         else:
             metadata_lists = self._metadata.values()
 
+        yielded = []
         for metadata_list in metadata_lists:
             for element in metadata_list:
                 if not element_type or isinstance(element, element_type):
-                    yield from element.elements()
+                    for _element in element.elements():
+                        # Metadata elements are not hashable, so we need to check equality of each.
+                        if not any(_element == yielded_element for yielded_element in yielded):
+                            yielded.append(_element)
+                            yield _element
 
     def get(
             self,

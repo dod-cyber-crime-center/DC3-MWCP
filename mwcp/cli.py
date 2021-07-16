@@ -346,7 +346,7 @@ def parse(parser, input, format, split, output_dir, output_files, cleanup, prefi
             reports.append(report)
 
         # TODO: Perhaps split up results with header of input file?
-        if format in ("simple", "markdown"):
+        if format in ("simple", "markdown", "html"):
             for report in reports:
                 print(report.as_text(format, split=split))
 
@@ -362,8 +362,8 @@ def parse(parser, input, format, split, output_dir, output_files, cleanup, prefi
                         results.append(json.loads(report.as_json()))
             print(json.dumps(results, indent=4))
 
-        elif format in ("csv", "html"):
-            if legacy and format == "csv":
+        elif format == "csv":
+            if legacy:
                 _write_csv(input_files, [report.metadata for report in reports])
             else:
                 # TODO: Determine a more elegant way to handle multiple reports and split/non-split reports
@@ -372,10 +372,7 @@ def parse(parser, input, format, split, output_dir, output_files, cleanup, prefi
                     df = reports[0].as_dataframe(split=split)
                 else:
                     df = pandas.concat([report.as_dataframe(split=split) for report in reports])
-                if format == "csv":
-                    print(df.to_csv(line_terminator="\n"))
-                else:
-                    print(df.to_html())
+                print(df.to_csv(line_terminator="\n"))
 
     except Exception as e:
         error_message = "Error running DC3-MWCP: {}".format(e)

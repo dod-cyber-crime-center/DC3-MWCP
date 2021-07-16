@@ -2,18 +2,14 @@
 Tests Report class.
 """
 
+import pytest
+
 import mwcp
 from mwcp import metadata
 from mwcp.metadata import *
 
 
-def test_report():
-    import logging
-    logger = logging.getLogger("test_report")
-    logging.root.setLevel(logging.DEBUG)
-
-    input_file = mwcp.FileObject(b"some data", file_path="C:/input_file.bin")
-    report = mwcp.Report(input_file, "FooParser")
+def test_report(report):
     with report:
         report.add(metadata.Path("C:\\windows\\temp\\1\\log\\keydb.txt", is_dir=False))
         report.add(metadata.Directory("%APPDATA%\\foo"))
@@ -213,10 +209,6 @@ def test_report():
                        "port": 21,
                        "tags": set(),
                        "type": "socket"},
-                      {"password": "pass",
-                       "tags": set(),
-                       "type": "credential",
-                       "username": "admin"},
                       {"tags": set(),
                        "type": "email_address",
                        "value": "email@bad.com"},
@@ -229,6 +221,7 @@ def test_report():
                       {"algorithm": "rc4",
                        "iv": None,
                        "key": b"myrc4key",
+                       "mode": None,
                        "tags": set(),
                        "type": "encryption_key"},
                       {"tags": set(), "type": "mission_id", "value": "target4"},
@@ -472,12 +465,6 @@ def test_report():
             "listen": null
         },
         {
-            "type": "credential",
-            "tags": [],
-            "username": "admin",
-            "password": "pass"
-        },
-        {
             "type": "email_address",
             "tags": [],
             "value": "email@bad.com"
@@ -507,6 +494,7 @@ def test_report():
             "tags": [],
             "key": "bXlyYzRrZXk=",
             "algorithm": "rc4",
+            "mode": null,
             "iv": null
         },
         {
@@ -731,4 +719,39 @@ def test_split_report():
             "tags": set(),
             "type": "report"
         }
+    ]
+
+
+def test_finalized(report):
+    """
+    Tests that we can't add metadata after it is finalized.
+    """
+    with report:
+        report.add(metadata.URL("example1.com"))
+    with pytest.raises(RuntimeError):
+        report.add(metadata.URL("example2.com"))
+
+
+def test_deduplication(report):
+    """
+    Tests that the same metadata information is dedupped.
+    """
+    with report:
+        report.add(metadata.URL("example.com"))
+        report.add(metadata.URL("example.com"))
+        report.add(metadata.Socket(address="example.com"))
+        report.add(metadata.Socket(address="example.com"))  # equivalent more verbose version.
+        report.add(metadata.Socket(address="example.com", c2=True))
+
+        # Set new file source to ensure we dedup across sources (if not split)
+        res_file = mwcp.FileObject(b"residual data", file_name="res.exe")
+        report.set_file(res_file)
+        report.add(metadata.URL("example.com"))
+        report.add(metadata.Socket(address="example.com"))
+
+    items = report.get()
+    assert items == [
+        metadata.URL("example.com"),
+        metadata.Socket(address="example.com"),
+        metadata.Socket(address="example.com", c2=True),
     ]

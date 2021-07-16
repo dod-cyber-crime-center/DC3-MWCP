@@ -1,58 +1,14 @@
-# TODO: change module name to singular?
-
 import abc
 import collections
-import io
+import html
 import re
+import textwrap
 from typing import List, Union
 
 import pandas
 import tabulate
 
 from mwcp import metadata
-
-
-def _flatten_dict(element_dict: dict) -> dict:
-    new_dict = {}
-    for key, value in element_dict.items():
-        if value is None or value == "":
-            continue
-        if isinstance(value, dict):
-            value.pop("type", None)
-            tags = value.pop("tags", None)
-            value = {
-                f"{key}.{_key}" if _key in element_dict else _key: _value
-                for _key, _value in _flatten_dict(value).items()
-            }
-            new_dict.update(value)
-
-            # Consolidate tags into main dictionary.
-            if tags:
-                try:
-                    new_dict["tags"].append(tags)
-                except KeyError:
-                    new_dict["tags"] = tags
-        else:
-            new_dict[key] = value
-
-    # Pop off type.
-    new_dict.pop("type", None)
-    return new_dict
-
-
-def _format_metadata_element(element: metadata.Element, join_tags=True, convert_field_names=True) -> dict:
-    entry = _flatten_dict(element.as_dict())
-
-    # Convert tags to a string.
-    if join_tags and "tags" in entry:
-        entry["tags"] = ", ".join(sorted(entry["tags"]))
-
-    # Convert key names in into more friendly titles.
-    if convert_field_names:
-        for key in list(entry.keys()):
-            entry[key.replace("_", " ").replace(".", " / ").title()] = entry.pop(key)
-
-    return entry
 
 
 def _camel_case_to_title(name: str):
@@ -108,7 +64,7 @@ class DataFrameWriter(ReportWriter):
 
         for meta_index, element in enumerate(report.metadata, start=1):
             category = _camel_case_to_title(element.__class__.__name__)
-            row_dict = _format_metadata_element(element, join_tags=False, convert_field_names=False)
+            row_dict = element.as_dict(flat=True)
 
             # Flatten "Other"
             if category == "Other":
@@ -136,28 +92,83 @@ class MarkupWriter(ReportWriter):
     """
     # Table format used when generating tables.
     _tablefmt = None
+    MAX_COL_WIDTH = 100
+    MAX_COL_INT_WIDTH = 50
 
     def __init__(self, stream):
         self._stream = stream
 
-    def table(self, data: Union[List[dict], List[list]], headers=None):
-        if not headers and data and isinstance(data[0], dict):
-            headers = "keys"
-        # Present sets as comma delimited elements. (useful for tags)
-        for entry in data:
-            if isinstance(entry, dict):
-                for key, value in entry.items():
-                    if isinstance(value, set):
-                        entry[key] = ", ".join(sorted(value))
-            elif isinstance(entry, list):
-                for i, value in enumerate(entry):
-                    if isinstance(value, set):
-                        entry[i] = ", ".join(sorted(value))
-        self._stream.write(tabulate.tabulate(data, headers=headers, tablefmt=self._tablefmt))
+    def _format_cell_value(self, value):
+        """
+        Converts given cell value into formatted value appropriate for a table cell.
+        Returns formatted value or passes back original value if no formatting is necessary.
+        """
+        # Present sets as comma delimited string. (e.g. for tags)
+        if isinstance(value, set):
+            value = ", ".join(sorted(value))
+
+        # Wrap really long values to multiple lines.
+        if value:
+            max_width = self.MAX_COL_WIDTH
+            # As a special case, we are going to force huge integers (such as in RSAPrivateKey)
+            # to be wrapped at a smaller width threshold.
+            if isinstance(value, int):
+                max_width = self.MAX_COL_INT_WIDTH
+
+            col_width = max(len(line) for line in str(value).splitlines())
+            if col_width > max_width:
+                # For simple format, we don't have any borders showing different cells, so we are going
+                # to indent subsequence lines to make it more obvious it is part of the same cell.
+                indent = "  " if isinstance(self, SimpleTextWriter) else ""
+                value = textwrap.fill(
+                    str(value),
+                    width=max_width,
+                    subsequent_indent=indent,
+                    tabsize=4,
+                    replace_whitespace=False,
+                )
+
+        return value
+
+    def table(self, tabular_data: Union[List[dict], List[list]], headers=None):
+        """
+        Writes out tabular data as a table using tabulate library.
+
+        :param tabular_data: A list of dicts or lists to represent tabular data.
+        :param headers: Header option passed to tabulate. If not provided and tabular data
+            contains dictionaries, it will use the keys.
+        """
+        if tabular_data:
+            if not headers and isinstance(tabular_data[0], dict):
+                headers = "keys"
+
+            for i, entry in enumerate(tabular_data):
+                # Reformat cells as appropriate.
+                if isinstance(entry, dict):
+                    tabular_data[i] = {key: self._format_cell_value(value) for key, value in entry.items()}
+                elif isinstance(entry, list):
+                    # noinspection PyTypeChecker
+                    tabular_data[i] = [self._format_cell_value(value) for value in entry]
+                else:
+                    raise ValueError(f"Invalid tabular data: {entry!r}")
+
+        self._stream.write(tabulate.tabulate(tabular_data, headers=headers, tablefmt=self._tablefmt))
         self._stream.write("\n\n")
 
     def _write_table(self, elements: List[metadata.Element]):
-        tabular_data = [_format_metadata_element(element) for element in elements]
+        tabular_data = []
+        for element in elements:
+            entry = element.as_formatted_dict()
+
+            # Strip None and "" values.
+            entry = {key: value for key, value in entry.items() if value not in (None, "", b"")}
+
+            # Convert key names into more friendly titles.
+            for key in list(entry.keys()):
+                entry[key.replace("_", " ").replace(".", " / ").title()] = entry.pop(key)
+
+            tabular_data.append(entry)
+
         self.table(tabular_data, headers="keys")
 
     def write(self, report: metadata.Report):
@@ -244,6 +255,13 @@ class MarkdownWriter(MarkupWriter):
     name = "markdown"
     _tablefmt = "pipe"
 
+    def _format_cell_value(self, value):
+        value = super()._format_cell_value(value)
+        # We need to replace newlines with <br> since tabulate doesn't do that for us.
+        if isinstance(value, str):
+            value = value.replace("\n", "<br>")
+        return value
+
     def h1(self, text: str):
         self._stream.write(f"# {text}\n")
 
@@ -259,24 +277,23 @@ class MarkdownWriter(MarkupWriter):
         self._stream.write(f"```\n{text}```\n\n")
 
 
-class HTMLWriter(MarkdownWriter):
+class HTMLWriter(MarkupWriter):
     name = "html"
     _tablefmt = "html"
 
     def h1(self, text: str):
-        self._stream.write(f"<h1>{text}</h1>\n")
+        self._stream.write(f"<h1>{html.escape(text)}</h1>\n")
 
     def h2(self, text: str):
-        self._stream.write(f"<h2>{text}</h2>\n")
+        self._stream.write(f"<h2>{html.escape(text)}</h2>\n")
 
     def h3(self, text: str):
-        self._stream.write(f"<h3>{text}</h3>\n")
+        self._stream.write(f"<h3>{html.escape(text)}</h3>\n")
 
     def code_block(self, text: str):
         if not text.endswith("\n"):
             text = text + "\n"
-        # TODO: Escape html characters?
-        self._stream.write(f"<pre>\n{text}</pre>\n\n")
+        self._stream.write(f"<pre>\n{html.escape(text)}</pre>\n\n")
 
 
 class SimpleTextWriter(MarkupWriter):

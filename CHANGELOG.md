@@ -3,8 +3,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Added `mode` attribute for EncryptionKey to report on block cipher mode.
+  - Updated testing utility to ensure test cases older than 3.3.2 ignore this new property.
+
+### Changed
+- Added word wrap for long fields in a generated report.
+- Switched "html" report output format to be consistent with "simple" and "markdown" formats.
+- Improved display formatting for EncryptionKey, RSAPrivateKey, and RSAPublicKey.
+
 ### Fixed
 - Fixed test case path for `foo` parser, changed to a path which will always exist since input file is irrelevant. (@ddash-ct)
+- Fixed issue with results in the new metadata style not being dedupped across file sources.
+- Split report results are now correctly ordered by processing order.
+- Fixed issue with running `mwcp test -u` command to update all legacy parser tests.
+
+### Removed
+- Removed unused `split` argument in `Report` initialization.
 
 
 ## [3.3.1] - 2021-06-28

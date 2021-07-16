@@ -10,9 +10,10 @@ import json
 import logging
 import pathlib
 import re
+import textwrap
 import warnings
 import ntpath
-from enum import Enum, IntEnum
+from enum import IntEnum
 import uuid
 from typing import Any, Union, List, Optional, TypeVar, Type, Set, Iterable
 
@@ -21,7 +22,6 @@ import cattr
 
 import mwcp
 from mwcp.exceptions import ValidationError
-
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,36 @@ def _strip_null(d: dict) -> dict:
     return new_dict
 
 
+def _flatten_dict(dict_: dict) -> dict:
+    """
+    Flattens given element dictionary into a single level of key/value pairs.
+    Combines tags into one.
+    """
+    new_dict = {}
+    for key, value in dict_.items():
+        if isinstance(value, dict):
+            value.pop("type", None)
+            tags = value.pop("tags", None)
+            value = {
+                f"{key}.{_key}" if _key in dict_ else _key: _value
+                for _key, _value in _flatten_dict(value).items()
+            }
+            new_dict.update(value)
+
+            # Consolidate tags into main dictionary.
+            if tags:
+                try:
+                    new_dict["tags"].append(tags)
+                except KeyError:
+                    new_dict["tags"] = tags
+        else:
+            new_dict[key] = value
+
+    # Pop off type.
+    new_dict.pop("type", None)
+    return new_dict
+
+
 @attr.s(auto_attribs=True, field_transformer=_auto_convert)
 class Element:
     """
@@ -134,8 +164,18 @@ class Element:
     def from_dict(cls, obj: dict) -> "Element":
         return cattr.structure(obj, cls)
 
-    def as_dict(self) -> dict:
-        return cattr.unstructure(self)
+    def as_dict(self, flat=False) -> dict:
+        ret = cattr.unstructure(self)
+        if flat:
+            ret = _flatten_dict(ret)
+        return ret
+
+    def as_formatted_dict(self) -> dict:
+        """
+        Converts metadata element into a well formatted dictionary usually
+        used for presenting metadata elements as tabular data.
+        """
+        return self.as_dict(flat=True)
 
     def as_json(self) -> str:
         class _JSONEncoder(json.JSONEncoder):
@@ -425,7 +465,7 @@ class URL(Element):
         URL("https://10.11.10.13:443/images/baner.jpg")
 
         creds = Credential(username="user", password="pass")
-        URL("mail.badhost.com", application_protocol="smtp", credential=creds))
+        URL(socket=Socket("mail.badhost.com"), application_protocol="smtp", credential=creds))
     """
     url: str = None
     socket: Socket = None
@@ -748,15 +788,49 @@ class EncryptionKey(Element):
             b"\x6d\x79\x72\x63\x34\x6b\x65\x79",
             algorithm="rc4",
         )
+        EncryptionKey(
+            b"\x6d\x79\x72\x63\x34\x6b\x65\x79",
+            algorithm="aes",
+            mode="ecb",
+            iv=b"\x00\x00\x00\x00\x00\x00\x00\x01",
+        )
     """
     key: bytes
     algorithm: str = None
+    mode: str = None
     iv: bytes = None
 
     def __attrs_post_init__(self):
         # Determines if key is an encoded utf8 string.
         # (Used for backwards compatibility support.)
         self._raw_string = False
+
+    def as_formatted_dict(self) -> dict:
+        # Convert key into hex number
+        key = f"0x{self.key.hex()}"
+
+        # Add context if encoding can be detected from key.
+        encoding = None
+        if self._raw_string:
+            encoding = "utf-8"
+        else:
+            # Test for encoding by determining which encoding creates pure ascii.
+            for test_encoding in ["utf-16", "ascii", "utf-8"]:
+                try:
+                    self.key.decode(test_encoding).encode("ascii")
+                    encoding = test_encoding
+                    break
+                except (UnicodeDecodeError, UnicodeEncodeError):
+                    continue
+        if encoding:
+            key += f' ("{self.key.decode(encoding)}")'
+
+        return {
+            "tags": self.tags,
+            "key": key,
+            "algorithm": self.algorithm,
+            "iv": f"0x{self.iv.hex()}" if self.iv else None,
+        }
 
 
 def EncryptionKeyLegacy(key: str) -> EncryptionKey:
@@ -900,6 +974,20 @@ def RegistryPathData(path: str, data: str) -> Registry:
     return Registry(path, data=data)
 
 
+def _int_dump(value: int) -> str:
+    """
+    Dumps integer into hex format in same style used by openssl.
+    """
+    # Display smaller values as decimal with hex in parenthesis.
+    if value < (0x1 << (15 * 8)):
+        return f"{value} ({hex(value)})"
+    # Otherwise display as hex dump with bytes separated by ":"
+    value_bytes = value.to_bytes((value.bit_length() + 7) // 8, "big")
+    hex_dump = ":".join(f"{byte:02x}" for byte in value_bytes)
+    hex_dump = textwrap.fill(hex_dump, width=45)
+    return hex_dump
+
+
 @attr.s(auto_attribs=True, field_transformer=_auto_convert)
 class RSAPrivateKey(Element):
     """
@@ -915,6 +1003,31 @@ class RSAPrivateKey(Element):
     d_mod_q1: int = None
     q_inv_mod_p: int = None
 
+    def as_formatted_dict(self) -> dict:
+        """
+        Display of RSAPrivateKey tends to create really wide output.
+        Reformatting results to equivalent output you would get with:
+            `openssl rsa -in key.pem -text -noout`
+        """
+        # NOTE: Not using openssl's field names since they are less descriptive.
+        fields = [
+            ("Modulus (n)", self.modulus),
+            ("Public Exponent (e)", self.public_exponent),
+            ("Private Exponent (d)", self.private_exponent),
+            ("p", self.p),
+            ("q", self.q),
+            ("d mod (p-1)", self.d_mod_p1),
+            ("d mod (q-1)", self.d_mod_q1),
+            ("(inverse of q) mod p", self.q_inv_mod_p),
+        ]
+
+        value = ""
+        for field, _value in fields:
+            if _value is not None:
+                value += f"{field}:\n{textwrap.indent(_int_dump(_value), '    ')}\n"
+
+        return {"tags": self.tags, "value": value or None}
+
 
 @attr.s(auto_attribs=True, field_transformer=_auto_convert)
 class RSAPublicKey(Element):
@@ -923,6 +1036,24 @@ class RSAPublicKey(Element):
     """
     public_exponent: int = None
     modulus: int = None
+
+    def as_formatted_dict(self) -> dict:
+        """
+        Display of RSAPublicKey tends to create really wide output.
+        Reformatting results to equivalent output you would get with:
+            `openssl rsa -in key.pem -text -noout -pubin`
+        """
+        fields = [
+            ("Modulus (n)", self.modulus),
+            ("Public Exponent (e)", self.public_exponent),
+        ]
+
+        value = ""
+        for field, _value in fields:
+            if _value is not None:
+                value += f"{field}:\n{textwrap.indent(_int_dump(_value), '    ')}\n"
+
+        return {"tags": self.tags, "value": value or None}
 
 
 @attr.s(auto_attribs=True, field_transformer=_auto_convert)

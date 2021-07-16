@@ -213,6 +213,12 @@ def update_tests(parsers: List[str] = None, force: bool = False) -> bool:
             success = False
             continue
 
+        # Don't bother updating if it only updates the mwcp version.
+        new_results = json.loads(report.as_json())
+        new_results["mwcp_version"] = old_results["mwcp_version"]
+        if new_results == old_results:
+            continue
+
         logger.info(f"Updating results for {file_path} in {results_path}")
         results_path.write_text(report.as_json())
 

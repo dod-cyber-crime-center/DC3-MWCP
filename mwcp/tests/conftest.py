@@ -1,5 +1,7 @@
 import pytest
 
+import mwcp
+
 
 def pytest_configure(config):
     """
@@ -104,3 +106,15 @@ def make_sample_parser(tmpdir):
         return parser_file, config_file
 
     return _make_sample_parser
+
+
+@pytest.fixture
+def report():
+    """
+    Creates dummy report for testing.
+    """
+    import logging
+    logger = logging.getLogger("test_report")
+    logging.root.setLevel(logging.DEBUG)
+    input_file = mwcp.FileObject(b"some data", file_path="C:/input_file.bin")
+    return mwcp.Report(input_file, "FooParser")

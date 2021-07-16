@@ -70,12 +70,22 @@ def test_parser(md5, results_path):
 
     # Remove mwcp version since we don't want to be updating our tests cases every time
     # there is a new version.
-    del expected_results["mwcp_version"]
-    del actual_results["mwcp_version"]
+    expected_results_version = expected_results.pop("mwcp_version")
+    actual_results_version = actual_results.pop("mwcp_version")
 
     # The order the metadata comes in doesn't matter and shouldn't fail the test.
     expected_results["metadata"] = sorted(expected_results["metadata"], key=repr)
     actual_results["metadata"] = sorted(actual_results["metadata"], key=repr)
+
+    # region - Handle changes in metadata schema so older test cases don't fail.
+
+    # Version 3.3.2 introduced "mode" property in encryption_key. Remove property for older tests.
+    if expected_results_version < "3.3.2":
+        for item in actual_results["metadata"]:
+            if item["type"] == "encryption_key":
+                del item["mode"]
+
+    # endregion
 
     # NOTE: When running this in PyCharm, the "<Click to see difference>" may be missing
     # on a failed test if there is a "==" contained within one of the results.
