@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Fixed issue with results in the new metadata style not being dedupped across file sources.
 - Split report results are now correctly ordered by processing order.
 - Fixed issue with running `mwcp test -u` command to update all legacy parser tests.
+- Fixed bug with differently ordered tags causing test cases to fail.
 
 ### Removed
 - Removed unused `split` argument in `Report` initialization.

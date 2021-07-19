@@ -188,7 +188,7 @@ class Element:
                     return base64.b64encode(o).decode()
                 # Convert sets to list
                 if isinstance(o, set):
-                    return list(o)
+                    return sorted(o)
                 return super().default(o)
         return json.dumps(self, cls=_JSONEncoder, indent=4)
 
