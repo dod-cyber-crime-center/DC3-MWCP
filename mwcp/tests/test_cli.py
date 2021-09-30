@@ -43,14 +43,14 @@ Compile Time
 Tags
 
 ---- Socket ----
-Tags    Address    Network Protocol
-------  ---------  ------------------
-        127.0.0.1  tcp
+Tags    Address
+------  ---------
+        127.0.0.1
 
 ---- URL ----
-Tags    Url               Address    Network Protocol    Application Protocol
-------  ----------------  ---------  ------------------  ----------------------
-        http://127.0.0.1  127.0.0.1  tcp                 http
+Tags    Url               Address    Application Protocol
+------  ----------------  ---------  ----------------------
+        http://127.0.0.1  127.0.0.1  http
 
 ---- Residual Files ----
 Tags    Filename           Description          MD5                               Arch    Compile Time
@@ -252,8 +252,8 @@ def test_csv_cli(tmpdir, script_runner):
     # Replace timestamp.
     results = re.sub('\n[^"]*?,', '\n[TIMESTAMP],', results)
     assert results == expected
-    
-    
+
+
 def test_add_testcase(tmpdir, script_runner):
     """Tests adding a parser testcase."""
     malware_repo = tmpdir.mkdir('malware_repo')

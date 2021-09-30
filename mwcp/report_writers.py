@@ -103,9 +103,13 @@ class MarkupWriter(ReportWriter):
         Converts given cell value into formatted value appropriate for a table cell.
         Returns formatted value or passes back original value if no formatting is necessary.
         """
-        # Present sets as comma delimited string. (e.g. for tags)
+        # Convert sets into sorted lists to ensure deterministic behaviour.
         if isinstance(value, set):
-            value = ", ".join(sorted(value))
+            value = sorted(set)
+
+        # Present lists of strings as comma delimited string.
+        if isinstance(value, list) and all(isinstance(item, str) for item in value):
+            value = ", ".join(value)
 
         # Wrap really long values to multiple lines.
         if value:
@@ -204,7 +208,14 @@ class MarkupWriter(ReportWriter):
         for element_class, elements in sorted(metadata_dict.items(), key=lambda tup: tup[0].__name__):
             if element_class in (metadata.Other, metadata.ResidualFile):
                 continue
-            self.h2(_camel_case_to_title(element_class.__name__))
+            table_name = _camel_case_to_title(element_class.__name__)
+            # Remove the " Legacy" part for legacy metadata fields.
+            # NOTE: This can potentially lead to two different tables with the same header.
+            #   But that would only happen if we are running a parser with a mixture of old an new.
+            #   Developer should be proactive in completely updating the parsers in a set if they see this.
+            if table_name.endswith(" Legacy"):
+                table_name = table_name[:-len(" Legacy")]
+            self.h2(table_name)
             self._write_table(elements)
 
         # Write Miscellaneous data
@@ -218,7 +229,7 @@ class MarkupWriter(ReportWriter):
         if residual_files:
             self.h2("Residual Files")
             tabular_data = [
-                [", ".join(sorted(residual_file.tags)),
+                [", ".join(residual_file.tags),
                  residual_file.name, residual_file.description, residual_file.md5,
                  residual_file.architecture, residual_file.compile_time]
                  for residual_file in residual_files

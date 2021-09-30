@@ -214,7 +214,7 @@ def update_tests(parsers: List[str] = None, force: bool = False) -> bool:
             continue
 
         # Don't bother updating if it only updates the mwcp version.
-        new_results = json.loads(report.as_json())
+        new_results = report.as_json_dict()
         new_results["mwcp_version"] = old_results["mwcp_version"]
         if new_results == old_results:
             continue

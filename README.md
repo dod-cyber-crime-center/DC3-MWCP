@@ -15,7 +15,6 @@ command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
     - [CLI Tool](#cli-tool)
     - [REST API](#rest-api)
     - [Python API](#python-api)
-- [Updates](#updates)
 - [Schema](#schema)
 - [Helper Utilities](#helper-utilities)
 
@@ -126,10 +125,12 @@ see ```mwcp parse -h``` for full set of options
 
 ### REST API
 
-DC3-MWCP can be used as a web service. The REST API provides two commonly used functions:
+DC3-MWCP can be used as a web service. The web service provides a web application as
+well as a REST API for some commonly used functions:
 
 * ```/run_parser/<parser>``` -- executes a parser on uploaded file
 * ```/descriptions``` -- provides list of available parsers
+* ```/schema.json``` -- provides the [schema](#schema) for report output
 
 To use, first start the server by running:
 ```console
@@ -358,36 +359,93 @@ to the configuration parameter `LOG_CONFIG_PATH`.
 You may also use the `--verbose` or `--debug` flags to adjust the logging level when using the `mwcp` tool.
 
 
-## Updates
-
-DC3-MWCP code updates are implemented to be backwards compatible.
-
-One exception to backwards compatibility is when new attributes are amended to previously existing
-fields. An example of this is the MD5 entry being amended to the 'outputfile' field. When attribute
-additions like this are made, it causes a backwards compatibility conflict with test cases. If
-`mwcp test` is being used to manage regression tests, the amended attributes can cause previously
-passing test cases to fail. To resolve this issue, work in an environment where parsers are in a known
-good state and run the command `mwcp test -u` to update all test cases. The newly generated test
-cases will include the updated field values.
-
 ## Schema
 
 One of the major goals of DC3-MWCP is to standardize output for malware configuration parsers, making the data
 from one parser comparable with that of other parsers. This is achieved by establishing a schema of
-standardized fields that represent the common malware attributes seen across malware families. To see the
-list of standardized fields and their definitions, see [fields.json](mwcp/config/fields.json).
+standardized metadata elements that represent the common malware configuration items seen across malware families.
 
-It is acknowledged that a set of generic fields will often not be adequate to capture the nuances of
+A formal [JSON Schema](https://json-schema.org) can be found at [schema.json](/mwcp/config/schema.json), by calling `mwcp schema` in the command line, or programatically by calling `mwcp.schema()`. 
+This schema is versioned the same as DC3-MWCP. A change in the version may not necessarily
+reflect a change in the actual schema. However, any major or minor changes to the schema will
+be reflected in an appropriate change to the version and will be noted in the [changelog](/CHANGELOG.md).
+Please ensure you pin DC3-MWCP appropriately.
+
+It is acknowledged that a set of generic elements will often not be adequate to capture the nuances of
 individual malware families. To ensure that malware family specific attributes are appropriately captured
-in parser output, the schema includes an "other" field which supports arbitrary key-value pairs. Information
-not captured in the abstract standardized fields is captured through this mechanism.
+in parser output, the schema includes an "Other" element which supports arbitrary key-value pairs.
+The keys and values are arbitrary to permit flexibility in describing the peculiarities of individual malware families.
+Information
+not captured in the abstract standardized elements is captured through this mechanism.
 
-Duplication of data items is encouraged both to provide additional family specific context and to
-simplify access of data through both composite fields and individual fields. The DC3-MWCP framework extracts
-individual items reported in composite fields to the degree possible. For example, the address in a url
-will be extracted automatically by DC3-MWCP.
+The use of [tags](/docs/ParserComponents.md#tagging) is encouraged to provide additional context for the configuration items.
+For example, if a specific url is used to download a second stage component, a tag of "download"
+could be added to the reported URL element. Alternatively, if the URL is used for a proxy, 
+a tag of "proxy" could be included.
+There is no standard on what tags are available or when they should be included.
+This should be determined by your organization.
 
-See [fields.txt](mwcp/config/fields.txt) for additional explanation.
+
+### Extending the Schema
+
+It is possible to extend the schema to include your own custom metadata elements.
+This can be accomplished by creating a class that inherits from `mwcp.metadata.Metadata`. 
+This class must be decorated with [attr](https://attrs.org) using the custom configuration `mwcp.metadata.config`. 
+
+*NOTE: The class name must be unique from other metdata elements.*
+
+```python
+from typing import List
+
+import attr
+
+import mwcp
+from mwcp import metadata
+
+
+@attr.s(**metadata.config)
+class MyCustom(metadata.Metadata):
+    """
+    This is my custom metadata item.
+    """
+    field_a: str
+    field_b: int
+    field_c: List[str] = attr.ib(factory=list)
+
+    
+item = MyCustom(field_a="hello", field_b=42, field_c=["a", "b"])
+
+print(item)
+print(item.as_dict())
+
+# Custom items can be included in the report like normal.
+# MWCP will automatically format and display the custom element in the report.
+report = mwcp.Report()
+with report:
+    report.add(item)
+
+print(report.as_text())
+```
+
+```
+MyCustom(tags=set(), field_a='hello', field_b=42, field_c=['a', 'b'])
+{'type': 'my_custom', 'tags': [], 'field_a': 'hello', 'field_b': 42, 'field_c': ['a', 'b']}
+---- My Custom ----
+Tags    Field A      Field B  Field C
+------  ---------  ---------  ----------
+        hello             42  a, b
+```
+
+
+Please note, that extending the schema will obviously cause the [schema.json](/mwcp/config/schema.json) file to be incorrect.
+To regenerate the schema to also include the custom element run `mwcp.schema()` afterwards.
+
+```python
+import json 
+
+with open("schema.json", "w") as fo:
+    json.dump(mwcp.schema(id="https://acme.org/0.1/schema.json"), fo, indent=4)
+```
 
 
 ## Helper Utilities

@@ -1,6 +1,27 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+## [Unreleased]
+
+### Added
+- Added a formal schema for (non-legacy) JSON report output which can be found in [schema.json](/mwcp/config/schema.json)
+- Added `mwcp schema` CLI command to generate the current schema.
+- Added documentation on how to create your own custom reportable metadata element.
+
+### Changed
+- Updated server dependencies.
+- The `input_file` and `residual_file` metadata types are now both referred to as `file`.
+- Legacy versions of `uuid` and `interval` metadata types are now typed as `uuid_legacy` and `interval_legacy`
+  respectively. This was done to ensure a proper schema can be generated.
+- Updated testing utility to ensure test cases older than 3.3.3 handle changes accordingly.
+- Updated the regular expression in the `URL` metadata object allowing it to succeed with optional schema
+- `URL` metadata object no longer defaults the network protocol to `tcp` for embedded `socket`
+
+### Fixed
+- Fixed `EncryptionKey` report formatting to display text representation when key is printable (not just ascii).
+
+
 ## [3.3.2] - 2021-07-19
 
 ### Added

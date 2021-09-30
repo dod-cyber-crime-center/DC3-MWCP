@@ -65,17 +65,12 @@ def test_parser(md5, results_path):
     # NOTE: Reading bytes of input file instead of passing in file path to ensure everything gets run in-memory
     #   and no residual artifacts (like idbs) are created in the malware repo.
     report = mwcp.run(parser_name, data=input_file_path.read_bytes(), include_logs=False)
-    actual_results_json = report.as_json()
-    actual_results = json.loads(actual_results_json)
+    actual_results = report.as_json_dict()
 
     # Remove mwcp version since we don't want to be updating our tests cases every time
     # there is a new version.
     expected_results_version = expected_results.pop("mwcp_version")
     actual_results_version = actual_results.pop("mwcp_version")
-
-    # The order the metadata comes in doesn't matter and shouldn't fail the test.
-    expected_results["metadata"] = sorted(expected_results["metadata"], key=repr)
-    actual_results["metadata"] = sorted(actual_results["metadata"], key=repr)
 
     # region - Handle changes in metadata schema so older test cases don't fail.
 
@@ -85,7 +80,46 @@ def test_parser(md5, results_path):
             if item["type"] == "encryption_key":
                 del item["mode"]
 
+    # Version 3.3.3 set "residual_file" and "input_file" types to just "file".
+    if expected_results_version < "3.3.3":
+        actual_results["input_file"]["type"] = "input_file"
+        for item in actual_results["metadata"]:
+            if item["type"] == "file":
+                item["type"] = "residual_file"
+
+    # Version 3.3.3 also changed the types for legacy interval and uuid to
+    # "interval_legacy" and "uuid_legacy" respectively.
+    if expected_results_version < "3.3.3":
+        for item in actual_results["metadata"]:
+            if item["type"].endswith("_legacy"):
+                item["type"] = item["type"][:-len("_legacy")]
+
+    # Version 3.3.3 no longer automatically adds tcp into a socket for url,
+    # therefore just clear the network_protocol when it's set to tcp for
+    # older versions
+    if expected_results_version < "3.3.3":
+        for item in actual_results["metadata"] + expected_results["metadata"]:
+            if item["type"] == "socket" and item["network_protocol"] == "tcp":
+                item["network_protocol"] = None
+
+            elif item["type"] == "url" and item["socket"] and item["socket"]["network_protocol"] == "tcp":
+                item["socket"]["network_protocol"] = None
+
+        # Deduplicate both lists of metadata dictionary items since changing "tcp" to None will likely
+        # create some.
+        for item in list(actual_results["metadata"]):
+            while actual_results["metadata"].count(item) > 1:
+                actual_results["metadata"].remove(item)
+
+        for item in list(expected_results["metadata"]):
+            while expected_results["metadata"].count(item) > 1:
+                expected_results["metadata"].remove(item)
+
     # endregion
+
+    # The order the metadata comes in doesn't matter and shouldn't fail the test.
+    expected_results["metadata"] = sorted(expected_results["metadata"], key=repr)
+    actual_results["metadata"] = sorted(actual_results["metadata"], key=repr)
 
     # NOTE: When running this in PyCharm, the "<Click to see difference>" may be missing
     # on a failed test if there is a "==" contained within one of the results.

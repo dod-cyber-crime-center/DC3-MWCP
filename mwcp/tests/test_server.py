@@ -34,22 +34,22 @@ def _get_expected_results(legacy: bool):
         SHA256        cc4fafa4c90b4e4c08ade61acfa63add6a3fc31aa58d3f217eb199f557512e2a
         Compile Time
         Tags
-        
+
         ---- Socket ----
-        Tags    Address    Network Protocol
-        ------  ---------  ------------------
-                127.0.0.1  tcp
-        
+        Tags    Address
+        ------  ---------
+                127.0.0.1
+
         ---- URL ----
-        Tags    Url               Address    Network Protocol    Application Protocol
-        ------  ----------------  ---------  ------------------  ----------------------
-                http://127.0.0.1  127.0.0.1  tcp                 http
-        
+        Tags    Url               Address    Application Protocol
+        ------  ----------------  ---------  ----------------------
+                http://127.0.0.1  127.0.0.1  http
+
         ---- Residual Files ----
         Tags    Filename           Description          MD5                               Arch    Compile Time
         ------  -----------------  -------------------  --------------------------------  ------  --------------
                 fooconfigtest.txt  example output file  5eb63bbbe01eeed093cb22bb8f5acdc3
-    
+
         ----- File Tree -----
         <33fb2ffd28461fa230b730f0d9db81c9.bin (33fb2ffd28461fa230b730f0d9db81c9) : Foo>
         └── <fooconfigtest.txt (5eb63bbbe01eeed093cb22bb8f5acdc3) : example output file>
@@ -77,7 +77,7 @@ def _get_expected_results(legacy: bool):
             "tags": [],
             "mwcp_version": mwcp.__version__,
             "input_file": {
-                "type": "input_file",
+                "type": "file",
                 "tags": [],
                 "name": "33fb2ffd28461fa230b730f0d9db81c9.bin",
                 "description": "Foo",
@@ -100,7 +100,7 @@ def _get_expected_results(legacy: bool):
                         'address': '127.0.0.1',
                         'c2': None,
                         'listen': None,
-                        'network_protocol': 'tcp',
+                        'network_protocol': None,
                         'port': None,
                         'tags': [],
                         'type': 'socket'
@@ -113,13 +113,13 @@ def _get_expected_results(legacy: bool):
                     'address': '127.0.0.1',
                     'c2': None,
                     'listen': None,
-                    'network_protocol': 'tcp',
+                    'network_protocol': None,
                     'port': None,
                     'tags': [],
                     'type': 'socket'
                 },
                 {
-                    "type": "residual_file",
+                    "type": "file",
                     "tags": [],
                     "name": "fooconfigtest.txt",
                     "description": "example output file",
@@ -298,12 +298,12 @@ def test_zip_download(client, make_test_buffer, legacy):
         expected_residual_files = [
             element
             for element in expected_results["metadata"]
-            if element["type"] == "residual_file"
+            if element["type"] == "file"
         ]
         expected_results["metadata"] = [
             element
             for element in expected_results["metadata"]
-            if element["type"] != "residual_file"
+            if element["type"] != "file"
         ]
 
     results_txt = zip_file.read("results.txt").decode("unicode_escape")

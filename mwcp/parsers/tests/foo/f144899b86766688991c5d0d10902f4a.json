@@ -1,9 +1,9 @@
 {
     "type": "report",
     "tags": [],
-    "mwcp_version": "3.2.1",
+    "mwcp_version": "3.3.3",
     "input_file": {
-        "type": "input_file",
+        "type": "file",
         "tags": [],
         "name": "f144899b86766688991c5d0d10902f4a.bin",
         "description": "Foo",
@@ -34,7 +34,7 @@
                 "tags": [],
                 "address": "127.0.0.1",
                 "port": null,
-                "network_protocol": "tcp",
+                "network_protocol": null,
                 "c2": null,
                 "listen": null
             },
@@ -48,12 +48,12 @@
             "tags": [],
             "address": "127.0.0.1",
             "port": null,
-            "network_protocol": "tcp",
+            "network_protocol": null,
             "c2": null,
             "listen": null
         },
         {
-            "type": "residual_file",
+            "type": "file",
             "tags": [],
             "name": "fooconfigtest.txt",
             "description": "example output file",

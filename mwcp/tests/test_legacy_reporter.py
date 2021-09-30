@@ -37,11 +37,11 @@ def test_managed_tempdir(tmpdir):
         'c2_url': ['http://[fe80::20c:1234:5678:9abc]:80/badness'],
         'url': ['http://[fe80::20c:1234:5678:9abc]:80/badness'],
         'urlpath': ['/badness'],
-        'c2_socketaddress': [['fe80::20c:1234:5678:9abc', '80', 'tcp']],
-        'socketaddress': [['fe80::20c:1234:5678:9abc', '80', 'tcp']],
+        'c2_socketaddress': [['fe80::20c:1234:5678:9abc', '80', '']],
+        'socketaddress': [['fe80::20c:1234:5678:9abc', '80', '']],
         'c2_address': ['fe80::20c:1234:5678:9abc'],
         'address': ['fe80::20c:1234:5678:9abc'],
-        'port': [['80', 'tcp']]
+        'port': [['80', '']]
     }),
     ('url', b'http://127.0.0.1/really/bad?hostname=pwned', {
         'url': ['http://127.0.0.1/really/bad?hostname=pwned'],

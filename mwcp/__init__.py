@@ -19,8 +19,8 @@ from mwcp.runner import Runner
 from mwcp.report import Report
 from mwcp.dispatcher import Dispatcher, UnidentifiedFile
 from mwcp.utils.logutil import setup_logging
-from mwcp.core import run
+from mwcp.core import run, schema
 from mwcp.exceptions import *
 
 
-__version__ = "3.3.2"
+__version__ = "3.3.3"

@@ -17,7 +17,7 @@ from anytree import RenderTree
 
 import mwcp
 from mwcp import metadata, FileObject
-from mwcp.metadata import Report as ReportModel, Element, ResidualFile
+from mwcp.metadata import Report as ReportModel, Metadata, ResidualFile
 from mwcp.report_writers import DataFrameWriter, SimpleTextWriter, MarkdownWriter, HTMLWriter
 from mwcp.utils import logutil
 from mwcp.utils.stringutils import convert_to_unicode, sanitize_filename
@@ -326,13 +326,13 @@ class Report:
             elif isinstance(element, metadata.Event):
                 results["event"].append(str(element.value))
 
-            elif isinstance(element, metadata._UUID):
+            elif isinstance(element, (metadata.UUID, metadata.UUIDLegacy)):
                 results["guid"].append(str(element.value))
 
             elif isinstance(element, metadata.InjectionProcess):
                 results["injectionprocess"].append(str(element.value))
 
-            elif isinstance(element, (metadata.Interval, metadata._IntervalLegacy)):
+            elif isinstance(element, (metadata.Interval, metadata.IntervalLegacy)):
                 results["interval"].append(str(element.value))
 
             elif isinstance(element, metadata.EncryptionKey):
@@ -512,7 +512,7 @@ class Report:
         # Include input file information.
         # (originally part of _parse_file in cli)
         if include_filename:
-            input_file = metadata._File.from_file_object(self.input_file)
+            input_file = metadata.File.from_file_object(self.input_file)
             result["inputfilename"] = input_file.file_path
             result["md5"] = input_file.md5
             result["sha1"] = input_file.sha1
@@ -532,11 +532,21 @@ class Report:
         """
         if split:
             return json.dumps(
-                [json.loads(report_model.as_json())
-                 for report_model in self._report_models]
+                [report_model.as_json_dict() for report_model in self._report_models]
             )
         else:
             return self._report_model.as_json()
+
+    def as_json_dict(self, split=False):
+        """
+        Jsonifies the element and then loads it back as a dictionary.
+        NOTE: This is different from .as_dict() because things like bytes
+        will be converted to a base64 encoded string.
+        """
+        if split:
+            return [report_model.as_json_dict() for report_model in self._report_models]
+        else:
+            return self._report_model.as_json_dict()
 
     def as_json_legacy(self, include_filename=False) -> str:
         """
@@ -603,7 +613,7 @@ class Report:
         """
         return str(RenderTree(self.input_file))
 
-    def _get_metadata_element(self, field_name: str) -> Union[Element, Callable]:
+    def _get_metadata_element(self, field_name: str) -> Union[Metadata, Callable]:
         """
         Returns an appropriate metadata.Element or helper function based on given legacy field name.
 
@@ -648,7 +658,7 @@ class Report:
 
         return value
 
-    def add(self, element: Element):
+    def add(self, element: Metadata):
         """
         Report a metadata item.
         Supports both the new and old way of reporting.
@@ -677,7 +687,7 @@ class Report:
         if file_object not in self._history:
             self._history.append(file_object)
 
-    def add_metadata(self, field_name_or_element: Union[str, Element], value=None):
+    def add_metadata(self, field_name_or_element: Union[str, Metadata], value=None):
         """
         Report a metadata item.
         Supports both the new and old way of reporting.
@@ -690,7 +700,7 @@ class Report:
             ".add_metadata() is deprecated in favor of .add() which only supports the new metadata elements.",
             DeprecationWarning
         )
-        if isinstance(field_name_or_element, metadata.Element):
+        if isinstance(field_name_or_element, metadata.Metadata):
             self.add(field_name_or_element)
             return
 
@@ -768,7 +778,7 @@ class Report:
 
         self.finalized = True
 
-    def __iter__(self) -> Iterable[Element]:
+    def __iter__(self) -> Iterable[Metadata]:
         """
         Iterates the added metadata elements found within the Report.
         """
@@ -836,7 +846,7 @@ class Report:
         """
         return list(self.iter(*element_type, source=source))
 
-    def iter_tagged(self, *tags) -> Iterable[Element]:
+    def iter_tagged(self, *tags) -> Iterable[Metadata]:
         """
         Iterates metadata elements with specific tags.
 
@@ -852,7 +862,7 @@ class Report:
                 if any(tag in element.tags for tag in tags):
                     yield element
 
-    def get_tagged(self, *tags) -> List[Element]:
+    def get_tagged(self, *tags) -> List[Metadata]:
         """
         Same as .iter_tagged(), but wraps the results in a list for you.
         """

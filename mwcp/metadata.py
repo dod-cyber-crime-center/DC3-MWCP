@@ -6,6 +6,7 @@ Schema for reportable metadata.
 import base64
 import datetime
 import hashlib
+import inspect
 import json
 import logging
 import pathlib
@@ -19,6 +20,7 @@ from typing import Any, Union, List, Optional, TypeVar, Type, Set, Iterable
 
 import attr
 import cattr
+import jsonschema_extractor
 
 import mwcp
 from mwcp.exceptions import ValidationError
@@ -141,14 +143,37 @@ def _flatten_dict(dict_: dict) -> dict:
     return new_dict
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
+# Global configuration for all elements.
+config = dict(auto_attribs=True, field_transformer=_auto_convert)
+
+
+@attr.s(**config)
 class Element:
     """
-    Represents a collection of Elements that together represent an idea.
-
+    Base class for handling reporting elements.
     These should be created using dataclass for convenience.
     """
-    tags: Set[str] = attr.ib(init=False, factory=set)
+    tags: List[str] = attr.ib(init=False, factory=list)
+
+    _registry = {}
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Registers all subclasses of Element.
+        """
+        typ = cls._type()
+        if not typ.startswith("_") and typ != "metadata":
+            if typ in cls._registry:
+                raise ValueError(f"Metadata element of type {typ} already exists.")
+            cls._registry[typ] = cls
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def _all_subclasses(cls):
+        """
+        Returns all registered subclasses of the class, sorted by type.
+        """
+        return [subclass for _, subclass in sorted(cls._registry.items()) if issubclass(subclass, cls) and subclass != cls]
 
     @classmethod
     def _type(cls):
@@ -159,6 +184,76 @@ class Element:
     @classmethod
     def fields(cls):
         return attr.fields(cls)
+
+    @classmethod
+    def _schema(cls, extractor):
+        """
+        Generates schema for this particular Element class.
+        """
+        # First get the short description by looking for the first complete sentence.
+        description = []
+        for line in inspect.getdoc(cls).splitlines():
+            # Stop when we hit an empty line or see variable statements.
+            if not line or line.startswith(":"):
+                break
+            description.append(line.strip())
+        description = " ".join(description)
+
+        schema = {
+            "title": cls.__name__.strip("_"),
+            "description": description,
+            "type": "object",
+            "properties": {
+                # Include the "type" property that gets added dynamically during serialization.
+                "type": {
+                    "const": cls._type(),
+                }
+            },
+            "additionalProperties": False,
+            "required": ["type"],
+        }
+        for field in cls.fields():
+            is_required = field.default is not None
+
+            # Allow customization within attr metadata field for corner cases.
+            if "jsonschema" in field.metadata:
+                sub_schema = field.metadata["jsonschema"]
+            else:
+                sub_schema = extractor.extract(field.type)
+
+            # Anything not required is nullable.
+            if not is_required:
+                if list(sub_schema.keys()) == ["type"]:
+                    if isinstance(sub_schema["type"], list):
+                        sub_schema["type"].append("null")
+                    else:
+                        sub_schema["type"] = [sub_schema["type"], "null"]
+                elif list(sub_schema.keys()) == ["anyOf"]:
+                    sub_schema["anyOf"].append({"type": "null"})
+                else:
+                    sub_schema = {"anyof": [sub_schema, {"type": "null"}]}
+
+            schema["properties"][field.name] = sub_schema
+
+            if is_required:
+                schema["required"].append(field.name)
+
+        return schema
+
+    @classmethod
+    def schema(cls) -> dict:
+        """
+        Generates a JSONSchema from the given element.
+        :return: Dictionary representing the schema.
+        """
+        typing_extractor = jsonschema_extractor.TypingExtractor()
+        typing_extractor.register(Element, lambda extractor, typ: typ._schema(extractor))
+        typing_extractor.register(bytes, lambda extractor, typ: {
+            "type": "string",
+            "contentEncoding": "base64",
+        })
+        extractor = jsonschema_extractor.SchemaExtractorSet([typing_extractor])
+        return extractor.extract(cls)
 
     @classmethod
     def from_dict(cls, obj: dict) -> "Element":
@@ -189,8 +284,19 @@ class Element:
                 # Convert sets to list
                 if isinstance(o, set):
                     return sorted(o)
+                # Convert UUID
+                if isinstance(o, uuid.UUID):
+                    return str(o)
                 return super().default(o)
         return json.dumps(self, cls=_JSONEncoder, indent=4)
+
+    def as_json_dict(self) -> dict:
+        """
+        Jsonifies the element and then loads it back as a dictionary.
+        NOTE: This is different from .as_dict() because things like bytes
+        will be converted to a base64 encoded string.
+        """
+        return json.loads(self.as_json())
 
     def validate(self):
         attr.validate(self)
@@ -220,7 +326,10 @@ class Element:
         :returns: self to make this function chainable.
         """
         for tag in tags:
-            self.tags.add(tag)
+            if tag not in self.tags:
+                self.tags.append(tag)
+        # Ensure we keep the tags sorted.
+        self.tags = sorted(self.tags)
         return self
 
 
@@ -234,10 +343,7 @@ def _structure_hook(value: dict, klass):
     value = dict(value)  # create copy
 
     # Determine class to use based on "type" field.
-    type = value.pop("type")
-    for _klass in Element.__subclasses__():
-        if _klass._type() == type:
-            klass = _klass
+    klass = Element._registry[value.pop("type")]
 
     # Remove None values from dictionary, since that seems to be causing
     # cattr (or our autocasting) to convert them to the string "None"
@@ -248,7 +354,7 @@ def _structure_hook(value: dict, klass):
     # then re-add them.
     tags = value.pop("tags")
     ret = cattr.structure_attrs_fromdict(value, klass)
-    ret.tags = set(tags)
+    ret.tags = tags
     return ret
 
 
@@ -266,8 +372,27 @@ def _unstructure_hook(obj):
 cattr.register_unstructure_hook(Element, _unstructure_hook)
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Path(Element):
+class Metadata(Element):
+    """
+    Represents a collection of reportable metadata attributes that together represent an idea.
+
+    This class can be subclassed to create your own reportable metadata element.
+    """
+
+    @classmethod
+    def _schema(cls, extractor):
+        # If we are typing the base Metadata class, this means we want to represent
+        # all subclasses instead.
+        if cls == Metadata:
+            return {"anyOf": [
+                extractor.extract(subclass) for subclass in Metadata._all_subclasses()
+            ]}
+        else:
+            return super()._schema(extractor)
+
+
+@attr.s(**config)
+class Path(Metadata):
     """
     Filesystem path used by malware. may include both a directory and filename.
 
@@ -303,8 +428,8 @@ def FileName(name: str) -> Path:
     return Path(name=name, is_dir=False)
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Alphabet(Element):
+@attr.s(**config)
+class Alphabet(Metadata):
     """
     Generic baseXX alphabet
     """
@@ -356,8 +481,8 @@ def Base64Alphabet(alphabet: str) -> Alphabet:
     return Alphabet(alphabet=alphabet, base=64)
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Credential(Element):
+@attr.s(**config)
+class Credential(Metadata):
     """
     Collection of username and password used as credentials.
 
@@ -376,8 +501,8 @@ def Username(username: str) -> Credential:
     return Credential(username=username)
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Socket(Element):
+@attr.s(**config)
+class Socket(Metadata):
     """
     A collection of address, port, and protocol used together to make a socket
     connection.
@@ -385,18 +510,28 @@ class Socket(Element):
     e.g.
         Socket(address="bad.com", port=21, protocol="tcp")
     """
+    _VALID_PROTOCOLS = {"tcp", "udp", "icmp"}
+
     address: str = None  # ip address or domain  # TODO: should this be split up?
-    port: int = attr.ib(default=None)
+    port: int = attr.ib(
+        default=None,
+        metadata={"jsonschema": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+        }}
+    )
     network_protocol: str = attr.ib(
         default=None,
-        converter=lambda v: str(v).lower() if v is not None else v
+        converter=lambda v: str(v).lower() if v is not None else v,
+        metadata={"jsonschema": {
+            "enum": sorted(_VALID_PROTOCOLS),
+        }}
     )
     # Determines if socket is for a C2 server.
     #   True == known C2, False == known not a C2, None == unknown
     c2: bool = None
     listen: bool = None
-
-    _VALID_PROTOCOLS = {"tcp", "udp", "icmp"}
 
     def __attrs_post_init__(self):
         # Add the _from_port attribute, used internally for backwards compatibility support.
@@ -456,8 +591,8 @@ def C2Address(address: str) -> Socket:
     return Socket(address=address, c2=True)
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class URL(Element):
+@attr.s(**config)
+class URL(Metadata):
     """
     RFC 3986 URL
 
@@ -475,7 +610,7 @@ class URL(Element):
     credential: Credential = None
 
     _URL_RE = re.compile(
-        r"(?P<app_protocol>[a-z\.\-+]{1,40})://(?P<address>\[?[^/]+\]?)"
+        r"((?P<app_protocol>[a-z\.\-+]{1,40})://)?(?P<address>\[?[^/]+\]?)"
         r"(?P<path>/[^?]+)?(?P<query>.*)",
         flags=re.IGNORECASE
     )
@@ -515,7 +650,7 @@ class URL(Element):
                 port = None
 
         if not self.socket:
-            self.socket = Socket(address=address, port=port, network_protocol="tcp")
+            self.socket = Socket(address=address, port=port)
         if not self.path:
             self.path = path
         if not self.query:
@@ -649,15 +784,18 @@ def FTP(
     return url_object
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class EmailAddress(Element):
+@attr.s(**config)
+class EmailAddress(Metadata):
     """
     Email address
 
     e.g.
         EmailAddress("email@bad.com")
     """
-    value: str = attr.ib()
+    value: str = attr.ib(metadata={"jsonschema": {
+        "type": "string",
+        "format": "email",
+    }})
 
     @value.validator
     def _validate(self, attribute, value):
@@ -665,8 +803,8 @@ class EmailAddress(Element):
             raise ValidationError(f"Email address should at least have a '@' character.")
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Event(Element):
+@attr.s(**config)
+class Event(Metadata):
     """
     Event object
 
@@ -676,66 +814,60 @@ class Event(Element):
     value: str
 
 
+def _uuid_convert(value):
+    """
+    Converts value into a uuid.UUID value (if not already).
+    This is necessary because uuid.UUID can't handle being constructed twice.
+    """
+    try:
+        if isinstance(value, str):
+            return uuid.UUID(value)
+        elif isinstance(value, bytes):
+            return uuid.UUID(bytes=value)
+        elif isinstance(value, int):
+            return uuid.UUID(int=value)
+        elif isinstance(value, uuid.UUID):
+            return value
+        else:
+            raise ValidationError(f"Invalid UUID: {value}")
+    except Exception as e:
+        raise ValidationError(f"Invalid UUID: {e}")
+
 # NOTE: We are not typing this as uuid.UUID because that has caused issues with serialization.
 #   Validation occurs in the below function.
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class _UUID(Element):
+@attr.s(**config)
+class UUID(Metadata):
     """
     A 128-bit number used to identify information, also referred to as a GUID.
 
     e.g.
-        _UUID("654e5cff-817c-4e3d-8b01-47a6f45ae09a")
+        UUID("654e5cff-817c-4e3d-8b01-47a6f45ae09a")
     """
-    value: str
-
-    @classmethod
-    def _type(cls):
-        return "uuid"
-
-
-def UUID(value: Union[str, bytes, int, uuid.UUID]) -> _UUID:
-    """
-    Constructor for UUID metadata element.
-    If user provides a uuid.UUID object it is converted into a string.
-    This is necessary because uuid.UUID can't handle being constructed twice.
-    :param value:
-    :return:
-    """
-    # TODO: Move this validation/converter into the metadata element
-    #   when we no longer need to support UUIDLegacy.
-    try:
-        if isinstance(value, str):
-            value = uuid.UUID(value)
-        elif isinstance(value, bytes):
-            value = uuid.UUID(bytes=value)
-        elif isinstance(value, int):
-            value = uuid.UUID(int=value)
-    except Exception as e:
-        raise ValidationError(f"Invalid UUID: {e}")
-
-    return _UUID(str(value))
-
-
-def UUIDLegacy(value: str) -> _UUID:
-    """
-    Legacy version of UUID that doesn't validate or convert the uuid in order to ensure
-    the original raw strings is displayed.
-    """
-    warnings.warn(
-        "UUIDLegacy is only for backwards compatibility support. Please use UUID instead.",
-        DeprecationWarning
-    )
-    return _UUID(value)
+    value: uuid.UUID = attr.ib(converter=_uuid_convert, metadata={"jsonschema": {
+        "type": "string",
+        "format": "uuid",
+    }})
 
 
 GUID = UUID  # alias
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class InjectionProcess(Element):
+@attr.s(**config)
+class UUIDLegacy(Metadata):
+    """
+    Legacy version of UUID that doesn't validate or convert the uuid in order to ensure
+    the original raw strings is displayed.
+
+    WARNING: This should not be used in new code. Use UUID instead.
+    """
+    value: str
+
+
+@attr.s(**config)
+class InjectionProcess(Metadata):
     """
     Process into which malware is injected.
-    Usually this is a process name but it make take other forms such as a filename of the executable.
+    Usually this is a process name but it may take other forms such as a filename of the executable.
 
     e.g.
         InjectionProcess("iexplore")
@@ -744,8 +876,8 @@ class InjectionProcess(Element):
     value: str
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Interval(Element):
+@attr.s(**config)
+class Interval(Metadata):
     """
     Time malware waits between beacons or other activity given in seconds.
 
@@ -756,30 +888,20 @@ class Interval(Element):
     value: float
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class _IntervalLegacy(Element):
+@attr.s(**config)
+class IntervalLegacy(Metadata):
     """
     Legacy version of interval that uses a string type instead of float in order to preserve original
     display of the interval.
     This was done in order to ensure the decimal is either included or not depending on what the user provides.
+
+    WARNING: This should not be used in new code!
     """
     value: str
 
-    @classmethod
-    def _type(cls):
-        return "interval"
 
-
-def IntervalLegacy(value: str) -> _IntervalLegacy:
-    warnings.warn(
-        "IntervalLegacy is only for backwards compatibility support. Please use Interval instead.",
-        DeprecationWarning
-    )
-    return _IntervalLegacy(value)
-
-
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class EncryptionKey(Element):
+@attr.s(**config)
+class EncryptionKey(Metadata):
     """
     Encryption, encoding, or obfuscation key.
 
@@ -817,10 +939,10 @@ class EncryptionKey(Element):
             # Test for encoding by determining which encoding creates pure ascii.
             for test_encoding in ["utf-16", "ascii", "utf-8"]:
                 try:
-                    self.key.decode(test_encoding).encode("ascii")
-                    encoding = test_encoding
-                    break
-                except (UnicodeDecodeError, UnicodeEncodeError):
+                    if self.key.decode(test_encoding).isprintable():
+                        encoding = test_encoding
+                        break
+                except UnicodeDecodeError:
                     continue
         if encoding:
             key += f' ("{self.key.decode(encoding)}")'
@@ -846,8 +968,8 @@ def EncryptionKeyLegacy(key: str) -> EncryptionKey:
     return encryption_key
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class DecodedString(Element):
+@attr.s(**config)
+class DecodedString(Metadata):
     """
     Extracted decrypted or decoded string.
 
@@ -859,8 +981,8 @@ class DecodedString(Element):
     encryption_key: EncryptionKey = None
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class MissionID(Element):
+@attr.s(**config)
+class MissionID(Metadata):
     """
     Attacker specified identifier encoded in malware,
     usually reflected in beacons and often related to target or time of attack.
@@ -872,8 +994,8 @@ class MissionID(Element):
     value: str
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Mutex(Element):
+@attr.s(**config)
+class Mutex(Metadata):
     """
     Mutex name used to prevent multiple executions of malware
 
@@ -884,21 +1006,21 @@ class Mutex(Element):
     value: str
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Other(Element):
+@attr.s(**config)
+class Other(Metadata):
     """
-    All items other that don't fit within the existing declared schema.
-    Items may also be duplicated here to provide malware specific content.
+    All other items that don't fit within the existing declared schema.
 
     e.g.
         Other(key="keylogger", value="True")
     """
     key: str
     value: Union[str, bytes]
+    data_format = "string" or "bytes" or "unsignedInt"
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Pipe(Element):
+@attr.s(**config)
+class Pipe(Metadata):
     r"""
     Named, one-way or duplex pipe for communication between the pipe server and one or more pipe clients.
 
@@ -921,8 +1043,8 @@ class RegistryDataType(IntEnum):
     REG_QWORD = 11
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Registry(Element):
+@attr.s(**config)
+class Registry(Metadata):
     """
     Registry key and value.
 
@@ -935,7 +1057,7 @@ class Registry(Element):
     path: str = None
     key: str = None
     value: str = None  # registry key, value name, combination of the two
-    data: Any = None
+    data: Union[bytes, str, int] = None
     # data_type: RegistryDataType = None  # TODO
 
     def __attrs_post_init__(self):
@@ -988,8 +1110,8 @@ def _int_dump(value: int) -> str:
     return hex_dump
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class RSAPrivateKey(Element):
+@attr.s(**config)
+class RSAPrivateKey(Metadata):
     """
     RSA private key containing: public exponent, modulus, private exponent (d),
         p, q, d mod (p-1), d mod (q-1), q inv mod p
@@ -1029,8 +1151,8 @@ class RSAPrivateKey(Element):
         return {"tags": self.tags, "value": value or None}
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class RSAPublicKey(Element):
+@attr.s(**config)
+class RSAPublicKey(Metadata):
     """
     RSA public key containing: public_exponent, modulus
     """
@@ -1056,8 +1178,8 @@ class RSAPublicKey(Element):
         return {"tags": self.tags, "value": value or None}
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Service(Element):
+@attr.s(**config)
+class Service(Metadata):
     r"""
     Windows service information
 
@@ -1136,15 +1258,18 @@ def ServiceImage(image: str) -> Service:
     return Service(image=image)
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class SSLCertSHA1(Element):
+@attr.s(**config)
+class SSLCertSHA1(Metadata):
     """
     SSL Certificate SHA-1 Hash
 
     e.g.
         SSLCertSHA1("c29d79df9b5416fd416c31e57cd525dfc23a8f66")
     """
-    value: str = attr.ib()
+    value: str = attr.ib(metadata={"jsonschema": {
+        "type": "string",
+        "pattern": "^[0-9a-fA-F]{40}$",
+    }})
 
     _SHA1_RE = re.compile("[0-9a-fA-F]{40}")
 
@@ -1154,8 +1279,8 @@ class SSLCertSHA1(Element):
             raise ValidationError(f"Invalid SHA1 hash found: {value!r}")
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class UserAgent(Element):
+@attr.s(**config)
+class UserAgent(Metadata):
     """
     Software identifier used by malware
 
@@ -1165,8 +1290,8 @@ class UserAgent(Element):
     value: str
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class Version(Element):
+@attr.s(**config)
+class Version(Metadata):
     """
     The version of the malware.
     To the degree possible this should be based directly on artifacts from the malware.
@@ -1178,11 +1303,10 @@ class Version(Element):
     value: str
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class _File(Element):
+@attr.s(**config)
+class File(Metadata):
     """
-    Generic interface for describing a file.
-    NOTE: This should not be used directly. Please use either InputFile or ResidualFile.
+    The original input malware file that triggered parsing or extracted file.
 
     :var name: Name of the file.
     :var description: Description of the file.
@@ -1200,7 +1324,10 @@ class _File(Element):
     sha1: str = attr.ib(default=None)
     sha256: str = attr.ib(default=None)
     architecture: str = None
-    compile_time: str = None  # TODO: make this a datetime type?
+    compile_time: str = attr.ib(default=None, metadata={"jsonschema": {
+        "type": "string",
+        "format": "date-time",
+    }})
     file_path: str = None
     data: bytes = None
 
@@ -1231,22 +1358,12 @@ class _File(Element):
         ).add_tag(*file_object.tags)
 
 
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class InputFile(_File):
-    """
-    Original input malware file that triggered parsing.
-    """
+# Helper aliases
+InputFile = File  # Original input malware file that triggered parsing.
+ResidualFile = File  # Relevant or related file created during parsing of malware.
 
 
-# TODO: InputFile and ResidualFile should be the same element type.
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
-class ResidualFile(_File):
-    """
-    Relevant or related file created during parsing of malware.
-    """
-
-
-@attr.s(auto_attribs=True, field_transformer=_auto_convert)
+@attr.s(**config)
 class Report(Element):
     """
     Defines the report of all metadata elements.
@@ -1259,8 +1376,8 @@ class Report(Element):
     :var metadata: List of extracted metadata elements.
     """
     mwcp_version: str = attr.ib(init=False, factory=lambda: mwcp.__version__)
-    input_file: InputFile = None
+    input_file: File = None
     parser: str = None
     errors: List[str] = attr.ib(factory=list)
     logs: List[str] = attr.ib(factory=list)
-    metadata: List[Element] = attr.ib(factory=list)
+    metadata: List[Metadata] = attr.ib(factory=list)

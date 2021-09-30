@@ -357,9 +357,9 @@ def parse(parser, input, format, split, output_dir, output_files, cleanup, prefi
                 results = []
                 for report in reports:
                     if split:
-                        results.extend(json.loads(report.as_json(split=True)))
+                        results.extend(report.as_json_dict(split=True))
                     else:
-                        results.append(json.loads(report.as_json()))
+                        results.append(report.as_json_dict())
             print(json.dumps(results, indent=4))
 
         elif format == "csv":
@@ -699,6 +699,16 @@ def test(
 
             logger.debug(f"Running pytest with arguments: {pytest_args}")
             sys.exit(pytest.main(pytest_args))
+
+
+@main.command()
+def schema():
+    """
+    Displays JSON Schema for a single report in JSON.
+    NOTE: This is the schema for a single report. Depending on how you use MWCP,
+    you may get a list of these reports instead.
+    """
+    print(json.dumps(mwcp.schema(), indent=4))
 
 
 if __name__ == "__main__":
