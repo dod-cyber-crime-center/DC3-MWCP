@@ -2,12 +2,12 @@
 All notable changes to this project will be documented in this file.
 
 
-## [Unreleased]
+## [3.4.0] - 2021-10-06
 
 ### Added
 - Added a formal schema for (non-legacy) JSON report output which can be found in [schema.json](/mwcp/config/schema.json)
 - Added `mwcp schema` CLI command to generate the current schema.
-- Added documentation on how to create your own custom reportable metadata element.
+- Added [documentation](/README.md#schema) on how to create your own custom reportable metadata element.
 
 ### Changed
 - Updated server dependencies.
@@ -405,7 +405,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.2...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.4.0...HEAD
+[3.4.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.2...3.4.0
 [3.3.2]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.1...3.3.2
 [3.3.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.0...3.3.1
 [3.3.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.2.1...3.3.0

@@ -211,7 +211,7 @@ class MarkupWriter(ReportWriter):
             table_name = _camel_case_to_title(element_class.__name__)
             # Remove the " Legacy" part for legacy metadata fields.
             # NOTE: This can potentially lead to two different tables with the same header.
-            #   But that would only happen if we are running a parser with a mixture of old an new.
+            #   But that would only happen if we are running a parser with a mixture of old and new.
             #   Developer should be proactive in completely updating the parsers in a set if they see this.
             if table_name.endswith(" Legacy"):
                 table_name = table_name[:-len(" Legacy")]

@@ -392,7 +392,7 @@ It is possible to extend the schema to include your own custom metadata elements
 This can be accomplished by creating a class that inherits from `mwcp.metadata.Metadata`. 
 This class must be decorated with [attr](https://attrs.org) using the custom configuration `mwcp.metadata.config`. 
 
-*NOTE: The class name must be unique from other metdata elements.*
+*NOTE: The class name must be unique from other metadata elements.*
 
 ```python
 from typing import List
