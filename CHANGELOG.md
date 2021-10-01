@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Fixed `EncryptionKey` report formatting to display text representation when key is printable (not just ascii).
+- The `--testcase-dir` flag when running `mwcp test` in non-legacy mode will now handle any directory structure.
 
 
 ## [3.3.2] - 2021-07-19
