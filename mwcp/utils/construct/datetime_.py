@@ -35,15 +35,27 @@ DateTimeDateData = _DateTimeDateDataAdapter(Int64sl)
 
 
 # TODO: Implement _encode
-class _EpochTimeAdapter(Adapter):
+class EpochTimeAdapter(Adapter):
     r"""
     Adapter to convert time_t, EpochTime, to an isoformat
 
-    >>> _EpochTimeAdapter(Int32ul).parse('\xff\x93\x37\x57')
+    >>> EpochTimeAdapter(construct.Int32ul, tz=datetime.timezone.utc).parse(b'\xff\x93\x37\x57')
+    '2016-05-14T21:09:19+00:00'
+    >>> EpochTimeAdapter(construct.Int32ul).parse(b'\xff\x93\x37\x57')
     '2016-05-14T17:09:19'
     """
-    def _decode(self, obj, context, path):
-        return datetime.datetime.fromtimestamp(obj).isoformat()
+    def __init__(self, subcon, tz=None):
+        """
+        :param tz: Optional timezone object, default is localtime
+        :param subcon: subcon to parse EpochTime.
+        """
+        super(EpochTimeAdapter, self).__init__(subcon)
+        self._tz = tz
 
-# Hide the adapter
-EpochTime = _EpochTimeAdapter(Int32ul)
+    def _decode(self, obj, context, path):
+        return datetime.datetime.fromtimestamp(obj, tz=self._tz).isoformat()
+
+
+# Add common helpers
+EpochTime = EpochTimeAdapter(Int32ul)
+EpochTimeUTC = EpochTimeAdapter(construct.Int32ul, tz=datetime.timezone.utc)
