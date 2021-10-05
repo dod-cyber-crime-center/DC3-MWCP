@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
-- Enable construct Adapters for `EpochTime`, `SystemTime`, and `FileTime` to accept a timezone, and add default helpers for UTC
+- Enable construct Adapters for `EpochTime`, `SystemTime`, and `FileTime` to accept a timezone, and add default helpers for UTC. (@ddash-ct)
 
 
 ## [3.3.2] - 2021-07-19
