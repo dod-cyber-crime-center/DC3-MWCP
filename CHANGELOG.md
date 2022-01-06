@@ -9,7 +9,7 @@ command that would be run given the other options provided in the command line.
 
 ### Changed
 - The `--no-legacy` flag is now set by default for `mwcp parse` and `mwcp test` commands. 
-  - **If you still need to use legacy testing or parse results, you must now include the `--legacy` flag.**
+  - **If you still need to use legacy testing or parse results, you must now explicitly include the `--legacy` flag.**
   - *This does not affect the web service tool. For now, legacy mode is still set as default.*
 - Updated the `Other` metadata element to accept string, bytes, integers, or booleans as values.
   - Also, added new field `value_format` to show the data type of the value. This helps to avoid any ambiguities in json results.
@@ -19,7 +19,7 @@ command that would be run given the other options provided in the command line.
 - Fixed UnicodeDecodeError that can occur when printing a report with nested metadata elements. ([\#31](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/31))
 - Include missing "Mode" column from EncryptionKey report tables.
 - Fixed rendering for values with line breaks in the HTML report output.
-- Removed obfuscated powershell examples from poshdeob causing a VT hit.
+- Removed obfuscated powershell examples from poshdeob causing a VT hit. ([\#32](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/32))
 
 
 ## [3.4.0] - 2021-10-06

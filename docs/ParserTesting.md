@@ -142,6 +142,15 @@ The `--malware-repo` and `--testcase-dir` options can also be used directly with
 > pytest --pyargs mwcp -m parsers --malware-repo="C:/malware" --testcase-dir="C:/mwcp_parser_tests" 
 ```
 
+Finally, if you would like to see what pytest command would be run for a given `mwcp test` command,
+we can use the `-c`/`--command` flag.
+This will not run any tests, but rather just output the `pytest` command.
+
+```console
+> mwcp test foo --command
+pytest 'C:\Python310\Lib\site-packages\mwcp\tests\test_parsers.py' --disable-pytest-warnings --durations 10 -vv -k foo -n auto
+```
+
 
 ## Creating or Adding test cases
 
