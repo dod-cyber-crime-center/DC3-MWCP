@@ -161,11 +161,19 @@ class MarkupWriter(ReportWriter):
 
     def _write_table(self, elements: List[metadata.Element]):
         tabular_data = []
+        includes_tags = False
         for element in elements:
-            entry = element.as_formatted_dict()
+            entry = element.as_formatted_dict(flat=True)
 
-            # Strip None and "" values.
-            entry = {key: value for key, value in entry.items() if value not in (None, "", b"")}
+            # Strip empty values (but keep tags in order to ensure it is first)
+            entry = {
+                key: value
+                for key, value in entry.items()
+                if (value or value == 0 or key == "tags")
+            }
+
+            if entry["tags"]:
+                includes_tags = True
 
             # Convert key names into more friendly titles.
             for key in list(entry.keys()):
@@ -173,7 +181,12 @@ class MarkupWriter(ReportWriter):
 
             tabular_data.append(entry)
 
-        self.table(tabular_data, headers="keys")
+        # Decide if we should remove tags if no entries have tags.
+        if not includes_tags:
+            for entry in tabular_data:
+                del entry["Tags"]
+
+        self.table(tabular_data)
 
     def write(self, report: metadata.Report):
         """
@@ -194,8 +207,9 @@ class MarkupWriter(ReportWriter):
                 ["SHA1", input_file.sha1],
                 ["SHA256", input_file.sha256],
                 ["Compile Time", input_file.compile_time],
-                ["Tags", ", ".join(input_file.tags)]
             ]
+            if input_file.tags:
+                tabular_data.append(["Tags", ", ".join(input_file.tags)])
             self.table(tabular_data, headers=["Field", "Value"])
 
         # Consolidate metadata elements by their type.
@@ -228,14 +242,20 @@ class MarkupWriter(ReportWriter):
         residual_files = metadata_dict.get(metadata.ResidualFile, [])
         if residual_files:
             self.h2("Residual Files")
-            tabular_data = [
-                [", ".join(residual_file.tags),
-                 residual_file.name, residual_file.description, residual_file.md5,
-                 residual_file.architecture, residual_file.compile_time]
-                 for residual_file in residual_files
-            ]
-            self.table(tabular_data, headers=[
-                "Tags", "Filename", "Description", "MD5", "Arch", "Compile Time"])
+            include_tags = any(residual_file.tags for residual_file in residual_files)
+            tabular_data = []
+            for residual_file in residual_files:
+                row = [
+                    residual_file.name, residual_file.description, residual_file.md5,
+                    residual_file.architecture, residual_file.compile_time
+                ]
+                if include_tags:
+                    row = [", ".join(residual_file.tags)] + row
+                tabular_data.append(row)
+            headers = ["Filename", "Description", "MD5", "Arch", "Compile Time"]
+            if include_tags:
+                headers = ["Tags"] + headers
+            self.table(tabular_data, headers=headers)
 
         # Finally write out log messages.
         if report.errors:
@@ -290,7 +310,18 @@ class MarkdownWriter(MarkupWriter):
 
 class HTMLWriter(MarkupWriter):
     name = "html"
-    _tablefmt = "html"
+    # NOTE: Using unsafehtml format so we can escape the values ourselves.
+    _tablefmt = "unsafehtml"
+
+    def _format_cell_value(self, value):
+        value = super()._format_cell_value(value)
+        if isinstance(value, str):
+            value = html.escape(value)
+            # If we have newlines in the value, wrap it in <pre>
+            # in order to preserve whitespace.
+            if "\n" in value:
+                value = f"<pre>{value}</pre>"
+        return value
 
     def h1(self, text: str):
         self._stream.write(f"<h1>{html.escape(text)}</h1>\n")

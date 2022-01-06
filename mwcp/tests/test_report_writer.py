@@ -1,4 +1,3 @@
-import pathlib
 
 import pytest
 
@@ -10,11 +9,15 @@ from mwcp import metadata
     ("simple", "report.txt"),
     ("html", "report.html"),
 ])
-def test_basic(report, datadir, text_format, report_name):
+def test_basic(datadir, report, metadata_items, text_format, report_name):
+    """
+    Tests each metadata element to ensure they are presented
+    nicely in a report.
+    """
     with report:
         report.input_file.description = "SuperMalware Implant"
-        report.add(metadata.Interval(3))
-        report.add(metadata.EncryptionKey(b"hello", algorithm="rc4"))
+        for item in metadata_items:
+            report.add(item)
 
     actual = report.as_text(text_format)
     print(actual)
@@ -27,7 +30,7 @@ def test_basic(report, datadir, text_format, report_name):
     ("simple", "report_wordwrap.txt"),
     ("html", "report_wordwrap.html"),
 ])
-def test_wordwrap(report, datadir, text_format, report_name):
+def test_wordwrap(datadir, report, text_format, report_name):
     with report:
         report.input_file.description = "SuperMalware Implant"
         large_num = int("123"*50)  # Large number that will require word wrapping.
@@ -47,7 +50,7 @@ def test_wordwrap(report, datadir, text_format, report_name):
     ("simple", "report_foreign.txt"),
     ("html", "report_foreign.html"),
 ])
-def test_foreign_characters(report, datadir, text_format, report_name):
+def test_foreign_characters(datadir, report, text_format, report_name):
     with report:
         report.input_file.description = "SuperMalware Implant"
         report.add(metadata.Other("JAPAN", "\u30E6\u30FC\u30B6\u30FC\u5225\u30B5\u30A4\u30C8"))

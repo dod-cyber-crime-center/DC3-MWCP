@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$id": "https://raw.githubusercontent.com/Defense-Cyber-Crime-Center/DC3-MWCP/3.4.0/mwcp/config/schema.json",
+    "$id": "https://raw.githubusercontent.com/Defense-Cyber-Crime-Center/DC3-MWCP/3.5.0/mwcp/config/schema.json",
     "title": "Report",
     "description": "Defines the report of all metadata elements.",
     "type": "object",
@@ -586,7 +586,7 @@
                     },
                     {
                         "title": "Other",
-                        "description": "All other items that don't fit within the existing declared schema.",
+                        "description": "All other items that don't fit within the existing declared schema. Value type is determined by the \"value_format\" property.",
                         "type": "object",
                         "properties": {
                             "type": {
@@ -604,12 +604,26 @@
                             "value": {
                                 "anyOf": [
                                     {
-                                        "type": "string"
+                                        "type": "integer"
                                     },
                                     {
                                         "type": "string",
                                         "contentEncoding": "base64"
+                                    },
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "boolean"
                                     }
+                                ]
+                            },
+                            "value_format": {
+                                "enum": [
+                                    "string",
+                                    "bytes",
+                                    "integer",
+                                    "boolean"
                                 ]
                             }
                         },
@@ -618,7 +632,8 @@
                             "type",
                             "tags",
                             "key",
-                            "value"
+                            "value",
+                            "value_format"
                         ]
                     },
                     {

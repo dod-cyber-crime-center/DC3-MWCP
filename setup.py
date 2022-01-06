@@ -36,7 +36,7 @@ setup(
         'appdirs',
         'attrs>=20.3.0',
         'cattrs',
-        'click',
+        'click>=8.0.1',
         'construct==2.9.45',  # pin because parsers are very dependent on this.
         'future',
         'jinja2',  # For construct.html_hex()
@@ -46,7 +46,6 @@ setup(
         'pyelftools',
         'pyparsing',
         'pytest>=6.0.0',
-        'pytest-console-scripts',
         'pytest-datadir',
         'pytest-xdist',
         'pyyaml',
@@ -56,8 +55,8 @@ setup(
         'tabulate[widechars]<1.0.0',
 
         # For the server and API
-        'flask<2.0.0',
-        'pygments<3.0.0',
+        'flask',
+        'pygments',
     ],
     extras_require={
         'kordesii': ['kordesii>=2.0.0'],

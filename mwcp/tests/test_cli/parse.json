@@ -1,0 +1,71 @@
+[
+    {
+        "type": "report",
+        "tags": [],
+        "mwcp_version": "MWCP_VERSION",
+        "input_file": {
+            "type": "file",
+            "tags": [],
+            "name": "test.txt",
+            "description": "Foo",
+            "md5": "fb843efb2ffec987db12e72ca75c9ea2",
+            "sha1": "5e90c4c2be31a7a0be133b3dbb4846b0434bc2ab",
+            "sha256": "fe5af8c641835c24f3bbc237a659814b96ed64d2898fae4cb3d2c0ac5161f5e9",
+            "architecture": null,
+            "compile_time": null,
+            "file_path": "test.txt",
+            "data": null
+        },
+        "parser": "foo",
+        "errors": [],
+        "logs": [
+            "[+] File test.txt identified as Foo.",
+            "[+] size of inputfile is 23 bytes",
+            "[+] test.txt dispatched residual file: fooconfigtest.txt",
+            "[+] File fooconfigtest.txt described as example output file",
+            "[+] operating on inputfile test.txt"
+        ],
+        "metadata": [
+            {
+                "type": "url",
+                "tags": [],
+                "url": "http://127.0.0.1",
+                "socket": {
+                    "type": "socket",
+                    "tags": [],
+                    "address": "127.0.0.1",
+                    "port": null,
+                    "network_protocol": null,
+                    "c2": null,
+                    "listen": null
+                },
+                "path": null,
+                "query": "",
+                "application_protocol": "http",
+                "credential": null
+            },
+            {
+                "type": "socket",
+                "tags": [],
+                "address": "127.0.0.1",
+                "port": null,
+                "network_protocol": null,
+                "c2": null,
+                "listen": null
+            },
+            {
+                "type": "file",
+                "tags": [],
+                "name": "fooconfigtest.txt",
+                "description": "example output file",
+                "md5": "5eb63bbbe01eeed093cb22bb8f5acdc3",
+                "sha1": "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed",
+                "sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+                "architecture": null,
+                "compile_time": null,
+                "file_path": null,
+                "data": null
+            }
+        ]
+    }
+]

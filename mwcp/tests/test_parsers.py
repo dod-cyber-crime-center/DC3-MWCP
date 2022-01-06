@@ -115,6 +115,17 @@ def test_parser(md5, results_path):
             while expected_results["metadata"].count(item) > 1:
                 expected_results["metadata"].remove(item)
 
+    # Version 3.5.0 adds "value_format" to Other metadata elements
+    # and allows for new value types.
+    if expected_results_version < "3.5.0":
+        for item in actual_results["metadata"]:
+            if item["type"] == "other":
+                del item["value_format"]
+                # If we get an integer or boolean, that was meant to be automatically
+                # converted to a string.
+                if isinstance(item["value"], (int, bool)):
+                    item["value"] = str(item["value"])
+
     # endregion
 
     # The order the metadata comes in doesn't matter and shouldn't fail the test.

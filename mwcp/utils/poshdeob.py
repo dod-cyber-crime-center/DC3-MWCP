@@ -7,51 +7,9 @@ WARNING: This is a very rudimentary parser that doesn't support a lot of things.
  It makes no promises in deobfuscating all your code.
 
 Usage:
-    >>> from mwcp.utils import poshdeob
+    from mwcp.utils import poshdeob
 
-    # Deobfuscate strings
-    >>> deobfuscated, strings = poshdeob.deobfuscate('''\
-    ... ${iP} = ("{0}{2}{6}{3}{5}{4}{1}" -f'htt','8000','p://192.1','.','0:','10','68.200')
-    ... ${m} = ("{1}{0}{2}"-f'VsbG8','aG','=')
-    ... ${r} = (('@*'+'{1'+'}(){0}['+'_')-f [ChaR]124,[ChaR]36)
-    ... ${P} = ((("{1}{4}{3}{2}{0}"-f 'e{0}','HK','twar','Sof','CU:{0}'))  -f [cHAR]92)
-    ... ${S} = ((("{0}{3}{2}{4}{1}"-f'HKL','Y5a',':Y5aSoftwa','M','re'))  -CrepLAcE ([CHar]89+[CHar]53+[CHar]97),[CHar]92)
-    ... ${data} = '%1101000T1100101<1101100<1101100&1101111'-spLIT 'U'-sPlit 'T'-SPliT'%'-spLiT'j' -sPLIT'&' -SpLiT '<'
-    ... ${data2} = 'G1101000N1100101m1101100%1101100E1101111'.split( '>G{m:%~NqE')
-    ... ${secret} = $ShELlID[1]+$shelLiD[13]+'x'
-    ... ''')
-
-    >>> print(deobfuscated)
-    ${iP} = 'http://192.168.200.100:8000'
-    ${m} = 'aGVsbG8='
-    ${r} = '@*$()|[_'
-    ${P} = 'HKCU:\Software\'
-    ${S} = 'HKLM:\Software\'
-    ${data} = ('', '1101000', '1100101', '1101100', '1101100', '1101111')
-    ${data2} = ('', '1101000', '1100101', '1101100', '1101100', '1101111')
-    ${secret} = 'iex'
-    <BLANKLINE>
-
-    >>> strings
-    ['http://192.168.200.100:8000', 'aGVsbG8=', '@*$()|[_', 'HKCU:\\Software\\', 'HKLM:\\Software\\', '', '1101000', '1100101', '1101100', '1101100', '1101111', '', '1101000', '1100101', '1101100', '1101100', '1101111', 'iex']
-
-    # Embedded strings can also be processed recursively
-    >>> deobfuscated, strings = poshdeob.deobfuscate('''\
-    ... ${i`P} = ("{0}{2}{6}{3}{5}{4}{1}" -f'htt','8000','p://192.1','.','0:','10','68.200')
-    ... ${data} = "
-    ...     ${secret} = -join $ShELlID[1,13]+'x'
-    ...     ${r} = (('@*'+'{1'+'}(){0}['+'_')-f [ChaR]124,[ChaR]36)
-    ... "
-    ... ''', recursive=True)
-    >>> print(deobfuscated)
-    ${i`P} = 'http://192.168.200.100:8000'
-    ${data} = "
-        ${secret} = 'iex'
-        ${r} = '@*$()|[_'
-    "
-    <BLANKLINE>
-    >>> strings
-    ['http://192.168.200.100:8000', 'iex', '@*$()|[_']
+    deobfuscated_code, found_strings = poshdeob.debofuscate(obfuscated_code)
 """
 
 import argparse

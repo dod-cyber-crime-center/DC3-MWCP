@@ -21,8 +21,19 @@ class Config(dict):
     # Fields which contain a file or directory path.
     PATH_FIELDS = ['LOG_CONFIG_PATH', 'TESTCASE_DIR', 'MALWARE_REPO', 'PARSER_DIR', 'PARSER_CONFIG_PATH']
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # We are going to manually add the fields.json path because
+        # the fields.json file is not currently designed to be modified.
+        self['FIELDS_PATH'] = os.path.abspath(pkg_resources.resource_filename('mwcp.config', 'fields.json'))
+
     def __repr__(self):
-        return 'Config({})'.format(super(Config, self).__repr__())
+        return f"Config({super().__repr__()})"
+
+    def clear(self):
+        """Clears config (and re-adds FIELDS_PATH)"""
+        super().clear()
+        self.__init__()
 
     @property
     def user_path(self):
@@ -70,8 +81,3 @@ class Config(dict):
 
 
 _config = Config()
-
-# We are going to manually add the fields.json path because
-# the fields.json file is not currently designed to be modified.
-_config['FIELDS_PATH'] = os.path.abspath(pkg_resources.resource_filename('mwcp.config', 'fields.json'))
-

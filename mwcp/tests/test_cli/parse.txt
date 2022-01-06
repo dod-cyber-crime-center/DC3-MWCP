@@ -1,0 +1,39 @@
+----- File: test.txt -----
+Field         Value
+------------  ----------------------------------------------------------------
+Parser        foo
+File Path     test.txt
+Description   Foo
+Architecture
+MD5           fb843efb2ffec987db12e72ca75c9ea2
+SHA1          5e90c4c2be31a7a0be133b3dbb4846b0434bc2ab
+SHA256        fe5af8c641835c24f3bbc237a659814b96ed64d2898fae4cb3d2c0ac5161f5e9
+Compile Time
+
+---- Socket ----
+Address
+---------
+127.0.0.1
+
+---- URL ----
+Url               Address    Application Protocol
+----------------  ---------  ----------------------
+http://127.0.0.1  127.0.0.1  http
+
+---- Residual Files ----
+Filename           Description          MD5                               Arch    Compile Time
+-----------------  -------------------  --------------------------------  ------  --------------
+fooconfigtest.txt  example output file  5eb63bbbe01eeed093cb22bb8f5acdc3
+
+---- Logs ----
+[+] File test.txt identified as Foo.
+[+] size of inputfile is 23 bytes
+[+] test.txt dispatched residual file: fooconfigtest.txt
+[+] File fooconfigtest.txt described as example output file
+[+] operating on inputfile test.txt
+
+----- File Tree -----
+<test.txt (fb843efb2ffec987db12e72ca75c9ea2) : Foo>
+└── <fooconfigtest.txt (5eb63bbbe01eeed093cb22bb8f5acdc3) : example output file>
+
+

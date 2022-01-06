@@ -126,7 +126,7 @@ def test_output_file(tmpdir):
         ]
 
 
-def test_print_report(tmpdir):
+def test_print_report(datadir):
     """Tests the text report generation."""
     report = mwcp.Report()
     with report:
@@ -134,37 +134,8 @@ def test_print_report(tmpdir):
         report.add_metadata('other', {b'foo': 'bar', 'biz': b'baz\x00\x01'})
         report.output_file(b'data', 'file_1.exe', 'example output file')
 
-    expected_output = '''\
----- Credential ----
-Tags    Username    Password
-------  ----------  ----------
-        admin       pass
-
----- Socket ----
-Tags    Address        Port  Network Protocol
-------  -----------  ------  ------------------
-        192.168.1.1      80  tcp
-
----- URL ----
-Tags    Address        Port  Network Protocol    Username    Password
-------  -----------  ------  ------------------  ----------  ----------
-proxy   192.168.1.1      80  tcp                 admin       pass
-
----- Miscellaneous ----
-Tags    Key    Value
-------  -----  --------------
-        foo    bar
-        biz    b'baz\\x00\\x01'
-
----- Residual Files ----
-Tags    Filename    Description          MD5                               Arch    Compile Time
-------  ----------  -------------------  --------------------------------  ------  --------------
-        file_1.exe  example output file  8d777f385d3dfec8815d20f7496026dc
-
-'''
-
     print(report.as_text())
-    assert report.as_text() == expected_output
+    assert report.as_text() == (datadir / "report.txt").read_text()
 
 
 # TODO: Deal with field ordering?

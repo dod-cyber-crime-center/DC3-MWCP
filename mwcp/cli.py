@@ -7,6 +7,7 @@ Used for running and testing parsers.
 from __future__ import print_function, division
 
 import pathlib
+import shlex
 
 import pandas
 import pytest
@@ -256,7 +257,7 @@ def _write_csv(input_files, results, csv_path=None):
     show_default=True,
     help="Whether to display results by source file the metadata originates from. "
          "By default, results are only consolidated based on original input file. "
-         "(This feature is only available when --no-legacy is set.)"
+         "(This feature is not available when --legacy is set.)"
 )
 @click.option(
     "-o",
@@ -291,7 +292,7 @@ def _write_csv(input_files, results, csv_path=None):
 )
 @click.option(
     "--legacy/--no-legacy",
-    default=True,
+    default=False,
     show_default=True,
     help="Whether to present json output using legacy schema. "
          "(WARNING: This flag will eventually be removed in favor of only supporting the new schema.)"
@@ -551,7 +552,7 @@ def _run_tests(tester, silent=False, show_passed=False):
     "--delete",
     multiple=True,
     type=click.Path(exists=True, dir_okay=False),
-    help="Deletes given file from the test case. " 
+    help="Deletes given file from the test case. "
          "(Note, this does not delete the file if placed in a malware repo.)",
 )
 @click.option("-y", "--yes", is_flag=True, help="Auto confirm questions.")
@@ -570,7 +571,7 @@ def _run_tests(tester, silent=False, show_passed=False):
 @click.option("-s", "--silent", is_flag=True, help="Limit output to statement saying whether all tests passed or not.")
 @click.option(
     "--legacy/--no-legacy",
-    default=True,
+    default=False,
     show_default=True,
     help="Whether to present json output using legacy schema. "
          "(WARNING: This flag will eventually be removed in favor of only supporting the new schema.)"
@@ -579,13 +580,20 @@ def _run_tests(tester, silent=False, show_passed=False):
     "--exit-on-first/--no-exit-on-first",
     default=False,
     show_default=True,
-    help="Whether to exit on the first failed test case. (Only works with --no-legacy)"
+    help="Whether to exit on the first failed test case."
+)
+@click.option(
+    "-c", "--command",
+    is_flag=True,
+    help="Displays the pytest command that would be run, instead of actually running any test "
+         "(only applicable for running tests). "
+         "This might be helpful for scripting your own advanced testing apparatus."
 )
 # Parser to process.
 @click.argument("parser", nargs=-1, required=False)
 def test(
     testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete, yes, force, show_passed,
-    silent, legacy, exit_on_first, parser
+    silent, legacy, exit_on_first, command, parser,
 ):
     """
     Testing utility to create and execute parser test cases.
@@ -658,7 +666,7 @@ def test(
 
     # Run tests
     else:
-        if not parser and not yes:
+        if not parser and not (yes or command):
             click.confirm("PARSER argument not provided. Run tests for ALL parsers?", default=True, abort=True)
         if legacy:
             # Force ERROR level logs so we don't spam the console.
@@ -670,17 +678,20 @@ def test(
         else:
             # Due to bug in pytest, we won't get our custom command line arguments
             # registered just by using "--pyargs mwcp".
-            # Therefore, we need to explicitly change the directory to the root mwcp path.
+            # Therefore, we need to explicitly define the full path.
             # TODO: Remove this workaround when github.com/pytest-dev/pytest/issues/1596 is solved.
             if testcase_dir:
                 testcase_dir = str(pathlib.Path(testcase_dir).resolve())
             if malware_repo:
                 malware_repo = str(pathlib.Path(malware_repo).resolve())
-            os.chdir(pathlib.Path(mwcp.__file__).parent)
+
+            from mwcp.tests import test_parsers
 
             pytest_args = [
-                "--pyargs", "mwcp",
-                "-m", "parsers",
+                test_parsers.__file__,
+                # TODO: Reenable this when the above the above mentioned issue is fixed.
+                # "--pyargs", "mwcp",
+                # "-m", "parsers",
                 "--disable-pytest-warnings",
                 "--durations", "10",
             ]
@@ -698,7 +709,11 @@ def test(
                 pytest_args += ["-x"]
 
             logger.debug(f"Running pytest with arguments: {pytest_args}")
-            sys.exit(pytest.main(pytest_args))
+            if command:
+                print(" ".join(map(shlex.quote, ["pytest"] + pytest_args)))
+            else:
+                status = pytest.main(pytest_args)
+                sys.exit(status)
 
 
 @main.command()

@@ -151,7 +151,7 @@ config = dict(auto_attribs=True, field_transformer=_auto_convert)
 class Element:
     """
     Base class for handling reporting elements.
-    These should be created using dataclass for convenience.
+    These should be created using attr for convenience.
     """
     tags: List[str] = attr.ib(init=False, factory=list)
 
@@ -173,7 +173,11 @@ class Element:
         """
         Returns all registered subclasses of the class, sorted by type.
         """
-        return [subclass for _, subclass in sorted(cls._registry.items()) if issubclass(subclass, cls) and subclass != cls]
+        return [
+            subclass
+            for _, subclass in sorted(cls._registry.items())
+            if issubclass(subclass, cls) and subclass != cls
+        ]
 
     @classmethod
     def _type(cls):
@@ -265,12 +269,26 @@ class Element:
             ret = _flatten_dict(ret)
         return ret
 
-    def as_formatted_dict(self) -> dict:
+    def as_formatted_dict(self, flat=False) -> dict:
         """
         Converts metadata element into a well formatted dictionary usually
         used for presenting metadata elements as tabular data.
         """
-        return self.as_dict(flat=True)
+        ret = {}
+        for field in self.fields():
+            name = field.name
+            value = getattr(self, name)
+            # Convert bytes to a string representation.
+            if isinstance(value, bytes):
+                value = str(value)
+            # Recursively handle nested elements.
+            if isinstance(value, Element):
+                value = value.as_formatted_dict()
+            ret[name] = value
+
+        if flat:
+            ret = _flatten_dict(ret)
+        return ret
 
     def as_json(self) -> str:
         class _JSONEncoder(json.JSONEncoder):
@@ -336,7 +354,7 @@ class Element:
 # Create a hook that uses the "type" field to determine the appropriate class to use for Element.
 def _structure_hook(value: dict, klass):
     # Value may be partially converted
-    # github.com/Tinche/cattrs/issues/78
+    # github.com/python-attrs/cattrs/issues/78
     if hasattr(value, "__attrs_attrs__"):
         return value
 
@@ -347,7 +365,7 @@ def _structure_hook(value: dict, klass):
 
     # Remove None values from dictionary, since that seems to be causing
     # cattr (or our autocasting) to convert them to the string "None"
-    # TODO: Remove when github.com/Tinche/cattrs/issues/53 is solved.
+    # TODO: Remove when github.com/python-attrs/cattrs/issues/53 is solved.
     value = _strip_null(value)
 
     # cattrs doesn't support init=False values, so we need to remove tags and
@@ -927,7 +945,7 @@ class EncryptionKey(Metadata):
         # (Used for backwards compatibility support.)
         self._raw_string = False
 
-    def as_formatted_dict(self) -> dict:
+    def as_formatted_dict(self, flat=False) -> dict:
         # Convert key into hex number
         key = f"0x{self.key.hex()}"
 
@@ -951,6 +969,7 @@ class EncryptionKey(Metadata):
             "tags": self.tags,
             "key": key,
             "algorithm": self.algorithm,
+            "mode": self.mode,
             "iv": f"0x{self.iv.hex()}" if self.iv else None,
         }
 
@@ -1010,13 +1029,39 @@ class Mutex(Metadata):
 class Other(Metadata):
     """
     All other items that don't fit within the existing declared schema.
+    Value type is determined by the "value_format" property.
 
     e.g.
-        Other(key="keylogger", value="True")
+        Other("keylogger", True)
+        Other("custom_info", b"\xde\xad\xbe\xef")
+        Other("custom_info2", "hello")
     """
     key: str
-    value: Union[str, bytes]
-    data_format = "string" or "bytes" or "unsignedInt"
+    value: Union[int, bytes, str, bool]
+    value_format: str = attr.ib(
+        init=False,
+        metadata={"jsonschema": {
+            "enum": ["string", "bytes", "integer", "boolean"],
+        }}
+    )
+
+    def __attrs_post_init__(self):
+        if isinstance(self.value, bool):
+            self.value_format = "boolean"
+        elif isinstance(self.value, int):
+            self.value_format = "integer"
+        elif isinstance(self.value, str):
+            self.value_format = "string"
+        elif isinstance(self.value, bytes):
+            self.value_format = "bytes"
+        else:
+            raise ValidationError(f"Got unexpected data: {self.value}")
+
+    def as_formatted_dict(self, flat=False) -> dict:
+        ret = super().as_formatted_dict()
+        # Don't show value_format.
+        del ret["value_format"]
+        return ret
 
 
 @attr.s(**config)
@@ -1125,7 +1170,7 @@ class RSAPrivateKey(Metadata):
     d_mod_q1: int = None
     q_inv_mod_p: int = None
 
-    def as_formatted_dict(self) -> dict:
+    def as_formatted_dict(self, flat=False) -> dict:
         """
         Display of RSAPrivateKey tends to create really wide output.
         Reformatting results to equivalent output you would get with:
@@ -1159,7 +1204,7 @@ class RSAPublicKey(Metadata):
     public_exponent: int = None
     modulus: int = None
 
-    def as_formatted_dict(self) -> dict:
+    def as_formatted_dict(self, flat=False) -> dict:
         """
         Display of RSAPublicKey tends to create really wide output.
         Reformatting results to equivalent output you would get with:

@@ -1,0 +1,425 @@
+{
+    "type": "report",
+    "tags": [],
+    "mwcp_version": "MWCP_VERSION",
+    "input_file": {
+        "type": "file",
+        "tags": [],
+        "name": "input_file.bin",
+        "description": null,
+        "md5": "1e50210a0202497fb79bc38b6ade6c34",
+        "sha1": "baf34551fecb48acc3da868eb85e1b6dac9de356",
+        "sha256": "1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee",
+        "architecture": null,
+        "compile_time": null,
+        "file_path": "C:/input_file.bin",
+        "data": null
+    },
+    "parser": "FooParser",
+    "errors": [
+        "[!] Test error log"
+    ],
+    "logs": [
+        "[+] Test info log",
+        "[!] Test error log",
+        "[*] Test debug log"
+    ],
+    "metadata": [
+        {
+            "type": "path",
+            "tags": [],
+            "path": "C:\\windows\\temp\\1\\log\\keydb.txt",
+            "directory_path": "C:\\windows\\temp\\1\\log",
+            "name": "keydb.txt",
+            "is_dir": false,
+            "file_system": null
+        },
+        {
+            "type": "path",
+            "tags": [],
+            "path": "%APPDATA%\\foo",
+            "directory_path": "%APPDATA%",
+            "name": "foo",
+            "is_dir": true,
+            "file_system": null
+        },
+        {
+            "type": "path",
+            "tags": [],
+            "path": "C:\\foo\\bar.txt",
+            "directory_path": "C:\\foo",
+            "name": "bar.txt",
+            "is_dir": false,
+            "file_system": null
+        },
+        {
+            "type": "path",
+            "tags": [],
+            "path": null,
+            "directory_path": null,
+            "name": "malware.exe",
+            "is_dir": false,
+            "file_system": null
+        },
+        {
+            "type": "alphabet",
+            "tags": [],
+            "alphabet": "0123456789ABCDEF",
+            "base": 16
+        },
+        {
+            "type": "alphabet",
+            "tags": [],
+            "alphabet": "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567=",
+            "base": 32
+        },
+        {
+            "type": "alphabet",
+            "tags": [],
+            "alphabet": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
+            "base": 64
+        },
+        {
+            "type": "credential",
+            "tags": [],
+            "username": "admin",
+            "password": "123456"
+        },
+        {
+            "type": "credential",
+            "tags": [],
+            "username": "mruser",
+            "password": null
+        },
+        {
+            "type": "credential",
+            "tags": [],
+            "username": null,
+            "password": "secrets"
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": "bad.com",
+            "port": 21,
+            "network_protocol": "tcp",
+            "c2": null,
+            "listen": null
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": null,
+            "port": 1635,
+            "network_protocol": "udp",
+            "c2": null,
+            "listen": null
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": null,
+            "port": 4568,
+            "network_protocol": "tcp",
+            "c2": null,
+            "listen": true
+        },
+        {
+            "type": "url",
+            "tags": [],
+            "url": "https://10.11.10.13:443/images/baner.jpg",
+            "socket": {
+                "type": "socket",
+                "tags": [],
+                "address": "10.11.10.13",
+                "port": 443,
+                "network_protocol": null,
+                "c2": null,
+                "listen": null
+            },
+            "path": "/images/baner.jpg",
+            "query": "",
+            "application_protocol": "https",
+            "credential": null
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": "10.11.10.13",
+            "port": 443,
+            "network_protocol": null,
+            "c2": null,
+            "listen": null
+        },
+        {
+            "type": "url",
+            "tags": [
+                "proxy"
+            ],
+            "url": null,
+            "socket": {
+                "type": "socket",
+                "tags": [],
+                "address": "192.168.1.1",
+                "port": 80,
+                "network_protocol": "tcp",
+                "c2": null,
+                "listen": null
+            },
+            "path": null,
+            "query": null,
+            "application_protocol": null,
+            "credential": {
+                "type": "credential",
+                "tags": [],
+                "username": "admin",
+                "password": "pass"
+            }
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": "192.168.1.1",
+            "port": 80,
+            "network_protocol": "tcp",
+            "c2": null,
+            "listen": null
+        },
+        {
+            "type": "credential",
+            "tags": [],
+            "username": "admin",
+            "password": "pass"
+        },
+        {
+            "type": "url",
+            "tags": [],
+            "url": "ftp://badhost.com:21",
+            "socket": {
+                "type": "socket",
+                "tags": [],
+                "address": "badhost.com",
+                "port": 21,
+                "network_protocol": null,
+                "c2": null,
+                "listen": null
+            },
+            "path": null,
+            "query": "",
+            "application_protocol": "ftp",
+            "credential": {
+                "type": "credential",
+                "tags": [],
+                "username": "admin",
+                "password": "pass"
+            }
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": "badhost.com",
+            "port": 21,
+            "network_protocol": null,
+            "c2": null,
+            "listen": null
+        },
+        {
+            "type": "email_address",
+            "tags": [],
+            "value": "email@bad.com"
+        },
+        {
+            "type": "event",
+            "tags": [],
+            "value": "MicrosoftExist"
+        },
+        {
+            "type": "uuid",
+            "tags": [],
+            "value": "654e5cff-817c-4e3d-8b01-47a6f45ae09a"
+        },
+        {
+            "type": "injection_process",
+            "tags": [],
+            "value": "svchost"
+        },
+        {
+            "type": "interval",
+            "tags": [],
+            "value": 3.0
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "aGVsbG8=",
+            "algorithm": "rc4",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "/////w==",
+            "algorithm": "aes",
+            "mode": "ecb",
+            "iv": "AAAAAA=="
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "GetProcess",
+            "encryption_key": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "badstring",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "//8=",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "//8=",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "mission_id",
+            "tags": [],
+            "value": "target4"
+        },
+        {
+            "type": "mutex",
+            "tags": [],
+            "value": "ithinkimalonenow"
+        },
+        {
+            "type": "other",
+            "tags": [],
+            "key": "misc_info",
+            "value": "some miscellaneous info",
+            "value_format": "string"
+        },
+        {
+            "type": "other",
+            "tags": [],
+            "key": "random_data",
+            "value": "3q2+7w==",
+            "value_format": "bytes"
+        },
+        {
+            "type": "other",
+            "tags": [],
+            "key": "keylogger",
+            "value": true,
+            "value_format": "boolean"
+        },
+        {
+            "type": "other",
+            "tags": [
+                "tag1"
+            ],
+            "key": "misc_integer",
+            "value": 432,
+            "value_format": "integer"
+        },
+        {
+            "type": "pipe",
+            "tags": [],
+            "value": "\\.\\pipe\\namedpipe"
+        },
+        {
+            "type": "registry",
+            "tags": [],
+            "path": "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\Updater",
+            "key": "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            "value": "Updater",
+            "data": "c:\\update.exe"
+        },
+        {
+            "type": "registry",
+            "tags": [],
+            "path": null,
+            "key": "HKLM\\Foo\\Bar",
+            "value": null,
+            "data": null
+        },
+        {
+            "type": "registry",
+            "tags": [
+                "tag2"
+            ],
+            "path": null,
+            "key": null,
+            "value": "Baz",
+            "data": null
+        },
+        {
+            "type": "rsa_private_key",
+            "tags": [],
+            "public_exponent": 7,
+            "modulus": 187,
+            "private_exponent": 23,
+            "p": 17,
+            "q": 11,
+            "d_mod_p1": 7,
+            "d_mod_q1": 3,
+            "q_inv_mod_p": 14
+        },
+        {
+            "type": "rsa_public_key",
+            "tags": [],
+            "public_exponent": 7,
+            "modulus": 187
+        },
+        {
+            "type": "service",
+            "tags": [],
+            "name": "WindowsUserManagement",
+            "display_name": "Windows User Management",
+            "description": "Provides a common management to access information about windows user.",
+            "image": "%System%\\svohost.exe",
+            "dll": null
+        },
+        {
+            "type": "path",
+            "tags": [],
+            "path": "%System%\\svohost.exe",
+            "directory_path": "%System%",
+            "name": "svohost.exe",
+            "is_dir": false,
+            "file_system": null
+        },
+        {
+            "type": "user_agent",
+            "tags": [],
+            "value": "Mozilla/4.0 (compatible; MISE 6.0; Windows NT 5.2)"
+        },
+        {
+            "type": "version",
+            "tags": [],
+            "value": "3.1"
+        },
+        {
+            "type": "file",
+            "tags": [],
+            "name": "config.xml",
+            "description": "Extracted backdoor Foo config file",
+            "md5": "8c41f2802904e53469390845cfeb2b28",
+            "sha1": "ce6519a1dc71510ee15e66b3926fd164a373803a",
+            "sha256": "81addbf732d9d6c24b1d3ede7afceef6a1cff59af7b63d01504a0913a6c6701a",
+            "architecture": null,
+            "compile_time": null,
+            "file_path": null,
+            "data": null
+        }
+    ]
+}

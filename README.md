@@ -318,7 +318,7 @@ for url in report.get(metadata.URL):
     print(url.url)
 
 # get residual files
-for residual_file in report.get(metadata.ResidualFile):
+for residual_file in report.get(metadata.File):
   print(residual_file.name)
   print(residual_file.description)
   print(residual_file.md5)
@@ -365,7 +365,7 @@ One of the major goals of DC3-MWCP is to standardize output for malware configur
 from one parser comparable with that of other parsers. This is achieved by establishing a schema of
 standardized metadata elements that represent the common malware configuration items seen across malware families.
 
-A formal [JSON Schema](https://json-schema.org) can be found at [schema.json](/mwcp/config/schema.json), by calling `mwcp schema` in the command line, or programatically by calling `mwcp.schema()`. 
+A formal [JSON Schema](https://json-schema.org) can be found at [schema.json](/mwcp/config/schema.json), by calling `mwcp schema` in the command line, or programmatically by calling `mwcp.schema()`. 
 This schema is versioned the same as DC3-MWCP. A change in the version may not necessarily
 reflect a change in the actual schema. However, any major or minor changes to the schema will
 be reflected in an appropriate change to the version and will be noted in the [changelog](/CHANGELOG.md).
@@ -441,7 +441,8 @@ Please note, that extending the schema will obviously cause the [schema.json](/m
 To regenerate the schema to also include the custom element run `mwcp.schema()` afterwards.
 
 ```python
-import json 
+import json
+import mwcp
 
 with open("schema.json", "w") as fo:
     json.dump(mwcp.schema(id="https://acme.org/0.1/schema.json"), fo, indent=4)

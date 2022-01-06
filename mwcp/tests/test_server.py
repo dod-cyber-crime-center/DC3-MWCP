@@ -33,22 +33,21 @@ def _get_expected_results(legacy: bool):
         SHA1          8eb231a85a9445902571ef2ca8e3f64ec085519d
         SHA256        cc4fafa4c90b4e4c08ade61acfa63add6a3fc31aa58d3f217eb199f557512e2a
         Compile Time
-        Tags
 
         ---- Socket ----
-        Tags    Address
-        ------  ---------
-                127.0.0.1
+        Address
+        ---------
+        127.0.0.1
 
         ---- URL ----
-        Tags    Url               Address    Application Protocol
-        ------  ----------------  ---------  ----------------------
-                http://127.0.0.1  127.0.0.1  http
+        Url               Address    Application Protocol
+        ----------------  ---------  ----------------------
+        http://127.0.0.1  127.0.0.1  http
 
         ---- Residual Files ----
-        Tags    Filename           Description          MD5                               Arch    Compile Time
-        ------  -----------------  -------------------  --------------------------------  ------  --------------
-                fooconfigtest.txt  example output file  5eb63bbbe01eeed093cb22bb8f5acdc3
+        Filename           Description          MD5                               Arch    Compile Time
+        -----------------  -------------------  --------------------------------  ------  --------------
+        fooconfigtest.txt  example output file  5eb63bbbe01eeed093cb22bb8f5acdc3
 
         ----- File Tree -----
         <33fb2ffd28461fa230b730f0d9db81c9.bin (33fb2ffd28461fa230b730f0d9db81c9) : Foo>
