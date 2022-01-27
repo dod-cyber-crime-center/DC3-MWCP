@@ -139,6 +139,14 @@ def descriptions():
     )
 
 
+@bp.route("/schema.json")
+def schema():
+    """
+    Provides JSON schema for report output.
+    """
+    return mwcp.schema()
+
+
 @bp.route("/logs")
 def logs():
     """
@@ -259,7 +267,7 @@ def _build_zip(parser_results):
         encoded_files = []
         metadata_list = list(parser_results["metadata"])
         for element in metadata_list:
-            if element["type"] == "residual_file":
+            if element["type"] == "file":
                 encoded_files.append(element)
                 parser_results["metadata"].remove(element)
 
@@ -409,9 +417,7 @@ def _run_parser(name, data=b"", append_output_text=True):
         if _legacy():
             output = report.as_dict_legacy()
         else:
-            # FIXME: bit of a hack here since what the server really wants is a
-            #   json serializable dictionary, which we don't get with .as_dict()
-            output = json.loads(report.as_json())
+            output = report.as_json_dict()
 
         if append_output_text:
             output["output_text"] = report.as_text()

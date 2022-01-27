@@ -36,16 +36,16 @@ setup(
         'appdirs',
         'attrs>=20.3.0',
         'cattrs',
-        'click',
+        'click>=8.0.1',
         'construct==2.9.45',  # pin because parsers are very dependent on this.
         'future',
         'jinja2',  # For construct.html_hex()
+        'jsonschema_extractor==0.9',
         'pandas',
         'pefile>=2019.4.18',
         'pyelftools',
         'pyparsing',
         'pytest>=6.0.0',
-        'pytest-console-scripts',
         'pytest-datadir',
         'pytest-xdist',
         'pyyaml',
@@ -55,12 +55,13 @@ setup(
         'tabulate[widechars]<1.0.0',
 
         # For the server and API
-        'flask~=1.1.0',
-        'pygments~=2.2.0',
+        'flask',
+        'pygments',
     ],
     extras_require={
         'kordesii': ['kordesii>=2.0.0'],
         'testing': [
+            'jsonschema',
         ],
     }
 )

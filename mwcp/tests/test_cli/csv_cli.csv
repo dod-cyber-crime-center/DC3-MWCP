@@ -1,0 +1,31 @@
+MD5,MetaIndex,Category,Field,Value
+fb843efb2ffec987db12e72ca75c9ea2,0,Input File,parser,foo
+fb843efb2ffec987db12e72ca75c9ea2,0,Input File,filename,test.txt
+fb843efb2ffec987db12e72ca75c9ea2,0,Input File,description,Foo
+fb843efb2ffec987db12e72ca75c9ea2,0,Input File,architecture,
+fb843efb2ffec987db12e72ca75c9ea2,0,Input File,compile_time,
+fb843efb2ffec987db12e72ca75c9ea2,1,URL,url,http://127.0.0.1
+fb843efb2ffec987db12e72ca75c9ea2,1,URL,address,127.0.0.1
+fb843efb2ffec987db12e72ca75c9ea2,1,URL,port,
+fb843efb2ffec987db12e72ca75c9ea2,1,URL,network_protocol,
+fb843efb2ffec987db12e72ca75c9ea2,1,URL,c2,
+fb843efb2ffec987db12e72ca75c9ea2,1,URL,listen,
+fb843efb2ffec987db12e72ca75c9ea2,1,URL,path,
+fb843efb2ffec987db12e72ca75c9ea2,1,URL,query,
+fb843efb2ffec987db12e72ca75c9ea2,1,URL,application_protocol,http
+fb843efb2ffec987db12e72ca75c9ea2,1,URL,credential,
+fb843efb2ffec987db12e72ca75c9ea2,2,Socket,address,127.0.0.1
+fb843efb2ffec987db12e72ca75c9ea2,2,Socket,port,
+fb843efb2ffec987db12e72ca75c9ea2,2,Socket,network_protocol,
+fb843efb2ffec987db12e72ca75c9ea2,2,Socket,c2,
+fb843efb2ffec987db12e72ca75c9ea2,2,Socket,listen,
+fb843efb2ffec987db12e72ca75c9ea2,3,File,name,fooconfigtest.txt
+fb843efb2ffec987db12e72ca75c9ea2,3,File,description,example output file
+fb843efb2ffec987db12e72ca75c9ea2,3,File,md5,5eb63bbbe01eeed093cb22bb8f5acdc3
+fb843efb2ffec987db12e72ca75c9ea2,3,File,sha1,2aae6c35c94fcfb415dbe95f408b9ce91ee846ed
+fb843efb2ffec987db12e72ca75c9ea2,3,File,sha256,b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
+fb843efb2ffec987db12e72ca75c9ea2,3,File,architecture,
+fb843efb2ffec987db12e72ca75c9ea2,3,File,compile_time,
+fb843efb2ffec987db12e72ca75c9ea2,3,File,file_path,
+fb843efb2ffec987db12e72ca75c9ea2,3,File,data,
+

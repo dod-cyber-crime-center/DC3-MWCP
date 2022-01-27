@@ -1,0 +1,1290 @@
+{
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$id": "https://raw.githubusercontent.com/Defense-Cyber-Crime-Center/DC3-MWCP/3.5.0/mwcp/config/schema.json",
+    "title": "Report",
+    "description": "Defines the report of all metadata elements.",
+    "type": "object",
+    "properties": {
+        "type": {
+            "const": "report"
+        },
+        "tags": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "mwcp_version": {
+            "type": "string"
+        },
+        "input_file": {
+            "anyof": [
+                {
+                    "title": "File",
+                    "description": "The original input malware file that triggered parsing or extracted file.",
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "const": "file"
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "name": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "description": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "md5": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "sha1": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "sha256": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "architecture": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "compile_time": {
+                            "anyof": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ]
+                        },
+                        "file_path": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "data": {
+                            "anyof": [
+                                {
+                                    "type": "string",
+                                    "contentEncoding": "base64"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ]
+                        }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                        "type",
+                        "tags"
+                    ]
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        },
+        "parser": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "errors": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "logs": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "metadata": {
+            "type": "array",
+            "items": {
+                "anyOf": [
+                    {
+                        "title": "Alphabet",
+                        "description": "Generic baseXX alphabet",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "alphabet"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "alphabet": {
+                                "type": "string"
+                            },
+                            "base": {
+                                "type": "integer"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "alphabet",
+                            "base"
+                        ]
+                    },
+                    {
+                        "title": "Credential",
+                        "description": "Collection of username and password used as credentials.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "credential"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "username": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "password": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
+                        "title": "DecodedString",
+                        "description": "Extracted decrypted or decoded string.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "decoded_string"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            },
+                            "encryption_key": {
+                                "anyof": [
+                                    {
+                                        "title": "EncryptionKey",
+                                        "description": "Encryption, encoding, or obfuscation key.",
+                                        "type": "object",
+                                        "properties": {
+                                            "type": {
+                                                "const": "encryption_key"
+                                            },
+                                            "tags": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "key": {
+                                                "type": "string",
+                                                "contentEncoding": "base64"
+                                            },
+                                            "algorithm": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "mode": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "iv": {
+                                                "anyof": [
+                                                    {
+                                                        "type": "string",
+                                                        "contentEncoding": "base64"
+                                                    },
+                                                    {
+                                                        "type": "null"
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "required": [
+                                            "type",
+                                            "tags",
+                                            "key"
+                                        ]
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "EmailAddress",
+                        "description": "Email address",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "email_address"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string",
+                                "format": "email"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "EncryptionKey",
+                        "description": "Encryption, encoding, or obfuscation key.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "encryption_key"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "key": {
+                                "type": "string",
+                                "contentEncoding": "base64"
+                            },
+                            "algorithm": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "mode": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "iv": {
+                                "anyof": [
+                                    {
+                                        "type": "string",
+                                        "contentEncoding": "base64"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "key"
+                        ]
+                    },
+                    {
+                        "title": "Event",
+                        "description": "Event object",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "event"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "File",
+                        "description": "The original input malware file that triggered parsing or extracted file.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "file"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "md5": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "sha1": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "sha256": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "architecture": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "compile_time": {
+                                "anyof": [
+                                    {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "file_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "data": {
+                                "anyof": [
+                                    {
+                                        "type": "string",
+                                        "contentEncoding": "base64"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
+                        "title": "InjectionProcess",
+                        "description": "Process into which malware is injected. Usually this is a process name but it may take other forms such as a filename of the executable.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "injection_process"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "Interval",
+                        "description": "Time malware waits between beacons or other activity given in seconds.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "interval"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "number"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "IntervalLegacy",
+                        "description": "Legacy version of interval that uses a string type instead of float in order to preserve original display of the interval. This was done in order to ensure the decimal is either included or not depending on what the user provides.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "interval_legacy"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "MissionID",
+                        "description": "Attacker specified identifier encoded in malware, usually reflected in beacons and often related to target or time of attack.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "mission_id"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "Mutex",
+                        "description": "Mutex name used to prevent multiple executions of malware",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "mutex"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "Other",
+                        "description": "All other items that don't fit within the existing declared schema. Value type is determined by the \"value_format\" property.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "other"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "key": {
+                                "type": "string"
+                            },
+                            "value": {
+                                "anyOf": [
+                                    {
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "type": "string",
+                                        "contentEncoding": "base64"
+                                    },
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "boolean"
+                                    }
+                                ]
+                            },
+                            "value_format": {
+                                "enum": [
+                                    "string",
+                                    "bytes",
+                                    "integer",
+                                    "boolean"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "key",
+                            "value",
+                            "value_format"
+                        ]
+                    },
+                    {
+                        "title": "Path",
+                        "description": "Filesystem path used by malware. may include both a directory and filename.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "path"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "directory_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_dir": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "file_system": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
+                        "title": "Pipe",
+                        "description": "Named, one-way or duplex pipe for communication between the pipe server and one or more pipe clients.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "pipe"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "Registry",
+                        "description": "Registry key and value.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "registry"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "key": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "value": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "data": {
+                                "anyOf": [
+                                    {
+                                        "type": "string",
+                                        "contentEncoding": "base64"
+                                    },
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
+                        "title": "RSAPrivateKey",
+                        "description": "RSA private key containing: public exponent, modulus, private exponent (d), p, q, d mod (p-1), d mod (q-1), q inv mod p",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "rsa_private_key"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "public_exponent": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "modulus": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "private_exponent": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "p": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "q": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "d_mod_p1": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "d_mod_q1": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "q_inv_mod_p": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
+                        "title": "RSAPublicKey",
+                        "description": "RSA public key containing: public_exponent, modulus",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "rsa_public_key"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "public_exponent": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "modulus": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
+                        "title": "Service",
+                        "description": "Windows service information",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "service"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "display_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "image": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "dll": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
+                        "title": "Socket",
+                        "description": "A collection of address, port, and protocol used together to make a socket connection.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "socket"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "address": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "port": {
+                                "anyof": [
+                                    {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 65535
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "network_protocol": {
+                                "anyof": [
+                                    {
+                                        "enum": [
+                                            "icmp",
+                                            "tcp",
+                                            "udp"
+                                        ]
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "c2": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "listen": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
+                        "title": "SSLCertSHA1",
+                        "description": "SSL Certificate SHA-1 Hash",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "ssl_cert_sha1"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string",
+                                "pattern": "^[0-9a-fA-F]{40}$"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "URL",
+                        "description": "RFC 3986 URL",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "url"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "url": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "socket": {
+                                "anyof": [
+                                    {
+                                        "title": "Socket",
+                                        "description": "A collection of address, port, and protocol used together to make a socket connection.",
+                                        "type": "object",
+                                        "properties": {
+                                            "type": {
+                                                "const": "socket"
+                                            },
+                                            "tags": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "address": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "port": {
+                                                "anyof": [
+                                                    {
+                                                        "type": "integer",
+                                                        "minimum": 0,
+                                                        "maximum": 65535
+                                                    },
+                                                    {
+                                                        "type": "null"
+                                                    }
+                                                ]
+                                            },
+                                            "network_protocol": {
+                                                "anyof": [
+                                                    {
+                                                        "enum": [
+                                                            "icmp",
+                                                            "tcp",
+                                                            "udp"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "type": "null"
+                                                    }
+                                                ]
+                                            },
+                                            "c2": {
+                                                "type": [
+                                                    "boolean",
+                                                    "null"
+                                                ]
+                                            },
+                                            "listen": {
+                                                "type": [
+                                                    "boolean",
+                                                    "null"
+                                                ]
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "required": [
+                                            "type",
+                                            "tags"
+                                        ]
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "query": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "application_protocol": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "credential": {
+                                "anyof": [
+                                    {
+                                        "title": "Credential",
+                                        "description": "Collection of username and password used as credentials.",
+                                        "type": "object",
+                                        "properties": {
+                                            "type": {
+                                                "const": "credential"
+                                            },
+                                            "tags": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "username": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "password": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "required": [
+                                            "type",
+                                            "tags"
+                                        ]
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
+                        "title": "UserAgent",
+                        "description": "Software identifier used by malware",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "user_agent"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "UUID",
+                        "description": "A 128-bit number used to identify information, also referred to as a GUID.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "uuid"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string",
+                                "format": "uuid"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "UUIDLegacy",
+                        "description": "Legacy version of UUID that doesn't validate or convert the uuid in order to ensure the original raw strings is displayed.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "uuid_legacy"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
+                        "title": "Version",
+                        "description": "The version of the malware. To the degree possible this should be based directly on artifacts from the malware.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "version"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    }
+                ]
+            }
+        },
+        "output_text": {
+            "type": "string",
+            "description": "Raw text output from MWCP."
+        }
+    },
+    "additionalProperties": false,
+    "required": [
+        "type",
+        "tags",
+        "mwcp_version",
+        "errors",
+        "logs",
+        "metadata"
+    ]
+}

@@ -9,20 +9,19 @@
 | SHA1         | baf34551fecb48acc3da868eb85e1b6dac9de356                         |
 | SHA256       | 1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee |
 | Compile Time |                                                                  |
-| Tags         |                                                                  |
 
 ## Miscellaneous
-| Tags   | Key    | Value                               |
-|:-------|:-------|:------------------------------------|
-|        | JAPAN  | ユーザー別サイト                    |
-|        | CHINA  | 简体中文                            |
-|        | KOREA  | 크로스 플랫폼으로                   |
-|        | ISRAEL | מדורים מבוקשים                      |
-|        | EGYPT  | أفضل البحوث                         |
-|        | RUSSIA | Десятую Международную               |
-|        | MATH   | ∮ E⋅da = Q,  n → ∞, ∑ f(i) = ∏ g(i) |
-|        | FRANCE | français langue étrangère           |
-|        | SPAIN  | mañana olé                          |
+| Key    | Value                               |
+|:-------|:------------------------------------|
+| JAPAN  | ユーザー別サイト                    |
+| CHINA  | 简体中文                            |
+| KOREA  | 크로스 플랫폼으로                   |
+| ISRAEL | מדורים מבוקשים                      |
+| EGYPT  | أفضل البحوث                         |
+| RUSSIA | Десятую Международную               |
+| MATH   | ∮ E⋅da = Q,  n → ∞, ∑ f(i) = ∏ g(i) |
+| FRANCE | français langue étrangère           |
+| SPAIN  | mañana olé                          |
 
 # File Tree
 ```

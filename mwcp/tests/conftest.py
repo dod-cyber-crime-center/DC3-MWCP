@@ -1,6 +1,11 @@
+import logging
+from typing import List
+
 import pytest
 
 import mwcp
+from mwcp import metadata
+from mwcp.metadata import Metadata
 
 
 def pytest_configure(config):
@@ -111,10 +116,98 @@ def make_sample_parser(tmpdir):
 @pytest.fixture
 def report():
     """
-    Creates dummy report for testing.
+    Creates an empty report for testing.
     """
     import logging
     logger = logging.getLogger("test_report")
     logging.root.setLevel(logging.DEBUG)
     input_file = mwcp.FileObject(b"some data", file_path="C:/input_file.bin")
     return mwcp.Report(input_file, "FooParser")
+
+
+@pytest.fixture
+def metadata_items() -> List[Metadata]:
+    """
+    Collection of example metadata elements for each type.
+    This is used in number of different basic tests.
+    """
+    return [
+        metadata.Path("C:\\windows\\temp\\1\\log\\keydb.txt", is_dir=False),
+        metadata.Directory("%APPDATA%\\foo"),
+        metadata.FilePath("C:\\foo\\bar.txt"),
+        metadata.FileName("malware.exe"),
+        metadata.Base16Alphabet("0123456789ABCDEF"),
+        metadata.Base32Alphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567="),
+        metadata.Base64Alphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="),
+        metadata.Credential(username="admin", password="123456"),
+        metadata.Username("mruser"),
+        metadata.Password("secrets"),
+        metadata.Socket(address="bad.com", port=21, network_protocol="tcp"),
+        metadata.Port(1635, protocol="udp"),
+        metadata.ListenPort(4568, protocol="tcp"),
+        metadata.URL("https://10.11.10.13:443/images/baner.jpg"),
+        metadata.Proxy(
+            username="admin",
+            password="pass",
+            address="192.168.1.1",
+            port=80,
+            protocol="tcp",
+        ),
+        metadata.FTP(
+            username="admin",
+            password="pass",
+            url="ftp://badhost.com:21",
+        ),
+        metadata.EmailAddress("email@bad.com"),
+        metadata.Event("MicrosoftExist"),
+        metadata.UUID("654e5cff-817c-4e3d-8b01-47a6f45ae09a"),
+        metadata.InjectionProcess("svchost"),
+        metadata.Interval(3),
+        metadata.EncryptionKey(b"hello", algorithm="rc4"),
+        metadata.EncryptionKey(b"\xff\xff\xff\xff", algorithm="aes", mode="ecb", iv=b"\x00\x00\x00\x00"),
+        metadata.DecodedString("GetProcess"),
+        # Github issue #31
+        metadata.DecodedString(
+            "badstring",
+            encryption_key=metadata.EncryptionKey(b"\xff\xff", algorithm="xor")),
+        metadata.MissionID("target4"),
+        metadata.Mutex("ithinkimalonenow"),
+        metadata.Other("misc_info", "some miscellaneous info"),
+        metadata.Other("random_data", b"\xde\xad\xbe\xef"),
+        metadata.Other("keylogger", True),
+        metadata.Other("misc_integer", 432).add_tag("tag1"),
+        metadata.Pipe("\\.\\pipe\\namedpipe"),
+        metadata.Registry(
+            "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\Updater",
+            data="c:\\update.exe",
+        ),
+        metadata.Registry(key="HKLM\\Foo\\Bar"),
+        metadata.Registry(value="Baz").add_tag("tag2"),
+        metadata.RSAPrivateKey(
+            public_exponent=0x07,
+            modulus=0xbb,
+            private_exponent=0x17,
+            p=0x11,
+            q=0x0b,
+            d_mod_p1=0x07,
+            d_mod_q1=0x03,
+            q_inv_mod_p=0x0e,
+        ),
+        metadata.RSAPublicKey(
+            public_exponent=0x07,
+            modulus=0xbb,
+        ),
+        metadata.Service(
+            name="WindowsUserManagement",
+            display_name="Windows User Management",
+            description="Provides a common management to access information about windows user.",
+            image="%System%\\svohost.exe",
+        ),
+        metadata.UserAgent("Mozilla/4.0 (compatible; MISE 6.0; Windows NT 5.2)"),
+        metadata.Version("3.1"),
+        metadata.File(
+            name="config.xml",
+            description="Extracted backdoor Foo config file",
+            data=b"foo = bar"
+        ),
+    ]

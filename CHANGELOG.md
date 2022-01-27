@@ -1,10 +1,53 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
 ## [Unreleased]
 
 ### Changed
 - Enable construct Adapters for `EpochTime`, `SystemTime`, and `FileTime` to accept a timezone, and add default helpers for UTC. (@ddash-ct)
+
+
+## [3.5.0] - 2022-01-11
+
+### Added
+- Added `--command` flag to `mwcp test`. This flag will provide the user with a printout of the pytest 
+command that would be run given the other options provided in the command line.
+
+### Changed
+- The `--no-legacy` flag is now set by default for `mwcp parse` and `mwcp test` commands. 
+  - **If you still need to use legacy testing or parse results, you must now explicitly include the `--legacy` flag.**
+  - *This does not affect the web service tool. For now, legacy mode is still set as default.*
+- Updated the `Other` metadata element to accept string, bytes, integers, or booleans as values.
+  - Also, added new field `value_format` to show the data type of the value. This helps to avoid any ambiguities in json results.
+- The "Tags" column in the generated report won't be shown if there are no tags in the table.
+
+### Fixed
+- Fixed UnicodeDecodeError that can occur when printing a report with nested metadata elements. ([\#31](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/31))
+- Include missing "Mode" column from EncryptionKey report tables.
+- Fixed rendering for values with line breaks in the HTML report output.
+- Removed obfuscated powershell examples from poshdeob causing a VT hit. ([\#32](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/32))
+
+
+## [3.4.0] - 2021-10-06
+
+### Added
+- Added a formal schema for (non-legacy) JSON report output which can be found in [schema.json](/mwcp/config/schema.json)
+- Added `mwcp schema` CLI command to generate the current schema.
+- Added [documentation](/README.md#schema) on how to create your own custom reportable metadata element.
+
+### Changed
+- Updated server dependencies.
+- The `input_file` and `residual_file` metadata types are now both referred to as `file`.
+- Legacy versions of `uuid` and `interval` metadata types are now typed as `uuid_legacy` and `interval_legacy`
+  respectively. This was done to ensure a proper schema can be generated.
+- Updated testing utility to ensure test cases older than 3.3.3 handle changes accordingly.
+- Updated the regular expression in the `URL` metadata object allowing it to succeed with optional schema
+- `URL` metadata object no longer defaults the network protocol to `tcp` for embedded `socket`
+
+### Fixed
+- Fixed `EncryptionKey` report formatting to display text representation when key is printable (not just ascii).
+- The `--testcase-dir` flag when running `mwcp test` in non-legacy mode will now handle any directory structure.
 
 
 ## [3.3.2] - 2021-07-19
@@ -389,7 +432,9 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.2...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.5.0...HEAD
+[3.5.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.4.0...3.5.0
+[3.4.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.2...3.4.0
 [3.3.2]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.1...3.3.2
 [3.3.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.0...3.3.1
 [3.3.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.2.1...3.3.0

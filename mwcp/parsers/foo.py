@@ -24,7 +24,7 @@ class Foo(Parser):
         self.report.add(metadata.URL("http://127.0.0.1"))
 
         # demonstrate access to sample
-        logger.info("size of inputfile is {} bytes".format(len(input_file.file_data)))
+        logger.info(f"size of inputfile is {len(input_file.data)} bytes")
 
         # other, non-standardized metadata
         # also demonstrate use of pefile object
@@ -39,7 +39,7 @@ class Foo(Parser):
         ))
         #  Alternatively we can manually report a residual file without being processed.
         if False:
-            self.report.add(metadata.ResidualFile(
+            self.report.add(metadata.File(
                 "fooconfigtest.txt", description="example output file", data=b"hello world"
             ))
 

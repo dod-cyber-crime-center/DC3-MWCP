@@ -98,6 +98,19 @@ def iter_test_cases(source: registry.Source = None) -> Iterable[TestCase]:
             if source_dir.is_dir() and registry.is_source(source_dir.name):
                 testcase_dirs.append((source_dir.name, source_dir))
 
+        # If we don't find any testcase directories, user probably provided a directory
+        # not structured as expected.
+        # In this case, let's just recursively look for all .json files.
+        if not testcase_dirs:
+            for file_path in testcase_dir.glob("**/[!_]*.json"):
+                with open(file_path, "r") as fp:
+                    data = json.load(fp)
+                try:
+                    yield TestCase(data["parser"], data["input_file"]["md5"], file_path)
+                except (KeyError, TypeError):
+                    logger.warning(f"Failed to collect testcase file: {file_path}")
+            return
+
     # Otherwise we need to pull test case directories based on location of source.
     else:
         sources = [source] if source else registry.get_sources()
@@ -214,7 +227,7 @@ def update_tests(parsers: List[str] = None, force: bool = False) -> bool:
             continue
 
         # Don't bother updating if it only updates the mwcp version.
-        new_results = json.loads(report.as_json())
+        new_results = report.as_json_dict()
         new_results["mwcp_version"] = old_results["mwcp_version"]
         if new_results == old_results:
             continue

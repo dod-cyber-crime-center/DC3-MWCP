@@ -1,15 +1,15 @@
 {
     "type": "report",
     "tags": [],
-    "mwcp_version": "3.3.3",
+    "mwcp_version": "MWCP_VERSION",
     "input_file": {
         "type": "file",
         "tags": [],
-        "name": "f144899b86766688991c5d0d10902f4a.bin",
+        "name": "fb843efb2ffec987db12e72ca75c9ea2.bin",
         "description": "Foo",
-        "md5": "f144899b86766688991c5d0d10902f4a",
-        "sha1": "bdca4e5c28a89d3b5281cc189f5910eaad16395a",
-        "sha256": "8a599bf73a83c1d32a1b426ed736488ae34991fda6ac4cd27cc0597e21cd8420",
+        "md5": "fb843efb2ffec987db12e72ca75c9ea2",
+        "sha1": "5e90c4c2be31a7a0be133b3dbb4846b0434bc2ab",
+        "sha256": "fe5af8c641835c24f3bbc237a659814b96ed64d2898fae4cb3d2c0ac5161f5e9",
         "architecture": null,
         "compile_time": null,
         "file_path": null,
@@ -18,11 +18,11 @@
     "parser": "mwcp:foo",
     "errors": [],
     "logs": [
-        "[+] File f144899b86766688991c5d0d10902f4a.bin identified as Foo.",
-        "[+] size of inputfile is 15765 bytes",
-        "[+] f144899b86766688991c5d0d10902f4a.bin dispatched residual file: fooconfigtest.txt",
+        "[+] File fb843efb2ffec987db12e72ca75c9ea2.bin identified as Foo.",
+        "[+] size of inputfile is 23 bytes",
+        "[+] fb843efb2ffec987db12e72ca75c9ea2.bin dispatched residual file: fooconfigtest.txt",
         "[+] File fooconfigtest.txt described as example output file",
-        "[+] operating on inputfile f144899b86766688991c5d0d10902f4a.bin"
+        "[+] operating on inputfile fb843efb2ffec987db12e72ca75c9ea2.bin"
     ],
     "metadata": [
         {

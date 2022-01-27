@@ -2,9 +2,11 @@ import logging
 import pathlib
 from typing import Union, Type
 
+import mwcp
 from mwcp.runner import Runner
 from mwcp.report import Report
 from mwcp.parser import Parser
+from mwcp import metadata
 
 
 def run(
@@ -54,3 +56,29 @@ def run(
         log_filter=log_filter,
     )
     return runner.run(parser, file_path=file_path, data=data)
+
+
+def schema(id=None) -> dict:
+    """
+    Generates a JSON Schema for a Report object.
+    NOTE: This is the schema for a single report. Depending on how you use MWCP,
+    you may get a list of these reports instead.
+    """
+    if id is None:
+        id = (
+            f"https://raw.githubusercontent.com/Defense-Cyber-Crime-Center/DC3-MWCP/"
+            f"{mwcp.__version__}/mwcp/config/schema.json"
+        )
+    schema = {
+        "$schema": "https://json-schema.org/draft/2019-09/schema",
+        "$id": id,
+    }
+    schema.update(metadata.Report.schema())
+
+    # "output_text" may also be included if we are running from the server service.
+    schema["properties"]["output_text"] = {
+        "type": "string",
+        "description": "Raw text output from MWCP.",
+    }
+
+    return schema

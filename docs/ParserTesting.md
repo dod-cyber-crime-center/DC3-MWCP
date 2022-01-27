@@ -8,11 +8,8 @@ becomes simplified and streamlined.
 
 The `mwcp test` command line utility has been created for users to generate and run test cases.
 
-**UPDATE: To run and create tests using the new metadata schema, please add the flag
-`--no-legacy` to any of the `mwcp test` commands described below.
-Eventually, support for the legacy metadata schema will be removed in a future release.**
-
 - [Updating Legacy Test Cases](#updating-legacy-test-cases)
+- [Executing Existing Test Cases (legacy)](#executing-existing-test-cases-legacy)
 - [Executing Existing Test Cases](#executing-existing-test-cases)
 - [Creating or Adding Test Cases](#creating-or-adding-test-cases)
     - [Determining files to use as test cases](#determining-file-to-use-as-test-cases)
@@ -34,9 +31,8 @@ Eventually, support for the legacy metadata schema will be removed in a future r
 
 As of version 3.3.0, MWCP has updated how it presents its metadata schema. Henceforth, the format of the
 reported json has changed, breaking existing test cases. 
-While initially this change is only in effect if the user provided the `--no-legacy`
-command line flag, this will eventually become default in a future 4.0.0 release.
-Therefore, all existing test cases should eventually be updated to test with the newest schema.
+This has been set as the default for the `test` command. To run legacy test cases, ensure you include the
+`--legacy` flag.
 
 A small command line tool `mwcp_update_legacy_tests` has been created to ease in this transition.
 
@@ -72,12 +68,12 @@ To convert only a specific parser, provide the name of the parser in the command
 ```
 
 
-## Executing Existing Test Cases
+## Executing Existing Test Cases (legacy)
 
-Possibly the most routine action is to execute existing test cases.
+To run the legacy testing utility (not backed by pytest), ensure you include the `--legacy` flag.
 
 ```console
-> mwcp test foo
+> mwcp test foo --legacy
 
 Running test cases. May take a while...
 All Passed = True
@@ -86,7 +82,7 @@ All Passed = True
 If a parser is not provided all registered parsers will be tested.
 
 ```console
-> mwcp test
+> mwcp test --legacy
 
 PARSER argument not provided. Run tests for ALL parsers? [Y/n]:
 Running tests cases. May take a while...
@@ -99,14 +95,16 @@ The following command line options can also be used to modify how the results ar
 * `-s / --silent` : Silent. Only display a simple statement saying whether all test cases passed or not.
 
 
-### Using Pytest
+## Executing Existing Test Cases
 
 DC3-MWCP runs the parser tests using [pytest](https://pytest.org) as the backend for testing the newer
-metadata schema introduced in version 3.3.0. To enable this, include the `--no-legacy` flag when running `mwcp test`
+metadata schema introduced in version 3.3.0.
+
+When you run `mwcp test`, a call to pytest will be run, testing all or a specific query of parsers.
 
 ```console
-> mwcp test --no-legacy
-> mwcp test SuperMalware --no-legacy
+> mwcp test
+> mwcp test SuperMalware
 ```
 
 Since the newer testing utility is backed by pytest, testing is not limited to specific parsers.
@@ -115,17 +113,17 @@ We can now use any valid expression that can be used with the `-k` pytest flag.
 For example, to test a specific input file we can provide the all or part of the md5.
 
 ```console
-> mwcp test abd3 --no-legacy
+> mwcp test abd3
 ```
 
 Or test parsers from a specific parser source.
 ```console
-> mwcp test acme --no-legacy
+> mwcp test acme
 ```
 
 Or we can even get fancy with exclusionary rules.
 ```console
-> mwcp test "SuperMalware and not abd3" --no-legacy
+> mwcp test "SuperMalware and not abd3"
 ```
 
 
@@ -142,6 +140,15 @@ The `--malware-repo` and `--testcase-dir` options can also be used directly with
 
 ```console
 > pytest --pyargs mwcp -m parsers --malware-repo="C:/malware" --testcase-dir="C:/mwcp_parser_tests" 
+```
+
+Finally, if you would like to see what pytest command would be run for a given `mwcp test` command,
+we can use the `-c`/`--command` flag.
+This will not run any tests, but rather just output the `pytest` command.
+
+```console
+> mwcp test foo --command
+pytest 'C:\Python310\Lib\site-packages\mwcp\tests\test_parsers.py' --disable-pytest-warnings --durations 10 -vv -k foo -n auto
 ```
 
 

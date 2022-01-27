@@ -1,0 +1,9 @@
+scan_date,inputfilename,outputfile.name,outputfile.description,outputfile.md5,a,address,other.field1,other.field2
+[TIMESTAMP],file1.exe,"out_name
+out_name2","out_desc
+out_desc2","out_md5
+out_md52",,"https://google.com
+ftp://amazon.com",value1,"value2
+value3"
+[TIMESTAMP],file2.exe,,,,"b
+c",,,
