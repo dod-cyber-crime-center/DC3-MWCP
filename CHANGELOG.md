@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+## [Unreleased]
+
+### Changed
+- Enable construct Adapters for `EpochTime`, `SystemTime`, and `FileTime` to accept a timezone, and add default helpers for UTC. (@ddash-ct)
+
+
 ## [3.5.0] - 2022-01-11
 
 ### Added
