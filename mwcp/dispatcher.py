@@ -5,6 +5,7 @@ content to ease maintenance.
 """
 
 import logging
+import warnings
 from collections import deque
 
 from mwcp import metadata
@@ -27,7 +28,7 @@ class UnidentifiedFile(Parser):
         Identifies an unidentified file... which means this is always True.
 
         :param file_object: dispatcher.FileObject object
-        :return: Boolean indicating idenification
+        :return: Boolean indicating identification
         """
         return True
 
@@ -92,6 +93,7 @@ class Dispatcher(object):
         # TODO: Deprecate the author attribute?
         self.AUTHOR = author
         self.DESCRIPTION = description  # In all caps to match Parser interface
+        self.TAGS = ()
         self.parsers = parsers or []
         self.greedy = greedy
         self.default = default
@@ -121,6 +123,13 @@ class Dispatcher(object):
         return any(self._identify_parsers(file_object))
 
     def add_to_queue(self, file_object: FileObject, parent: FileObject = None):
+        warnings.warn(
+            "add_to_queue() has been renamed to add()",
+            DeprecationWarning
+        )
+        self.add(file_object, parent=parent)
+
+    def add(self, file_object: FileObject, parent: FileObject = None):
         """
         Add a FileObject to the FIFO queue for processing.
         :param file_object: a FileObject object requiring processing.
@@ -133,6 +142,13 @@ class Dispatcher(object):
         if not parent:
             parent = self._current_file_object
         assert isinstance(file_object, FileObject), "Not a FileObject: {!r}".format(file_object)
+
+        if parent == file_object:
+            # Letting this be info instead of warning, since it is not necessarily
+            # a problem. (e.g. deobfuscation parser runs on already deobfuscated file)
+            logger.info(f"{parent.name} dispatched itself, ignoring...")
+            return
+
         # If we already have a parent, this means this file is trickling up from a sub-dispatcher.
         # Don't duplicate logs or change the parent.
         if not file_object.parent:
@@ -188,6 +204,10 @@ class Dispatcher(object):
         if (not file_object.description or self._overwrite_descriptions) and not isinstance(parser, Dispatcher):
             file_object.description = parser.DESCRIPTION
 
+        # Add tags to the file.
+        for tag in parser.TAGS:
+            file_object.add_tag(tag)
+
         # Set parser class used in order to keep a history.
         file_object.parser = parser
 
@@ -220,26 +240,37 @@ class Dispatcher(object):
             (None if this dispatcher is the root)
         :return:
         """
+        parent = dispatcher
         orig_file_object = file_object
-        self.add_to_queue(file_object)
+        self.add(file_object)
 
         # Pull knowledge_base from previous dispatcher.
-        if dispatcher:
-            self.knowledge_base = dispatcher.knowledge_base
+        if parent:
+            self.knowledge_base = parent.knowledge_base
 
         while self._fifo_buffer:
             file_object = self._fifo_buffer.pop()
             first = file_object is orig_file_object
 
             # If this dispatcher is embedded, simply pass any dispatched files to the parent.
-            if self._embedded and dispatcher and not first:
-                dispatcher.add_to_queue(file_object)
+            if self._embedded and parent and not first:
+                parent.add(file_object)
                 continue
 
             identified = False
             unable_to_parse_error = None
 
             try:
+                # If file has already been parsed, don't bother running it again.
+                # (This also helps with cyclic loops)
+                if file_object.md5 in report.parsed_files:
+                    logger.info(f"File {file_object.name} has already been parsed. Ignoring...")
+                    # Copy file description from the already parsed version and mark as duplicate.
+                    parsed_file = report.parsed_files[file_object.md5]
+                    file_object.description = parsed_file.description
+                    file_object.add_tag("duplicate")
+                    continue
+
                 # Run applicable parsers.
                 for parser, _run_args in self._identify_parsers(file_object):
                     if isinstance(parser, Dispatcher):
@@ -260,13 +291,13 @@ class Dispatcher(object):
 
                 if identified:
                     continue
-                elif unable_to_parse_error and dispatcher:
+                elif unable_to_parse_error and parent:
                     # Pass UnableToParse exception up the chain to notify parent
                     raise unable_to_parse_error
 
                 # Give it to the parent dispatcher if we can't identify it.
-                if dispatcher:
-                    dispatcher.add_to_queue(file_object)
+                if parent:
+                    parent.add(file_object)
                     continue
 
                 # If no parsers match and developer didn't set a description,
@@ -283,13 +314,16 @@ class Dispatcher(object):
                 # Report the file as residual if we identified it or we are the root parser.
                 # NOTE: We don't want to report the file until the very end, since a parser may want to change
                 # the file's filename or description.
-                if identified or (not dispatcher and self._output_unidentified):
+                if identified or (not parent and self._output_unidentified):
                     if file_object.output_file:
                         # Temporarily set current file back to parent so residual file is
                         # reported correctly.
                         report.set_file(file_object.parent)
-                        report.add(metadata.ResidualFile.from_file_object(file_object))
+                        report.add(metadata.File.from_file_object(file_object))
                         report.set_file(file_object)
+
+                    if file_object.md5 not in report.parsed_files:
+                        report.parsed_files[file_object.md5] = file_object
 
                 # Cleanup any temporary files the file_object may have created.
                 file_object._cleanup()

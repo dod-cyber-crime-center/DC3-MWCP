@@ -3,6 +3,7 @@ import json
 import pytest
 
 import mwcp
+import mwcp.metadata
 from mwcp import testing
 
 
@@ -38,41 +39,28 @@ def pytest_generate_tests(metafunc):
     _setup(metafunc.config)
 
     params = []
-    for test_case in mwcp.testing.iter_test_cases():
+    for test_case in testing.iter_test_cases():
         params.append(pytest.param(
             test_case.md5, test_case.results_path, id=f"{test_case.name}-{test_case.md5}"
         ))
     metafunc.parametrize("md5,results_path", params)
 
 
-@pytest.mark.parsers  # Custom mark
-def test_parser(md5, results_path):
-    input_file_path = testing.get_path_in_malware_repo(md5=md5)
-
-    # Grab expected results.
-    with open(results_path, "r") as fo:
-        expected_results = json.load(fo)
-
+def _fixup_test_cases(expected_results, actual_results):
+    """
+    Fixes up test cases to handle differences in schema
+    and remove extraneous differences that don't affect the overall parse results.
+    """
     # Expected results are allowed to include logs to provide better insight when the
     # test case was first created. However, we don't want to include them in the test since
     # logs can easily change over time.
     expected_results["logs"] = []
     expected_results["errors"] = []
 
-    # Get full parser name from expected results.
-    parser_name = expected_results["parser"]
-
-    # NOTE: Reading bytes of input file instead of passing in file path to ensure everything gets run in-memory
-    #   and no residual artifacts (like idbs) are created in the malware repo.
-    report = mwcp.run(parser_name, data=input_file_path.read_bytes(), include_logs=False)
-    actual_results = report.as_json_dict()
-
     # Remove mwcp version since we don't want to be updating our tests cases every time
     # there is a new version.
     expected_results_version = expected_results.pop("mwcp_version")
     actual_results_version = actual_results.pop("mwcp_version")
-
-    # region - Handle changes in metadata schema so older test cases don't fail.
 
     # Version 3.3.2 introduced "mode" property in encryption_key. Remove property for older tests.
     if expected_results_version < "3.3.2":
@@ -126,15 +114,69 @@ def test_parser(md5, results_path):
                 if isinstance(item["value"], (int, bool)):
                     item["value"] = str(item["value"])
 
-    # endregion
+    # Version 3.6.0 adds "duplicate" tags to files already parsed and will not include
+    # the duplicate residual files that are extracted from such files.
+    # To best handle backwards compatibility we are just going to dedup all residual files
+    # based on md5.
+    if expected_results_version < "3.6.0":
+        # Find and remove files with "duplicate" tag.
+        for item in list(actual_results["metadata"]):
+            if item["type"] in ("file", "residual_file") and "duplicate" in item["tags"]:
+                actual_results["metadata"].remove(item)
+
+        # Find and remove all duplicate residual files from expected results,
+        # since they may not exist in new results due to skipped processing.
+        seen_md5s = set()
+        for item in list(expected_results["metadata"]):
+            if item["type"] in ("file", "residual_file"):
+                if item["md5"] in seen_md5s:
+                    expected_results["metadata"].remove(item)
+                else:
+                    seen_md5s.add(item["md5"])
+
+    # Version 3.6.0 changes schema for Registry.
+    # "path" has been removed.
+    # "key" has been replaced with a "hive"/"subkey" combo.
+    # Update registry entries in expected results to account for new schema.
+    if expected_results_version < "3.6.0":
+        for item in expected_results["metadata"]:
+            if item["type"] == "registry":
+                reg = mwcp.metadata.Registry2.from_path(item["path"], data=item["data"])
+                item.update(reg.as_json_dict())
+                del item["path"]
+                del item["key"]
 
     # The order the metadata comes in doesn't matter and shouldn't fail the test.
-    expected_results["metadata"] = sorted(expected_results["metadata"], key=repr)
-    actual_results["metadata"] = sorted(actual_results["metadata"], key=repr)
+    # (Using custom repr to ensure dictionary keys are sorted before repr is applied.)
+    custom_repr = lambda d: repr(dict(sorted(d.items())) if isinstance(d, dict) else d)
+    expected_results["metadata"] = sorted(expected_results["metadata"], key=custom_repr)
+    actual_results["metadata"] = sorted(actual_results["metadata"], key=custom_repr)
 
-    # NOTE: When running this in PyCharm, the "<Click to see difference>" may be missing
-    # on a failed test if there is a "==" contained within one of the results.
-    # This obviously can happen if the results have base64 encoded data.
-    # Recommend running the test from command line using pytest-clarity in these cases.
-    # Hopefully this eventually gets fixed: youtrack.jetbrains.com/issue/PY-43144
-    assert actual_results == expected_results
+
+@pytest.mark.parsers  # Custom mark
+def test_parser(pytestconfig, md5, results_path):
+    input_file_path = testing.get_path_in_malware_repo(md5=md5)
+
+    # Grab expected results.
+    with open(results_path, "r") as fo:
+        expected_results = json.load(fo)
+
+    # Get full parser name from expected results.
+    parser_name = expected_results["parser"]
+
+    # NOTE: Reading bytes of input file instead of passing in file path to ensure everything gets run in-memory
+    #   and no residual artifacts (like idbs) are created in the malware repo.
+    report = mwcp.run(parser_name, data=input_file_path.read_bytes(), include_logs=False)
+    actual_results = report.as_json_dict()
+
+    _fixup_test_cases(expected_results, actual_results)
+
+    # Convert results back to json text to improve comparison report on failure.
+    # But avoid doing this if we detect we are in PyCharm. This is because PyCharm's built in comparison
+    # tool displays better on the raw dictionary instead of the string.
+    if not hasattr(pytestconfig, "_teamcityReporting"):
+        actual_results = json.dumps(actual_results, indent=4, sort_keys=True)
+        expected_results = json.dumps(expected_results, indent=4, sort_keys=True)
+
+    assert actual_results == expected_results, \
+        f"Parser Test Failed \n\tparser = {parser_name}\n\tmd5 = {md5}\n\ttest_case = {results_path}"

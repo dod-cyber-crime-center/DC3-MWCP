@@ -302,7 +302,7 @@ print(report.as_text())
 print(report.as_dict_legacy())
 print(report.as_json_legacy())
 
-# You can also programatically view results of report:
+# You can also programmatically view results of report:
 from mwcp import metadata
 
 # display errors that may occur

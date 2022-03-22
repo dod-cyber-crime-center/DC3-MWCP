@@ -23,6 +23,10 @@ The file being processed by a parser is accessible via `self.file_object`, which
 It contains the following attributes:
 - `data` - The raw data of the file.
 - `name` - Name of the file (or an auto-generated stub)
+- `description` - Description of the file.
+  - This gets auto-set by the identifying parser's `DESCRIPTION` attribute, but can be overwritten as desired.
+- `tags` - User defined set of keyword tags for the file.
+  - These get set by using `.add_tag()` and/or automatically by the parser's `TAGS` attribute.
 - `file_path` - The actual file path as found in the file system (if backed by a real file).
   - (This is primarily used for the initial input file.)
 - `md5`, `sha1`, `sha256` - Hashes of the given file.
@@ -30,7 +34,10 @@ It contains the following attributes:
 - `resources` - List of PE resources (if a PE)
 - `elf` - An `ELFFile` object of the file or None if the file is not an ELF.
 - `parser_history` - A history of all the parser classes that have processed this file.
+- `knowledge_base` - A dictionary of miscellaneous information usually set by parsers to exchange information.
 - `parent` - The `mwcp.FileObject` object that this file was extracted from or None if this is the original input file.
+- `children` - The `mwcp.FileObject` objects that have been generated or dispatched by this file.
+- `siblings` - The `mwcp.FileObject` objects that share the same parent of this file.
 
 
 A file-like object can be generated in a context manager using `.open()`.
@@ -80,7 +87,7 @@ if config_display_name:
 ```
 
 ### Tagging
-Tags can be added to any produced metadata element or file object.
+Tags can be added to any produced metadata element, file object, or the report itself.
 To add a tag, simply call `add_tag()` with a provided sequence of tags.
 These tags provide an easy way to add context to the results based on your own
 defined standard such as actor set, technique, artifact location, etc.
@@ -91,14 +98,17 @@ being added to, allowing for easy addition of tags within existing code.
 ```python
 from mwcp import metadata
 
-
 # Report key and provide context that is was use for the implant.
 key = self._extract_rc4_key(self.file_object.data)
 if key:
     self.report.add(metadata.EncryptionKey(key=key, algorithm="rc4").add_tag("implant"))
 
 # Add embedded implant and add tag that it came from overlay.
-self.dispatcher.add_to_queue(FileObject(implant_data).add_tag("overlay"))
+self.dispatcher.add(FileObject(implant_data).add_tag("overlay"))
+
+# Add a global tag to the report itself.
+self.report.add_tag("acme_triage", "ransomware")
+
 
 # Attach a tag for known actor set after positive identification.
 @classmethod
@@ -110,6 +120,20 @@ def identify(cls, file_object):
 ```
 
 
+Tags can also be included as an attribute on a `Parser` class to automatically attach on all identified files.
+
+```python
+from mwcp import Parser
+
+
+class Implant(Parser):
+    DESCRIPTION = "SuperMalware Implant"
+    TAGS = ("implant", "SuperMalware")
+
+    ...
+```
+
+
 ## Dispatcher
 You can access the underlining `mwcp.Dispatcher` object used to control the parsers from `self.dispatcher`.
 
@@ -118,25 +142,26 @@ will initialize and run the parser. The parser can then report any metadata as w
 embedded files onto the queue for further processing.
 
 To dispatch newly found files, create a `mwcp.FileObject` object and then pass it to the dispatcher
-using the `add_to_queue()` function.
+using the `add()` function.
 
 ```python
-    from mwcp import FileObject
+from mwcp import FileObject
 
-    # ...
 
-    def run(self):
-        """
-        Extract metadata and implant from Foo Dropper.
-        """
-        # Decrypt and report implant.
-        key = self._extract_rc4_key(self.file_object.file_data)
-        if key:
-            # Decrypt and dispatch implant.
-            implant_data = self._decrypt_implant(key, self.file_object.file_data)
-            if implant_data:
-                implant_file_object = FileObject(implant_data, description='Decrypted Implant')
-                self.dispatcher.add_to_queue(implant_file_object)
+# ...
+
+def run(self):
+    """
+    Extract metadata and implant from Foo Dropper.
+    """
+    # Decrypt and report implant.
+    key = self._extract_rc4_key(self.file_object.file_data)
+    if key:
+        # Decrypt and dispatch implant.
+        implant_data = self._decrypt_implant(key, self.file_object.file_data)
+        if implant_data:
+            implant_file_object = FileObject(implant_data, description='Decrypted Implant')
+            self.dispatcher.add(implant_file_object)
 ```
 
 *NOTE: Setting the description for the extracted file is not usually necessary since it will automatically

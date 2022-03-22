@@ -9,6 +9,7 @@
 | SHA1         | baf34551fecb48acc3da868eb85e1b6dac9de356                         |
 | SHA256       | 1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee |
 | Compile Time |                                                                  |
+| Report Tags  | tagging, test                                                    |
 
 ## Alphabet
 | Alphabet                                                          |   Base |
@@ -17,6 +18,11 @@
 | ABCDEFGHIJKLMNOPQRSTUVWXYZ234567=                                 |     32 |
 | ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/= |     64 |
 
+## Command
+| Value                  |
+|:-----------------------|
+| cmd.exe /c notepad.exe |
+
 ## Credential
 | Username   | Password   |
 |:-----------|:-----------|
@@ -24,6 +30,11 @@
 | mruser     |            |
 |            | secrets    |
 | admin      | pass       |
+
+## Crypto Address
+| Address                            | Symbol   |
+|:-----------------------------------|:---------|
+| 14qViLJfdGaP4EeHnDyJbEGQysnCpwk3gd | BTC      |
 
 ## Decoded String
 | Value      | Key    | Algorithm   |
@@ -93,11 +104,11 @@
 | Modulus (n):<br>    187 (0xbb)<br>Public Exponent (e):<br>    7 (0x7)<br> |
 
 ## Registry
-| Tags   | Path                                                       | Key                                                | Value   | Data          |
-|:-------|:-----------------------------------------------------------|:---------------------------------------------------|:--------|:--------------|
-|        | HKLM\Software\Microsoft\Windows\CurrentVersion\Run\Updater | HKLM\Software\Microsoft\Windows\CurrentVersion\Run | Updater | c:\update.exe |
-|        |                                                            | HKLM\Foo\Bar                                       |         |               |
-| tag2   |                                                            |                                                    | Baz     |               |
+| Tags   | Key                                                              | Value   | Data          | Data Type   |
+|:-------|:-----------------------------------------------------------------|:--------|:--------------|:------------|
+|        | HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run | Updater | c:\update.exe | REG_SZ      |
+|        | HKEY_LOCAL_MACHINE\Foo\Bar                                       |         |               |             |
+| tag2   |                                                                  | Baz     |               |             |
 
 ## Service
 | Name                  | Display Name            | Description                                                            | Image                |
@@ -132,9 +143,10 @@
 | Mozilla/4.0 (compatible; MISE 6.0; Windows NT 5.2) |
 
 ## Version
-|   Value |
-|--------:|
-|     3.1 |
+| Value   |
+|:--------|
+| 3.1     |
+| 403.10  |
 
 ## Miscellaneous
 | Tags   | Key          | Value                   |

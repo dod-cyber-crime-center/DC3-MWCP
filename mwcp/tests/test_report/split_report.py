@@ -46,7 +46,7 @@ split_report = [
             }
         ],
         "parser": None,
-        "tags": [],
+        "tags": ["tagging", "test"],
         "type": "report"
     },
     {
@@ -79,7 +79,7 @@ split_report = [
             }
         ],
         "parser": None,
-        "tags": [],
+        "tags": ["tagging", "test"],
         "type": "report"
     }
 ]

@@ -18,6 +18,7 @@ def test_basic(datadir, report, metadata_items, text_format, report_name):
         report.input_file.description = "SuperMalware Implant"
         for item in metadata_items:
             report.add(item)
+        report.add_tag("test", "tagging")
 
     actual = report.as_text(text_format)
     print(actual)

@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$id": "https://raw.githubusercontent.com/Defense-Cyber-Crime-Center/DC3-MWCP/3.5.0/mwcp/config/schema.json",
+    "$id": "https://raw.githubusercontent.com/Defense-Cyber-Crime-Center/DC3-MWCP/3.6.0/mwcp/config/schema.json",
     "title": "Report",
     "description": "Defines the report of all metadata elements.",
     "type": "object",
@@ -18,7 +18,7 @@
             "type": "string"
         },
         "input_file": {
-            "anyof": [
+            "anyOf": [
                 {
                     "title": "File",
                     "description": "The original input malware file that triggered parsing or extracted file.",
@@ -70,7 +70,7 @@
                             ]
                         },
                         "compile_time": {
-                            "anyof": [
+                            "anyOf": [
                                 {
                                     "type": "string",
                                     "format": "date-time"
@@ -87,7 +87,7 @@
                             ]
                         },
                         "data": {
-                            "anyof": [
+                            "anyOf": [
                                 {
                                     "type": "string",
                                     "contentEncoding": "base64"
@@ -161,6 +161,31 @@
                         ]
                     },
                     {
+                        "title": "Command",
+                        "description": "Shell command",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "command"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "value"
+                        ]
+                    },
+                    {
                         "title": "Credential",
                         "description": "Collection of username and password used as credentials.",
                         "type": "object",
@@ -194,6 +219,37 @@
                         ]
                     },
                     {
+                        "title": "CryptoAddress",
+                        "description": "A cryptocurrency address and its symbol.",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "crypto_address"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "address": {
+                                "type": "string"
+                            },
+                            "symbol": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags",
+                            "address"
+                        ]
+                    },
+                    {
                         "title": "DecodedString",
                         "description": "Extracted decrypted or decoded string.",
                         "type": "object",
@@ -211,7 +267,7 @@
                                 "type": "string"
                             },
                             "encryption_key": {
-                                "anyof": [
+                                "anyOf": [
                                     {
                                         "title": "EncryptionKey",
                                         "description": "Encryption, encoding, or obfuscation key.",
@@ -243,7 +299,7 @@
                                                 ]
                                             },
                                             "iv": {
-                                                "anyof": [
+                                                "anyOf": [
                                                     {
                                                         "type": "string",
                                                         "contentEncoding": "base64"
@@ -331,7 +387,7 @@
                                 ]
                             },
                             "iv": {
-                                "anyof": [
+                                "anyOf": [
                                     {
                                         "type": "string",
                                         "contentEncoding": "base64"
@@ -425,7 +481,7 @@
                                 ]
                             },
                             "compile_time": {
-                                "anyof": [
+                                "anyOf": [
                                     {
                                         "type": "string",
                                         "format": "date-time"
@@ -442,7 +498,7 @@
                                 ]
                             },
                             "data": {
-                                "anyof": [
+                                "anyOf": [
                                     {
                                         "type": "string",
                                         "contentEncoding": "base64"
@@ -714,7 +770,7 @@
                     },
                     {
                         "title": "Registry",
-                        "description": "Registry key and value.",
+                        "description": "Registry key, value (or name), and data. (see docs.microsoft.com/en-us/windows/win32/sysinfo/structure-of-the-registry)",
                         "type": "object",
                         "properties": {
                             "type": {
@@ -726,13 +782,28 @@
                                     "type": "string"
                                 }
                             },
-                            "path": {
-                                "type": [
-                                    "string",
-                                    "null"
+                            "hive": {
+                                "anyOf": [
+                                    {
+                                        "enum": [
+                                            "HKEY_CLASSES_ROOT",
+                                            "HKEY_CURRENT_USER",
+                                            "HKEY_LOCAL_MACHINE",
+                                            "HKEY_USERS",
+                                            "HKEY_PERFORMANCE_DATA",
+                                            "HKEY_CURRENT_CONFIG",
+                                            "HKEY_DYN_DATA",
+                                            "HKEY_CURRENT_USER_LOCAL_SETTINGS",
+                                            "HKEY_PERFORMANCE_TEXT",
+                                            "HKEY_PERFORMANCE_NLSTEXT"
+                                        ]
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
                                 ]
                             },
-                            "key": {
+                            "subkey": {
                                 "type": [
                                     "string",
                                     "null"
@@ -755,6 +826,32 @@
                                     },
                                     {
                                         "type": "integer"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "data_type": {
+                                "anyOf": [
+                                    {
+                                        "enum": [
+                                            "REG_NONE",
+                                            "REG_SZ",
+                                            "REG_EXPAND_SZ",
+                                            "REG_BINARY",
+                                            "REG_DWORD",
+                                            "REG_DWORD_BIG_ENDIAN",
+                                            "REG_LINK",
+                                            "REG_MULTI_SZ",
+                                            "REG_QWORD"
+                                        ]
                                     },
                                     {
                                         "type": "null"
@@ -942,7 +1039,7 @@
                                 ]
                             },
                             "port": {
-                                "anyof": [
+                                "anyOf": [
                                     {
                                         "type": "integer",
                                         "minimum": 0,
@@ -954,7 +1051,7 @@
                                 ]
                             },
                             "network_protocol": {
-                                "anyof": [
+                                "anyOf": [
                                     {
                                         "enum": [
                                             "icmp",
@@ -1033,7 +1130,7 @@
                                 ]
                             },
                             "socket": {
-                                "anyof": [
+                                "anyOf": [
                                     {
                                         "title": "Socket",
                                         "description": "A collection of address, port, and protocol used together to make a socket connection.",
@@ -1055,7 +1152,7 @@
                                                 ]
                                             },
                                             "port": {
-                                                "anyof": [
+                                                "anyOf": [
                                                     {
                                                         "type": "integer",
                                                         "minimum": 0,
@@ -1067,7 +1164,7 @@
                                                 ]
                                             },
                                             "network_protocol": {
-                                                "anyof": [
+                                                "anyOf": [
                                                     {
                                                         "enum": [
                                                             "icmp",
@@ -1123,7 +1220,7 @@
                                 ]
                             },
                             "credential": {
-                                "anyof": [
+                                "anyOf": [
                                     {
                                         "title": "Credential",
                                         "description": "Collection of username and password used as credentials.",

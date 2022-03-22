@@ -11,6 +11,7 @@ The `mwcp test` command line utility has been created for users to generate and 
 - [Updating Legacy Test Cases](#updating-legacy-test-cases)
 - [Executing Existing Test Cases (legacy)](#executing-existing-test-cases-legacy)
 - [Executing Existing Test Cases](#executing-existing-test-cases)
+- [Downloading Test Samples](#downloading-test-samples)
 - [Creating or Adding Test Cases](#creating-or-adding-test-cases)
     - [Determining files to use as test cases](#determining-file-to-use-as-test-cases)
 - [Adding test cases](#adding-test-cases)
@@ -149,6 +150,33 @@ This will not run any tests, but rather just output the `pytest` command.
 ```console
 > mwcp test foo --command
 pytest 'C:\Python310\Lib\site-packages\mwcp\tests\test_parsers.py' --disable-pytest-warnings --durations 10 -vv -k foo -n auto
+```
+
+
+## Downloading Test Samples
+
+Use the `mwcp download` command to download a sample from the malware repo into the current directory.
+This command can take either a full/partial md5, a parser name, or previously failed test samples.
+
+### Downloading MD5 hashes
+
+```
+> mwcp download d41d8cd98f00b204e9800998ecf8427e
+> mwcp download d41d8
+```
+
+
+### Downloading Parser samples
+
+```
+> mwcp download SuperMalware 
+```
+
+
+### Downloading failed test samples.
+
+```
+> mwcp download --last-failed
 ```
 
 

@@ -24,6 +24,8 @@ def filled_report(report, metadata_items):
         logger.error("Test error log")
         logger.debug("Test debug log")
 
+        report.add_tag("test", "tagging")
+
     return report
 
 
@@ -53,11 +55,13 @@ def test_split_report(datadir):
         report.add(metadata.Mutex("root_mutex"))
 
         sub_file = mwcp.FileObject(b"some other data", file_name="sub_file.exe")
-        report.add(metadata.ResidualFile.from_file_object(sub_file))
+        report.add(metadata.File.from_file_object(sub_file))
         report.set_file(sub_file)
         logger.info("Info log in sub_file.exe")
         logger.error("Error log in sub_file.exe")
         report.add(metadata.Mutex("sub_mutex"))
+
+        report.add_tag("test", "tagging")
 
     assert len(report.get()) == 3
 

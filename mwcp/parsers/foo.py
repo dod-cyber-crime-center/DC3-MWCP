@@ -34,7 +34,7 @@ class Foo(Parser):
             ))
 
         # Dispatch residual files to also be processed.
-        self.dispatcher.add_to_queue(FileObject(
+        self.dispatcher.add(FileObject(
             b"hello world", file_name="fooconfigtest.txt", description="example output file"
         ))
         #  Alternatively we can manually report a residual file without being processed.

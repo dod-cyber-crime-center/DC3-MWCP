@@ -32,7 +32,7 @@ class Carrier(Parser):
         embed_data = match.group("embed_data")
 
         # Dispatch embedded dropper to be picked up by another ComponentParser.
-        self.dispatcher.add_to_queue(FileObject(embed_data, self.reporter))
+        self.dispatcher.add(FileObject(embed_data, self.reporter))
 
 
 class Dropper(Parser):
@@ -53,7 +53,7 @@ class Dropper(Parser):
         """Extracts config and embedded Implant files."""
         # Dispatch all the files in the ".DROPPER" resource directory.
         for rsrc in pefileutils.iter_rsrc(self.file_object.pe, ".DROPPER"):
-            self.dispatcher.add_to_queue(FileObject(rsrc.data, self.reporter, file_name=rsrc.idname))
+            self.dispatcher.add(FileObject(rsrc.data, self.reporter, file_name=rsrc.idname))
 
 
 class Implant(Parser):

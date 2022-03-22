@@ -53,7 +53,7 @@ For more persistence, you can add the directory path to the configuration parame
 ## Grouping Parsers
 DC3-MWCP has the ability to chain multiple parsers together into a group to create a larger
 parser. This was originally referred to as the "Dispatcher model".
-A parser group is comprised of a name, description, author, and list of parsers (or other parser groups) to run (in that order).
+A parser group consists of a name, description, author, and list of parsers (or other parser groups) to run (in that order).
 
 Creating a group allows you to chain
 the processing of possible components the parsers could extract.
@@ -129,6 +129,19 @@ Foo:
       - LlamaCorp:Foo.Carrier  # Imports LlamaCorp's Foo.Carrier parser component.
       - .Downloader
       - .Implant
+```
+
+You may also create direct aliases to other parser groups by providing just the parser name.
+
+```yaml
+Foo:
+    description: A Foo parser
+    author: ACME
+    parsers:
+        - .Downloader
+        - .Implant
+
+FooAlias: Foo
 ```
 
 

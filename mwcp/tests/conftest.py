@@ -1,4 +1,4 @@
-import logging
+import difflib
 from typing import List
 
 import pytest
@@ -29,6 +29,10 @@ def pytest_addoption(parser):
         "--malware-repo", action="store",
         help="Directory containing malware samples for parser tests."
     )
+    parser.addoption(
+        "--full-diff", action="store_true",
+        help="Whether to disable the custom unified diff view and instead use pytest's default full diff."
+    )
 
 
 def pytest_make_parametrize_id(config, val, argname):
@@ -38,6 +42,27 @@ def pytest_make_parametrize_id(config, val, argname):
     if "legacy" in argname:
         return "legacy" if val else "new"
 
+
+def pytest_assertrepr_compare(config, op, left, right):
+    """
+    Hooks assertion message creation in order to display a more condensed unified diff.
+    Can be disabled with the --full-diff flag.
+    """
+    # Ignore custom hook if user wants full diff.
+    if config.getoption("--full-diff", default=False):
+        return
+
+    # Force creation of full diff report when reporting on parse results.
+    type_report = '"type": "report"'
+    if (
+            op == "=="
+            and isinstance(left, str)
+            and isinstance(right, str)
+            and type_report in left
+            and type_report in right
+    ):
+        diff = difflib.unified_diff(right.splitlines(True), left.splitlines(True), "Expected", "Actual")
+        return ["", *(line.rstrip("\n") for line in diff)]
 
 
 @pytest.fixture
@@ -139,9 +164,11 @@ def metadata_items() -> List[Metadata]:
         metadata.Base16Alphabet("0123456789ABCDEF"),
         metadata.Base32Alphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567="),
         metadata.Base64Alphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="),
+        metadata.Command("cmd.exe /c notepad.exe"),
         metadata.Credential(username="admin", password="123456"),
         metadata.Username("mruser"),
         metadata.Password("secrets"),
+        metadata.CryptoAddress("14qViLJfdGaP4EeHnDyJbEGQysnCpwk3gd", "BTC"),
         metadata.Socket(address="bad.com", port=21, network_protocol="tcp"),
         metadata.Port(1635, protocol="udp"),
         metadata.ListenPort(4568, protocol="tcp"),
@@ -177,12 +204,13 @@ def metadata_items() -> List[Metadata]:
         metadata.Other("keylogger", True),
         metadata.Other("misc_integer", 432).add_tag("tag1"),
         metadata.Pipe("\\.\\pipe\\namedpipe"),
-        metadata.Registry(
-            "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\Updater",
+        metadata.Registry2(
+            subkey="HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            value="Updater",
             data="c:\\update.exe",
         ),
-        metadata.Registry(key="HKLM\\Foo\\Bar"),
-        metadata.Registry(value="Baz").add_tag("tag2"),
+        metadata.Registry2(subkey="HKLM\\Foo\\Bar"),
+        metadata.Registry2(value="Baz").add_tag("tag2"),
         metadata.RSAPrivateKey(
             public_exponent=0x07,
             modulus=0xbb,
@@ -205,6 +233,7 @@ def metadata_items() -> List[Metadata]:
         ),
         metadata.UserAgent("Mozilla/4.0 (compatible; MISE 6.0; Windows NT 5.2)"),
         metadata.Version("3.1"),
+        metadata.Version("403.10"),
         metadata.File(
             name="config.xml",
             description="Extracted backdoor Foo config file",

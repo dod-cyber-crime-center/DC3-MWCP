@@ -135,6 +135,33 @@ Sample2:
     assert 'Detected recursive loop: Sample2 -> Sample' in str(exec_info.value)
 
 
+def test_alias(make_sample_parser):
+    """Tests handling of an alias."""
+    registry.clear()
+
+    parser_path, config_file = make_sample_parser(
+        config_text=u'''
+
+Sample:
+    description: A test parser
+    author: Mr. Tester
+    parsers:
+        - .Downloader
+        - .Implant
+
+Sample_Alias: Sample
+
+        '''
+    )
+    parser_dir = str(parser_path.dirname)
+
+    mwcp.register_parser_directory(parser_dir, config_file_path=str(config_file), source_name='ACME')
+
+    parsers = [parser for _, parser in mwcp.iter_parsers()]
+    assert [parser.name for parser in parsers] == ["Sample", "Sample_Alias"]
+    assert parsers[1].parsers == parsers[0].parsers
+
+
 def test_external_source(make_sample_parser):
     """Tests importing a parser from an external source."""
     registry.clear()

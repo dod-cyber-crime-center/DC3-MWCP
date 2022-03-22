@@ -8,6 +8,7 @@ from __future__ import print_function, division
 
 import pathlib
 import shlex
+from typing import Tuple
 
 import pandas
 import pytest
@@ -557,15 +558,19 @@ def _run_tests(tester, silent=False, show_passed=False):
 )
 @click.option("-y", "--yes", is_flag=True, help="Auto confirm questions.")
 @click.option(
-    "--force", is_flag=True,
+    "-f", "--force", is_flag=True,
     help="Force test case to add/update even when errors are encountered."
+)
+@click.option(
+    "--last-failed", "--lf",
+    is_flag=True,
+    help="Rerun only the tests that failed at the last run",
 )
 # Arguments to configure console output
 @click.option(
-    "-f",
     "--show-passed",
     is_flag=True,
-    help="Display test case details for passed tests as well."
+    help="DEPRECATED: Display test case details for passed tests as well."
          "By default only failed tests are shown.",
 )
 @click.option("-s", "--silent", is_flag=True, help="Limit output to statement saying whether all tests passed or not.")
@@ -589,11 +594,16 @@ def _run_tests(tester, silent=False, show_passed=False):
          "(only applicable for running tests). "
          "This might be helpful for scripting your own advanced testing apparatus."
 )
+@click.option(
+    "--full-diff",
+    is_flag=True,
+    help="Whether to display a full diff for failed tests. Disables custom unified diff display."
+)
 # Parser to process.
 @click.argument("parser", nargs=-1, required=False)
 def test(
-    testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete, yes, force, show_passed,
-    silent, legacy, exit_on_first, command, parser,
+    testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete, yes, force, last_failed, show_passed,
+    silent, legacy, exit_on_first, command, full_diff, parser,
 ):
     """
     Testing utility to create and execute parser test cases.
@@ -607,6 +617,8 @@ def test(
         mwcp test foo                                         - Run test cases for foo parser.
         mwcp test foo -u                                      - Update existing test cases for foo parser.
         mwcp test -u                                          - Update existing test cases for all parsers.
+        mwcp test --lf                                        - Rerun previously failed test cases.
+        mwcp test --lf -u                                     - Update test cases that previously failed.
         mwcp test foo --add=./malware.bin                     - Add test case for malware.bin sample for foo parser.
         mwcp test foo -u --add=./malware.bin                  - Add test case for malware.bin sample.
                                                                 Allow updating if a test case for this file already exists.
@@ -655,20 +667,31 @@ def test(
 
     # Update
     elif update:
-        if not parser and not yes:
+        if not (parser or last_failed) and not yes:
             click.confirm("WARNING: About to update test cases for ALL parsers. Continue?", abort=True)
         click.echo("Updating test cases. May take a while...")
         if legacy:
+            if last_failed:
+                raise click.BadParameter(f"--last-failed flag is unsupported in legacy mode.")
             tester = Tester(parser_names=parser or [None], nprocs=nprocs)
             tester.update_tests(force=force)
         else:
-            testing.update_tests(parsers=parser, force=force)
+            if last_failed:
+                test_cases = testing.iter_failed_tests()
+            else:
+                test_cases = testing.iter_test_cases(parsers=parser)
+            for test_case in test_cases:
+                click.secho(f"Updating {test_case.name}-{test_case.md5}...", fg="green")
+                test_case.update(force=force)
 
     # Run tests
     else:
-        if not parser and not (yes or command):
+        if not (parser or last_failed) and not (yes or command):
             click.confirm("PARSER argument not provided. Run tests for ALL parsers?", default=True, abort=True)
+
         if legacy:
+            if last_failed:
+                raise click.BadParameter(f"--last-failed flag is unsupported in legacy mode.")
             # Force ERROR level logs so we don't spam the console.
             logging.root.setLevel(logging.ERROR)
             tester = Tester(parser_names=parser or [None], nprocs=nprocs)
@@ -694,11 +717,25 @@ def test(
                 # "-m", "parsers",
                 "--disable-pytest-warnings",
                 "--durations", "10",
+                "--tb", "short",  # Set to short to hide the test_parsers.py code.
+                # Set custom cache directory to make it easier to pull it programmatically later.
+                "-o", f"cache_dir={mwcp.config.pytest_cache_dir}",
             ]
+            if full_diff:
+                pytest_args += ["--full-diff"]
             if not silent:
                 pytest_args += ["-vv"]
+
+            if last_failed:
+                # Run last failed or none if no previous failures.
+                pytest_args += ["--lf", "--lfnf", "none"]
+            else:
+                # Reset cache for keeping track of previously failed tests.
+                pytest_args += ["--cache-clear"]
+
             if parser:
                 pytest_args += ["-k", " or ".join(parser)]
+
             if nprocs != 1:
                 pytest_args += ["-n", str(nprocs) if nprocs else "auto"]
             if testcase_dir:
@@ -724,6 +761,50 @@ def schema():
     you may get a list of these reports instead.
     """
     print(json.dumps(mwcp.schema(), indent=4))
+
+
+@main.command()
+@click.option(
+    "-o",
+    "--output-dir",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, path_type=pathlib.Path),
+    help="Root output directory to store downloaded files. (defaults to current directory)",
+)
+@click.option(
+    "--last-failed", "--lf",
+    is_flag=True,
+    help="Download samples for tests that previously failed.",
+)
+@click.argument("md5_or_parser", nargs=-1, required=False)
+def download(md5_or_parser: Tuple[str], output_dir, last_failed):
+    """
+    Downloads file from malware repo into current directory.
+
+    \b
+    MD5_OR_PARSER: One or more md5 hashes or parser names of the samples to download. (Hashes may be partial)
+        For parser names, all the samples for that parser test will be downloaded.
+
+    \b
+    Common usages::
+        mwcp download foo          - Download test samples for foo parser
+        mwcp download abcdef       - Download sample with md5 hash starting with 'abcdef'
+        mwcp download --lf         - Download samples from previously failed tests.
+    """
+    md5s = []
+    for entry in md5_or_parser:
+        md5s.extend(list(testing.iter_md5s(entry)) or [entry])
+    if last_failed:
+        for test_case in testing.iter_failed_tests():
+            md5s.append(test_case.md5)
+
+    for md5 in md5s:
+        try:
+            file_path = testing.download(md5, output_dir=output_dir)
+            click.secho(f"Downloaded: {file_path}")
+        except IOError as e:
+            click.secho(str(e), err=True, fg="red")
+            continue
 
 
 if __name__ == "__main__":

@@ -4,9 +4,10 @@ Schema for reportable metadata.
 - Using attrs for easy of use and validation.
 """
 import base64
-import datetime
+import binascii
 import hashlib
 import inspect
+import io
 import json
 import logging
 import pathlib
@@ -19,11 +20,17 @@ import uuid
 from typing import Any, Union, List, Optional, TypeVar, Type, Set, Iterable
 
 import attr
+from bitarray import bitarray
 import cattr
+from defusedxml import ElementTree
 import jsonschema_extractor
+from pyasn1.codec.der import decoder as asn1_decoder
+from pyasn1_modules import rfc2437, rfc2459, pem
+from pyasn1.error import PyAsn1Error
 
 import mwcp
 from mwcp.exceptions import ValidationError
+from mwcp.utils import construct
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +40,10 @@ cattr = cattr.GenConverter()
 # Register support for pathlib.
 cattr.register_structure_hook(pathlib.Path, lambda d, t: pathlib.Path(d))
 cattr.register_unstructure_hook(pathlib.Path, str)
+
+# Register support for enums.
+cattr.register_structure_hook(IntEnum, lambda d, t: t[d.upper()] if isinstance(d, str) else t(d))
+cattr.register_unstructure_hook(IntEnum, lambda d: None if d is None else d.name)
 
 
 T = TypeVar("T")
@@ -204,7 +215,7 @@ class Element:
         description = " ".join(description)
 
         schema = {
-            "title": cls.__name__.strip("_"),
+            "title": cls.__name__.strip("_").rstrip("2"),
             "description": description,
             "type": "object",
             "properties": {
@@ -229,13 +240,15 @@ class Element:
             if not is_required:
                 if list(sub_schema.keys()) == ["type"]:
                     if isinstance(sub_schema["type"], list):
-                        sub_schema["type"].append("null")
-                    else:
+                        if "null" not in sub_schema["type"]:
+                            sub_schema["type"].append("null")
+                    elif sub_schema["type"] != "null":
                         sub_schema["type"] = [sub_schema["type"], "null"]
                 elif list(sub_schema.keys()) == ["anyOf"]:
-                    sub_schema["anyOf"].append({"type": "null"})
+                    if {"type": "null"} not in sub_schema["anyOf"]:
+                        sub_schema["anyOf"].append({"type": "null"})
                 else:
-                    sub_schema = {"anyof": [sub_schema, {"type": "null"}]}
+                    sub_schema = {"anyOf": [sub_schema, {"type": "null"}]}
 
             schema["properties"][field.name] = sub_schema
 
@@ -256,6 +269,11 @@ class Element:
             "type": "string",
             "contentEncoding": "base64",
         })
+        # IntEnums are converted to their names before serialization by cattr.
+        # NOTE: Inserting hook in front to ensure we overwrite the "int" hook.
+        typing_extractor._extractor_list.insert(0, (IntEnum, lambda extractor, typ: {
+            "enum": [c.name for c in typ]
+        }))
         extractor = jsonschema_extractor.SchemaExtractorSet([typing_extractor])
         return extractor.extract(cls)
 
@@ -415,7 +433,12 @@ class Path(Metadata):
     Filesystem path used by malware. may include both a directory and filename.
 
     e.g.
-        Path("C:\\windows\\temp\\1\\log\\keydb.txt", is_dir=False)
+        Path("C:\\windows\\temp\\1\\log\\keydb.txt", is_dir=False)  # pass full path
+        Path(directory_path=f"C:\foo\", name="bar.exe", is_dir=False)  # know location and name of dropped file
+        Path(directory_path=f"C:\foo\", name="logs", is_dir=True)   # know location and name of a directory that gets created/used
+        Path(directory_path=f"C:\foo\", is_dir=False)  # know location of dropped file but name is unknown/varies
+        Path(name="bar.exe", is_dir=False)   # know name of of dropped file, but location is unknown
+        Path(directory_path=f"C:\foo\", is_dir=True)  # know location of a directory that gets created/used, but name of directory is unknown.
 
     """
     path: str = None
@@ -500,6 +523,14 @@ def Base64Alphabet(alphabet: str) -> Alphabet:
 
 
 @attr.s(**config)
+class Command(Metadata):
+    """
+    Shell command
+    """
+    value: str
+
+
+@attr.s(**config)
 class Credential(Metadata):
     """
     Collection of username and password used as credentials.
@@ -517,6 +548,23 @@ def Password(password: str) -> Credential:
 
 def Username(username: str) -> Credential:
     return Credential(username=username)
+
+
+@attr.s(**config)
+class CryptoAddress(Metadata):
+    """
+    A cryptocurrency address and its symbol.
+
+    :param address: The address or unique identifier of the crypto wallet.
+    :param symbol: A unique symbol for the cryptocurrency platform.
+        This is usually the ticker symbol like "BTC", but can be something else more appropriate.
+
+    e.g.
+        # Sample address pulled from bitcoinwiki.org/wiki/Bitcoin_address
+        CryptoAddress("14qViLJfdGaP4EeHnDyJbEGQysnCpwk3gd", "BTC")
+    """
+    address: str
+    symbol: str = None
 
 
 @attr.s(**config)
@@ -707,8 +755,22 @@ class URL(Metadata):
         self.socket.listen = value
 
 
-def C2URL(url: str) -> URL:
-    url = URL(url)
+def C2URL(
+        url: str = None,
+        socket: Socket = None,
+        path: str = None,
+        query: str = None,
+        application_protocol: str = None,
+        credential: Credential = None
+) -> URL:
+    url = URL(
+        url=url,
+        socket=socket,
+        path=path,
+        query=query,
+        application_protocol=application_protocol,
+        credential=credential
+    )
     url.c2 = True
     return url
 
@@ -1075,6 +1137,31 @@ class Pipe(Metadata):
     value: str
 
 
+class RegistryHive(IntEnum):
+    HKEY_CLASSES_ROOT = 0x80000000
+    HKEY_CURRENT_USER = 0x80000001
+    HKEY_LOCAL_MACHINE = 0x80000002
+    HKEY_USERS = 0x80000003
+    HKEY_PERFORMANCE_DATA = 0x80000004
+    HKEY_CURRENT_CONFIG = 0x80000005
+    HKEY_DYN_DATA = 0x80000006
+    HKEY_CURRENT_USER_LOCAL_SETTINGS = 0x80000007
+    HKEY_PERFORMANCE_TEXT = 0x80000050
+    HKEY_PERFORMANCE_NLSTEXT = 0x80000060
+
+    # Aliases
+    HKCR = HKEY_CLASSES_ROOT
+    HKCU = HKEY_CURRENT_USER
+    HKLM = HKEY_LOCAL_MACHINE
+    HKU = HKEY_USERS
+    HKPD = HKEY_PERFORMANCE_DATA
+    HKCC = HKEY_CURRENT_CONFIG
+    HKDD = HKEY_DYN_DATA
+    HKCULS = HKEY_CURRENT_USER_LOCAL_SETTINGS
+    HKPT = HKEY_PERFORMANCE_TEXT
+    HKPN = HKEY_PERFORMANCE_NLSTEXT
+
+
 class RegistryDataType(IntEnum):
     """Registry value data types in winreg.h"""
     REG_NONE = 0
@@ -1082,6 +1169,7 @@ class RegistryDataType(IntEnum):
     REG_EXPAND_SZ = 2
     REG_BINARY = 3
     REG_DWORD = 4
+    REG_DWORD_LITTLE_ENDIAN = REG_DWORD
     REG_DWORD_BIG_ENDIAN = 5
     REG_LINK = 6
     REG_MULTI_SZ = 7
@@ -1089,7 +1177,114 @@ class RegistryDataType(IntEnum):
 
 
 @attr.s(**config)
-class Registry(Metadata):
+class Registry2(Metadata):
+    """
+    Registry key, value (or name), and data.
+    (see docs.microsoft.com/en-us/windows/win32/sysinfo/structure-of-the-registry)
+
+    e.g.
+        Registry2(
+            hive="HKLM",  # or metadata.RegistryHive.HKEY_LOCAL_MACHINE
+            subkey="Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            value="Updater",
+            data="c:\\update.exe"
+        )
+    """
+    hive: RegistryHive = None
+    subkey: str = None
+    value: str = None  # registry key, value name, combination of the two
+    data: Union[bytes, str, int, List[str]] = attr.ib(default=None)
+    data_type: RegistryDataType = None
+
+    def __attrs_post_init__(self):
+        # Pull out hive if it was included in subkey.
+        if not self.hive and self.subkey:
+            hive, _, subkey = self.subkey.partition("\\")
+            try:
+                self.hive = RegistryHive[hive.upper()]
+            except KeyError:
+                pass
+            else:
+                self.subkey = subkey
+
+        # Strip off leading or trailing \'s on subkey.
+        if self.subkey:
+            self.subkey = self.subkey.strip("\\")
+
+        # Automatically set data type for some data values.
+        if self.data_type is None and self.data is not None:
+            if isinstance(self.data, str):
+                # If we have more than one "\0", this is a string list.
+                if self.data.count("\0") > 1:
+                    self.data_type = RegistryDataType.REG_MULTI_SZ
+                else:
+                    self.data_type = RegistryDataType.REG_SZ
+            elif isinstance(self.data, list) and all(isinstance(entry, str) for entry in self.data):
+                self.data_type = RegistryDataType.REG_MULTI_SZ
+            elif isinstance(self.data, bytes):
+                self.data_type = RegistryDataType.REG_BINARY
+            elif isinstance(self.data, int):
+                if self.data <= 0xffffffff:
+                    self.data_type = RegistryDataType.REG_DWORD
+                else:
+                    self.data_type = RegistryDataType.REG_QWORD
+            # NOTE: We are not going to convert a data of None to be type REG_NONE because data could
+            #   not be provided because we couldn't obtain it.
+            #   User must explicitly set data_type to REG_NONE if it is known to be None.
+
+        # Auto convert data set as REG_MULTI_SZ if given as a full string with null-terminations.
+        if self.data_type == RegistryDataType.REG_MULTI_SZ and isinstance(self.data, str) and "\0" in self.data:
+            if self.data.endswith("\0"):
+                self.data = self.data[:-1]
+            self.data = self.data.split("\0")
+
+        # Strip off null termination for strings.
+        if self.data and self.data_type == RegistryDataType.REG_SZ:
+            self.data = self.data.rstrip("\0")
+
+    @data.validator
+    def _validate_data(self, attribute, value):
+        if isinstance(value, int) and value < 0:
+            raise ValidationError(f"Integer data value must be positive. Got {value}")
+
+    @classmethod
+    def _type(cls):
+        return "registry"
+
+    @classmethod
+    def from_path(cls, path: str, data: Union[bytes, str, int] = None) -> "Registry2":
+        """
+        Generates a Registry from a given full path.
+        The last segment of the path is assumed to be the value.
+        """
+        # Cast path to string to be more backwards compatible.
+        if isinstance(path, bytes):
+            path = path.decode("utf8")
+        subkey, _, value = path.rpartition("\\")
+        return Registry2(subkey=subkey or None, value=value or None, data=data)
+
+    @property
+    def key(self) -> Optional[str]:
+        """
+        The combination of the hive + subkey.
+        """
+        hive_name = self.hive.name if self.hive is not None else ""
+        if hive_name or self.subkey:
+            return "\\".join([hive_name, self.subkey or ""])
+        else:
+            return None
+
+    def as_formatted_dict(self, flat=False) -> dict:
+        return {
+            "tags": self.tags,
+            "key": self.key,
+            "value": self.value,
+            "data": self.data,
+            "data_type": self.data_type.name if self.data_type is not None else None,
+        }
+
+
+def Registry(path: str = None, key: str = None, value: str = None, data: Union[bytes, str, int] = None) -> Registry2:
     """
     Registry key and value.
 
@@ -1099,46 +1294,48 @@ class Registry(Metadata):
             data="c:\\update.exe",
         )
     """
-    path: str = None
-    key: str = None
-    value: str = None  # registry key, value name, combination of the two
-    data: Union[bytes, str, int] = None
-    # data_type: RegistryDataType = None  # TODO
+    warnings.warn(
+        "Registry has been renamed to Registry2 during a transitional period to a new version of Registry " 
+        "with a new signature. "
+        "Please update to use Registry2 with explicit key/value fields or use the .from_path() constructor. "
+        "NOTE: In a future version, once this function is deprecated, Registry2 will be renamed back to Registry "
+        "using the new signature.",
+        DeprecationWarning
+    )
+    if path is not None:
+        registry = Registry2.from_path(path, data=data)
+        # Need to overwrite key and value if provided in order to replicate legacy logic.
+        if key:
+            registry.subkey = key
+        if value:
+            registry.value = value
+        return registry
+    else:
+        return Registry2(subkey=key, value=value, data=data)
 
-    def __attrs_post_init__(self):
-        if self.path is not None:
-            # TODO: support other file system path types.
-            key, _, value = self.path.rpartition("\\")
-            if self.key is None:
-                self.key = key
-            if self.value is None:
-                self.value = value
-        elif self.key and self.value:
-            self.path = "\\".join([self.key, self.value])
 
-
-def RegistryData(data: str) -> Registry:
+def RegistryData(data: str) -> Registry2:
     warnings.warn(
         "This is a temporary helper that may be removed in a future version. "
         "Please use Registry() instead.", DeprecationWarning
     )
-    return Registry(data=data)
+    return Registry2(data=data)
 
 
-def RegistryPath(path: str) -> Registry:
+def RegistryPath(path: str) -> Registry2:
     warnings.warn(
         "This is a temporary helper that may be removed in a future version. "
         "Please use Registry() instead.", DeprecationWarning
     )
-    return Registry(path)
+    return Registry2.from_path(path)
 
 
-def RegistryPathData(path: str, data: str) -> Registry:
+def RegistryPathData(path: str, data: str) -> Registry2:
     warnings.warn(
         "This is a temporary helper that may be removed in a future version. "
         "Please use Registry() instead.", DeprecationWarning
     )
-    return Registry(path, data=data)
+    return Registry2.from_path(path, data=data)
 
 
 def _int_dump(value: int) -> str:
@@ -1155,6 +1352,32 @@ def _int_dump(value: int) -> str:
     return hex_dump
 
 
+def _parse_rsa_xml(data: str):
+    """
+    Parses RSA key data from XML notation.
+    Logs any errors as warnings.
+
+    :raises ValueError: If nothing could be parsed out.
+    """
+    try:
+        root = ElementTree.fromstring(data)
+    except ElementTree.ParseError as e:
+        raise ValueError(f"Failed to parse XML data: {e}")
+    if root.tag != "RSAKeyValue":
+        raise ValueError(f"Expected root tag to be 'RSAKeyValue', got '{root.tag}'")
+    fields = {}
+    for child in root:
+        try:
+            fields[child.tag] = int.from_bytes(base64.b64decode(child.text), byteorder="big")
+        except binascii.Error as e:
+            logger.warning(f"Failed to base64 decode data in '{child.tag}': {e}")
+
+    if not fields:
+        raise ValueError(f"Failed to parse any RSA key data from XML.")
+
+    return fields
+
+
 @attr.s(**config)
 class RSAPrivateKey(Metadata):
     """
@@ -1169,6 +1392,99 @@ class RSAPrivateKey(Metadata):
     d_mod_p1: int = None
     d_mod_q1: int = None
     q_inv_mod_p: int = None
+
+    @classmethod
+    def from_DER(cls, data: bytes) -> "RSAPrivateKey":
+        """
+        Generates RSAPrivateKey from data in ASN.1 DER format.
+
+        :param data: RSA key data in ASN.1 DER format
+
+        :raises ValueError: on failure
+        """
+        try:
+            privkey, _ = asn1_decoder.decode(data, asn1Spec=rfc2437.RSAPrivateKey())
+            return RSAPrivateKey(
+                public_exponent=int(privkey.getComponentByName("publicExponent")),
+                modulus=int(privkey.getComponentByName("modulus")),
+                private_exponent=int(privkey.getComponentByName("privateExponent")),
+                p=int(privkey.getComponentByName("prime1")),
+                q=int(privkey.getComponentByName("prime2")),
+                d_mod_p1=int(privkey.getComponentByName("exponent1")),
+                d_mod_q1=int(privkey.getComponentByName("exponent2")),
+                q_inv_mod_p=int(privkey.getComponentByName("coefficient")),
+            )
+        except PyAsn1Error as e:
+            raise ValueError(f"Failed to extract RSA public key: {e}")
+
+    @classmethod
+    def from_PEM(
+            cls, data: str,
+            start_marker="-----BEGIN RSA PRIVATE KEY-----",
+            end_marker="-----END RSA PRIVATE KEY-----"
+    ) -> "RSAPrivateKey":
+        """
+        Generates RSAPrivateKey from data in ASN.1 PEM format.
+
+        :param data: RSA key data in ASN.1 PEM format
+        :param start_marker: Marks the beginning of the private key in PEM format.
+        :param end_marker: Marks the end of the private key in PEM format.
+
+        :raises ValueError: on failure
+        """
+        with io.StringIO(data) as fo:
+            der = pem.readPemFromFile(fo, startMarker=start_marker, endMarker=end_marker)
+            return cls.from_DER(der)
+
+    @classmethod
+    def from_BLOB(cls, data: bytes) -> "RSAPrivateKey":
+        """
+        Generates RSAPrivateKey from data stored in a Microsoft PRIVATEKEYBLOB format.
+
+        :param data: RSA key data in Microsoft Blob format
+
+        :raises ValueError: on failure
+        """
+        try:
+            privkey = construct.PRIVATEKEYBLOB.parse(data)
+            return RSAPrivateKey(
+                public_exponent=privkey.pubexponent,
+                modulus=privkey.modulus,
+                private_exponent=privkey.D,
+                p=privkey.P,
+                q=privkey.Q,
+                d_mod_p1=privkey.Dp,
+                d_mod_q1=privkey.Dq,
+                q_inv_mod_p=privkey.Iq,
+            )
+        except construct.ConstructError as e:
+            raise ValueError(f"Failed to parse Private Key BLOB: {e}")
+
+    @classmethod
+    def from_XML(cls, data: str, fallback=False) -> Union["RSAPrivateKey", "RSAPublicKey"]:
+        """
+        Generates RSAPrivateKey from data stored in serialized .NET XML resource.
+        (see RSA.FromXMLString() from .NET API documentation)
+
+        :param data: .NET Microsoft XML resource data
+        :param fallback: Whether to fallback to creating a RSAPublicKey if only the public exponent and modulus exists.
+            (useful if you don't know/care if the XML data contains a public or private key)
+
+        :raises ValueError: on failure
+        """
+        fields = _parse_rsa_xml(data)
+        if fallback and not any(key in fields for key in ("D", "P", "Q", "DP", "DQ", "InverseQ")):
+            return RSAPublicKey.from_XML(data)
+        return RSAPrivateKey(
+            public_exponent=fields.get("Exponent", None),
+            modulus=fields.get("Modulus", None),
+            private_exponent=fields.get("D", None),
+            p=fields.get("P", None),
+            q=fields.get("Q", None),
+            d_mod_p1=fields.get("DP", None),
+            d_mod_q1=fields.get("DQ", None),
+            q_inv_mod_p=fields.get("InverseQ", None),
+        )
 
     def as_formatted_dict(self, flat=False) -> dict:
         """
@@ -1203,6 +1519,80 @@ class RSAPublicKey(Metadata):
     """
     public_exponent: int = None
     modulus: int = None
+
+    @classmethod
+    def from_DER(cls, data: bytes) -> "RSAPublicKey":
+        """
+        Generates RSAPublicKey from data in ASN.1 DER format.
+
+        :param data: RSA key data in ASN.1 DER format
+
+        :raises ValueError: on failure
+        """
+        try:
+            keyinfo, _ = asn1_decoder.decode(data, asn1Spec=rfc2459.SubjectPublicKeyInfo())
+            pubkey_obj = keyinfo.getComponentByName("subjectPublicKey")
+            key_data = bitarray(pubkey_obj.asBinary()).tobytes()
+            pubkey, _ = asn1_decoder.decode(key_data, asn1Spec=rfc2437.RSAPublicKey())
+            return RSAPublicKey(
+                public_exponent=int(pubkey.getComponentByName("publicExponent")),
+                modulus=int(pubkey.getComponentByName("modulus")),
+            )
+        except PyAsn1Error as e:
+            raise ValueError(f"Failed to extract RSA public key: {e}")
+
+    @classmethod
+    def from_PEM(
+            cls, data: str,
+            start_marker="-----BEGIN PUBLIC KEY-----",
+            end_marker="-----END PUBLIC KEY-----"
+    ) -> "RSAPublicKey":
+        """
+        Generates RSAPublicKey from data in ASN.1 PEM format.
+
+        :param data: RSA key data in ASN.1 PEM format
+        :param start_marker: Marks the beginning of the public key in PEM format.
+        :param end_marker: Marks the end of the public key in PEM format.
+
+        :raises ValueError: on failure
+        """
+        with io.StringIO(data) as fo:
+            der = pem.readPemFromFile(fo, startMarker=start_marker, endMarker=end_marker)
+            return cls.from_DER(der)
+
+    @classmethod
+    def from_BLOB(cls, data: bytes) -> "RSAPublicKey":
+        """
+        Generates RSAPublicKey from data stored in a Microsoft PUBLICKEYBLOB format.
+
+        :param data: RSA key data in Microsoft Blob format
+
+        :raises ValueError: on failure
+        """
+        try:
+            pubkey = construct.PUBLICKEYBLOB.parse(data)
+            return RSAPublicKey(
+                public_exponent=pubkey.pubexponent,
+                modulus=pubkey.modulus,
+            )
+        except construct.ConstructError as e:
+            raise ValueError(f"Failed to parse Public Key BLOB: {e}")
+
+    @classmethod
+    def from_XML(cls, data: str) -> "RSAPublicKey":
+        """
+        Generates RSAPublicKey from data stored in serialized .NET XML resource.
+        (see RSA.FromXMLString() from .NET API documentation)
+
+        :param data: .NET Microsoft XML resource data
+
+        :raises ValueError: on failure
+        """
+        fields = _parse_rsa_xml(data)
+        return RSAPublicKey(
+            public_exponent=fields.get("Exponent", None),
+            modulus=fields.get("Modulus", None),
+        )
 
     def as_formatted_dict(self, flat=False) -> dict:
         """

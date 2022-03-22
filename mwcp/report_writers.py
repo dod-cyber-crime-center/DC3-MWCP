@@ -18,6 +18,8 @@ def _camel_case_to_title(name: str):
     >>> _camel_case_to_title("SocketURLAddress")
     "Socket URL Address"
     """
+    # Remove any "2" suffixes. These are here for transitions to new schemas.
+    name = name.rstrip("2")
     return re.sub(
         "([a-z])([A-Z])", "\g<1> \g<2>",
         re.sub("([A-Z][a-z])", " \g<1>", name).strip()
@@ -134,13 +136,14 @@ class MarkupWriter(ReportWriter):
 
         return value
 
-    def table(self, tabular_data: Union[List[dict], List[list]], headers=None):
+    def table(self, tabular_data: Union[List[dict], List[list]], headers=None, **options):
         """
         Writes out tabular data as a table using tabulate library.
 
         :param tabular_data: A list of dicts or lists to represent tabular data.
         :param headers: Header option passed to tabulate. If not provided and tabular data
             contains dictionaries, it will use the keys.
+        :param **options: Extra arguments to pass along to tabulate.
         """
         if tabular_data:
             if not headers and isinstance(tabular_data[0], dict):
@@ -156,7 +159,7 @@ class MarkupWriter(ReportWriter):
                 else:
                     raise ValueError(f"Invalid tabular data: {entry!r}")
 
-        self._stream.write(tabulate.tabulate(tabular_data, headers=headers, tablefmt=self._tablefmt))
+        self._stream.write(tabulate.tabulate(tabular_data, headers=headers, tablefmt=self._tablefmt, **options))
         self._stream.write("\n\n")
 
     def _write_table(self, elements: List[metadata.Element]):
@@ -186,7 +189,11 @@ class MarkupWriter(ReportWriter):
             for entry in tabular_data:
                 del entry["Tags"]
 
-        self.table(tabular_data)
+        if isinstance(elements[0], metadata.Version):
+            # tabulate may incorrectly see these versions as floats.
+            self.table(tabular_data, disable_numparse=True)
+        else:
+            self.table(tabular_data)
 
     def write(self, report: metadata.Report):
         """
@@ -210,6 +217,10 @@ class MarkupWriter(ReportWriter):
             ]
             if input_file.tags:
                 tabular_data.append(["Tags", ", ".join(input_file.tags)])
+            # For this view, we will include the global report tags in this table as well.
+            if report.tags:
+                tabular_data.append(["Report Tags", ", ".join(report.tags)])
+
             self.table(tabular_data, headers=["Field", "Value"])
 
         # Consolidate metadata elements by their type.
@@ -220,7 +231,7 @@ class MarkupWriter(ReportWriter):
         # Write all metadata elements in alphabetical order.
         # (Except for Other and ResidualFile which we will write at the end.)
         for element_class, elements in sorted(metadata_dict.items(), key=lambda tup: tup[0].__name__):
-            if element_class in (metadata.Other, metadata.ResidualFile):
+            if element_class in (metadata.Other, metadata.File):
                 continue
             table_name = _camel_case_to_title(element_class.__name__)
             # Remove the " Legacy" part for legacy metadata fields.
@@ -239,7 +250,7 @@ class MarkupWriter(ReportWriter):
             self._write_table(misc_elements)
 
         # Write out output/residual files. (Customized columns)
-        residual_files = metadata_dict.get(metadata.ResidualFile, [])
+        residual_files = metadata_dict.get(metadata.File, [])
         if residual_files:
             self.h2("Residual Files")
             include_tags = any(residual_file.tags for residual_file in residual_files)

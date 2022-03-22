@@ -17,7 +17,7 @@ from anytree import RenderTree
 
 import mwcp
 from mwcp import metadata, FileObject
-from mwcp.metadata import Report as ReportModel, Metadata, ResidualFile
+from mwcp.metadata import Report as ReportModel, Metadata, File
 from mwcp.report_writers import DataFrameWriter, SimpleTextWriter, MarkdownWriter, HTMLWriter
 from mwcp.utils import logutil
 from mwcp.utils.stringutils import convert_to_unicode, sanitize_filename
@@ -49,7 +49,7 @@ METADATA_MAP = {
     "missionid": metadata.MissionID,
     "mutex": metadata.Mutex,
     "other": metadata.Other,
-    "outputfile": metadata.ResidualFile,
+    "outputfile": metadata.File,
     "password": metadata.Password,
     "pipe": metadata.Pipe,
     "port": metadata.Port,
@@ -138,12 +138,14 @@ class Report:
 
         self.input_file = input_file
         self.parser = parser
+        self.tags = set()
         # Holds logs per file. (This is used by the ReportLogHandler)
         self._logs: List[LogRecord] = []
         # Holds metadata per file.
         self._metadata = collections.defaultdict(list)
         self._current_file = input_file  # type: FileObject
         self._history = [input_file]  # type: List[FileObject]
+        self.parsed_files = {}
         self.finalized = False
 
         # Setup a log handler to add errors and debug messages to the report.
@@ -222,7 +224,7 @@ class Report:
     @property
     def metadata(self) -> dict:
         """
-        Converts our metadata elements into back the legacy format described in fields.json
+        Converts our metadata elements back into the legacy format described in fields.json
 
         NOTE: This is here for backwards compatibility with the old json format.
             Please update your code to use the new schema found in as_dict() or as_json()
@@ -278,6 +280,13 @@ class Report:
                     # noinspection PyTypeChecker
                     self._insert_into_other(
                         results, f"base{element.base}_alphabet", element.alphabet)
+
+            elif isinstance(element, metadata.Command):
+                self._insert_into_other(results, "command", element.value)
+
+            elif isinstance(element, metadata.CryptoAddress):
+                symbol = (element.symbol or "crypto").lower()
+                self._insert_into_other(results, f"{symbol}_address", element.address)
 
             elif isinstance(element, metadata.URL):
                 if element.url:
@@ -363,13 +372,14 @@ class Report:
             elif isinstance(element, metadata.Pipe):
                 results["pipe"].append(str(element.value))
 
-            elif isinstance(element, metadata.Registry):
+            elif isinstance(element, metadata.Registry2):
                 if element.data:
                     results["registrydata"].append(str(element.data))
-                if element.path:
-                    results["registrypath"].append(element.path)
+                if element.key or element.value:
+                    path = "\\".join([element.key or "", element.value or ""])
+                    results["registrypath"].append(path)
                     if element.data:
-                        results["registrypathdata"].append([element.path, str(element.data)])
+                        results["registrypathdata"].append([path, str(element.data)])
 
             elif isinstance(element, metadata.RSAPrivateKey):
                 results["rsa_private_key"].append([
@@ -419,10 +429,9 @@ class Report:
             elif isinstance(element, metadata.Version):
                 results["version"].append(str(element.value))
 
-            elif isinstance(element, metadata.ResidualFile):
+            elif isinstance(element, metadata.File):
                 output_file = [element.name, element.description, element.md5]
                 if self._include_file_data and element.data:
-                    # TODO: convert ResidualFile into json instead?
                     output_file.append(base64.b64encode(element.data).decode())
                 results["outputfile"].append(output_file)
 
@@ -455,12 +464,12 @@ class Report:
         input_file = source or self.input_file
         metadata_entries = self.get(source=source)
         report_model = metadata.Report(
-            input_file=metadata.InputFile.from_file_object(input_file) if input_file else None,
+            input_file=metadata.File.from_file_object(input_file) if input_file else None,
             parser=(input_file.parser and input_file.parser.name) if source else self.parser,
             errors=self.get_logs(source, errors_only=True),
             logs=self.get_logs(source),
             metadata=deepcopy(metadata_entries),
-        )
+        ).add_tag(*self.tags)
         report_model.validate()
 
         # Remove raw file data from report model if requested.
@@ -468,7 +477,7 @@ class Report:
             if report_model.input_file:
                 report_model.input_file.data = None
             for element in report_model.metadata:
-                if isinstance(element, metadata.ResidualFile):
+                if isinstance(element, metadata.File):
                     element.data = None
 
         return report_model
@@ -613,6 +622,19 @@ class Report:
         """
         return str(RenderTree(self.input_file))
 
+    def add_tag(self, *tags: Iterable[str]) -> "Report":
+        """
+        Adds global tag(s) to the report.
+        NOTE: Tags added in this way are included in the overall report and aren't directed towards
+        any specific file (including the original input file).
+
+        :param tags: One or more tags to add to the metadata.
+        :returns: Report object to make it chainable.
+        """
+        for tag in tags:
+            self.tags.add(tag)
+        return self
+
     def _get_metadata_element(self, field_name: str) -> Union[Metadata, Callable]:
         """
         Returns an appropriate metadata.Element or helper function based on given legacy field name.
@@ -727,18 +749,18 @@ class Report:
 
     def output_file(self, data: bytes, filename: str = None, description: str = None):
         warnings.warn(
-            "output_file() is deprecated. Please add a metadata.ResidualFile object to add() instead.",
+            "output_file() is deprecated. Please add a metadata.File object to add() instead.",
             DeprecationWarning
         )
-        residual_file = metadata.ResidualFile(name=filename, description=description, data=data)
+        residual_file = metadata.File(name=filename, description=description, data=data)
         self.add(residual_file)
         # In order to be backwards compatible, we have to write out the file here so we can
         # return a file path.
         return self._write_residual_file(residual_file)
 
-    def _write_residual_file(self, residual_file: ResidualFile) -> Optional[str]:
+    def _write_residual_file(self, residual_file: File) -> Optional[str]:
         """
-        Writes out the given ResidualFile metadata object and returns the file path to the written file
+        Writes out the given File metadata object and returns the file path to the written file
         or None on failure.
         """
         if not self._write_output_files:
@@ -766,10 +788,10 @@ class Report:
         This should be called after parsing is complete.
         This performs post processing tasks such as validation and cleaning up the log handler.
         """
-        # TODO: move this to post_processing of ResidualFile?
+        # TODO: move this to post_processing of File?
         # Write out residual files to file system if requested.
         if self._write_output_files:
-            for residual_file in self.iter(metadata.ResidualFile):
+            for residual_file in self.iter(metadata.File):
                 self._write_residual_file(residual_file)
 
         # Remove log handler.
@@ -796,13 +818,13 @@ class Report:
         Iterates all elements if an element_type and source_file is not provided.
 
         e.g.
-            for residual_file in report.iter(metadata.ResidualFile):
+            for residual_file in report.iter(metadata.File):
                 ...
 
             for element in report.iter(metadata.URL, metadata.Socket):
                 ...
 
-            for residual_file in report.iter(metadata.ResidualFile, source="5d41402abc4b2a76b9719d911017c592"):
+            for residual_file in report.iter(metadata.File, source="5d41402abc4b2a76b9719d911017c592"):
                 ...
 
             for element in report.iter(metadata.URL, metadata.Socket, source="5d41402abc4b2a76b9719d911017c592"):
@@ -839,8 +861,8 @@ class Report:
         Same as .iter(), but wraps results in a list for you.
 
         e.g.
-            residual_files = report.get(metadata.ResidualFile)
-            residual_files = report.get(metadata.ResidualFile, source="5d41402abc4b2a76b9719d911017c592")
+            residual_files = report.get(metadata.File)
+            residual_files = report.get(metadata.File, source="5d41402abc4b2a76b9719d911017c592")
             elements = report.get(metadata.URL, metadata.Socket)
             elements = report.get(metadata.URL, metadata.Socket, source="5d41402abc4b2a76b9719d911017c592")
         """

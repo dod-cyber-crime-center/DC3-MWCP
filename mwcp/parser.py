@@ -50,9 +50,11 @@ class Parser(metaclass=ParserMeta):
     """
 
     file_object = None  # type: FileObject
-    # This is the description that will be given the the file object during output
+    # This is the description that will be given to the file object during output
     # if no description is set in the file_object. This must be overwritten by inherited classes.
     DESCRIPTION = None
+    # This is a tuple of tags that will be added to the file object after identification.
+    TAGS = ()
 
     # TODO: Deprecate the AUTHOR field?
     AUTHOR = ""  # Optional

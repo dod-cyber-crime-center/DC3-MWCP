@@ -1,6 +1,9 @@
 {
     "type": "report",
-    "tags": [],
+    "tags": [
+        "tagging",
+        "test"
+    ],
     "mwcp_version": "MWCP_VERSION",
     "input_file": {
         "type": "file",
@@ -80,6 +83,11 @@
             "base": 64
         },
         {
+            "type": "command",
+            "tags": [],
+            "value": "cmd.exe /c notepad.exe"
+        },
+        {
             "type": "credential",
             "tags": [],
             "username": "admin",
@@ -96,6 +104,12 @@
             "tags": [],
             "username": null,
             "password": "secrets"
+        },
+        {
+            "type": "crypto_address",
+            "tags": [],
+            "address": "14qViLJfdGaP4EeHnDyJbEGQysnCpwk3gd",
+            "symbol": "BTC"
         },
         {
             "type": "socket",
@@ -339,28 +353,31 @@
         {
             "type": "registry",
             "tags": [],
-            "path": "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\Updater",
-            "key": "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            "hive": "HKEY_LOCAL_MACHINE",
+            "subkey": "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
             "value": "Updater",
-            "data": "c:\\update.exe"
+            "data": "c:\\update.exe",
+            "data_type": "REG_SZ"
         },
         {
             "type": "registry",
             "tags": [],
-            "path": null,
-            "key": "HKLM\\Foo\\Bar",
+            "hive": "HKEY_LOCAL_MACHINE",
+            "subkey": "Foo\\Bar",
             "value": null,
-            "data": null
+            "data": null,
+            "data_type": null
         },
         {
             "type": "registry",
             "tags": [
                 "tag2"
             ],
-            "path": null,
-            "key": null,
+            "hive": null,
+            "subkey": null,
             "value": "Baz",
-            "data": null
+            "data": null,
+            "data_type": null
         },
         {
             "type": "rsa_private_key",
@@ -407,6 +424,11 @@
             "type": "version",
             "tags": [],
             "value": "3.1"
+        },
+        {
+            "type": "version",
+            "tags": [],
+            "value": "403.10"
         },
         {
             "type": "file",

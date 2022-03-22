@@ -133,7 +133,7 @@ class FileObject(object):
             "Please use .open() instead.",
             DeprecationWarning
         )
-        self._open_file = io.BytesIO(self.file_data)
+        self._open_file = io.BytesIO(self.data)
         return self._open_file
 
     def __exit__(self, *args):
@@ -169,9 +169,9 @@ class FileObject(object):
 
     def add_tag(self, *tags: Iterable[str]) -> "FileObject":
         """
-        Adds a tag for the given metadata.
+        Adds tag(s) for the file.
 
-        :param tags: One or more tags to add to the metadata.
+        :param tags: One or more tags to add to the file.
         :returns: self to make this function chainable.
         """
         for tag in tags:
@@ -418,7 +418,7 @@ class FileObject(object):
             DeprecationWarning
         )
         if self.output_file:
-            self._report.add(metadata.ResidualFile.from_file_object(self))
+            self._report.add(metadata.File.from_file_object(self))
 
     def run_kordesii_decoder(self, decoder_name: str, warn_no_strings=True, **run_config):
         """

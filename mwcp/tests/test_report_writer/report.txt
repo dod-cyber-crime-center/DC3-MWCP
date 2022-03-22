@@ -9,6 +9,7 @@ MD5           1e50210a0202497fb79bc38b6ade6c34
 SHA1          baf34551fecb48acc3da868eb85e1b6dac9de356
 SHA256        1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee
 Compile Time
+Report Tags   tagging, test
 
 ---- Alphabet ----
 Alphabet                                                             Base
@@ -17,6 +18,11 @@ Alphabet                                                             Base
 ABCDEFGHIJKLMNOPQRSTUVWXYZ234567=                                      32
 ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=      64
 
+---- Command ----
+Value
+----------------------
+cmd.exe /c notepad.exe
+
 ---- Credential ----
 Username    Password
 ----------  ----------
@@ -24,6 +30,11 @@ admin       123456
 mruser
             secrets
 admin       pass
+
+---- Crypto Address ----
+Address                             Symbol
+----------------------------------  --------
+14qViLJfdGaP4EeHnDyJbEGQysnCpwk3gd  BTC
 
 ---- Decoded String ----
 Value       Key     Algorithm
@@ -111,11 +122,11 @@ Public Exponent (e):
     7 (0x7)
 
 ---- Registry ----
-Tags    Path                                                        Key                                                 Value    Data
-------  ----------------------------------------------------------  --------------------------------------------------  -------  -------------
-        HKLM\Software\Microsoft\Windows\CurrentVersion\Run\Updater  HKLM\Software\Microsoft\Windows\CurrentVersion\Run  Updater  c:\update.exe
-                                                                    HKLM\Foo\Bar
-tag2                                                                                                                    Baz
+Tags    Key                                                               Value    Data           Data Type
+------  ----------------------------------------------------------------  -------  -------------  -----------
+        HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run  Updater  c:\update.exe  REG_SZ
+        HKEY_LOCAL_MACHINE\Foo\Bar
+tag2                                                                      Baz
 
 ---- Service ----
 Name                   Display Name             Description                                                             Image
@@ -150,9 +161,10 @@ Value
 Mozilla/4.0 (compatible; MISE 6.0; Windows NT 5.2)
 
 ---- Version ----
-  Value
+Value
 -------
-    3.1
+3.1
+403.10
 
 ---- Miscellaneous ----
 Tags    Key           Value

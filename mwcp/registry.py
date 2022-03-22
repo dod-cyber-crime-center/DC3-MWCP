@@ -157,12 +157,16 @@ def _load_config(config_file_path):
     for key, value in config.items():
         if "." in key:
             raise ValueError(f'"." in group name is not allowed: {key}')
-        if "description" not in value:
-            raise ValueError(f'Missing "description" field in group: {key}')
-        if "parsers" not in value:
-            raise ValueError(f'Missing "parsers" field in group: {key}')
-        if not isinstance(value["parsers"], list):
-            raise ValueError(f'"parsers" field is not a list in group: {key}')
+        if isinstance(value, str):
+            if value not in config.keys():
+                raise ValueError(f'Unable to find "{value}" aliased by "{key}"')
+        else:
+            if "description" not in value:
+                raise ValueError(f'Missing "description" field in group: {key}')
+            if "parsers" not in value:
+                raise ValueError(f'Missing "parsers" field in group: {key}')
+            if not isinstance(value["parsers"], list):
+                raise ValueError(f'"parsers" field is not a list in group: {key}')
     return config
 
 
@@ -255,6 +259,36 @@ def _is_module_available(module_name):
         return False
 
 
+def _import_parser(name: str, source: Source):
+    """Imports Parser class from full name."""
+    logger.debug(f"Generating parser: {name}")
+    if "." not in name:
+        raise ParserNotFoundError(f"Invalid name {name}")
+    # If not, find and import the referenced mwcp.Parser class.
+    module_name, _, class_name = name.rpartition(".")
+    module_fullname = source.package.__name__ + "." + module_name
+
+    logger.debug(f"Checking existence of {module_fullname}")
+    if not _is_module_available(module_fullname):
+        raise ParserNotFoundError(f"{module_fullname} module does not exist")
+
+    logger.debug(f"Importing: {module_fullname}")
+    module = importlib.import_module(module_fullname)
+
+    if not hasattr(module, class_name):
+        raise ParserNotFoundError(f"{class_name} is not in {module_fullname}")
+
+    klass = getattr(module, class_name)
+
+    if not issubclass(klass, Parser):
+        raise ParserNotFoundError(f"{module_fullname}.{class_name} is not a mwcp.Parser class")
+
+    klass.name = name
+    klass.source = source.name
+    logger.debug(f"Created parser: {klass!r}")
+    return klass
+
+
 def _generate_parser_aux(parser_name, group_name, source, _visiting):
     """
     Auxiliary function used by _generate_parser() to format the parser_name
@@ -301,38 +335,21 @@ def _generate_parser(name: str, source: Source, recursive=True, _visiting=None):
     _visiting.add((name, source.name))
 
     try:
-        # First check if parser name is a parser group.
-        options = dict(source.config[name])
+        # First check if parser name is a parser group or alias.
+        config_value = source.config[name]
     except KeyError:
-        logger.debug(f"Generating parser: {name}")
-        if "." not in name:
-            raise ParserNotFoundError(f"Invalid name {name}")
-        # If not, find and import the referenced mwcp.Parser class.
-        module_name, _, class_name = name.rpartition(".")
-        module_fullname = source.package.__name__ + "." + module_name
-
-        logger.debug(f"Checking existence of {module_fullname}")
-        if not _is_module_available(module_fullname):
-            raise ParserNotFoundError(f"{module_fullname} module does not exist")
-
-        logger.debug(f"Importing: {module_fullname}")
-        module = importlib.import_module(module_fullname)
-
-        if not hasattr(module, class_name):
-            raise ParserNotFoundError(f"{class_name} is not in {module_fullname}")
-
-        klass = getattr(module, class_name)
-
-        if not issubclass(klass, Parser):
-            raise ParserNotFoundError(f"{module_fullname}.{class_name} is not a mwcp.Parser class")
-
-        klass.name = name
-        klass.source = source.name
-        logger.debug(f"Created parser: {klass!r}")
+        klass = _import_parser(name, source)
         _visiting.remove((name, source.name))
         return klass
 
+    # If value is a string, this is an alias.
+    if isinstance(config_value, str):
+        parser = _generate_parser(config_value, source, recursive=recursive, _visiting=_visiting)
+        parser.name = name
+        return parser
+
     # Otherwise, instantiate a mwcp.Dispatcher class for the parser group.
+    options = dict(config_value)
     group_name = name
     parser_names = options.pop("parsers")
     sub_parsers = []

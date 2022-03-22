@@ -35,14 +35,18 @@ setup(
         'anytree',
         'appdirs',
         'attrs>=20.3.0',
+        'bitarray',
         'cattrs',
         'click>=8.0.1',
         'construct==2.9.45',  # pin because parsers are very dependent on this.
+        'defusedxml',
         'future',
         'jinja2',  # For construct.html_hex()
         'jsonschema_extractor==0.9',
         'pandas',
         'pefile>=2019.4.18',
+        'pyasn1',
+        'pyasn1_modules',
         'pyelftools',
         'pyparsing',
         'pytest>=6.0.0',

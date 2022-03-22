@@ -178,7 +178,7 @@ class Dropper(Parser):
             implant_data = self._decrypt_implant(key, self.file_object.data)
             if implant_data:
                 implant_file_object = FileObject(implant_data)
-                self.dispatcher.add_to_queue(implant_file_object)
+                self.dispatcher.add(implant_file_object)
         else:
             self.logger.warning('Unable to find RC4 key!')
 ```
@@ -367,7 +367,7 @@ class Dropper(Parser):
         implant_data = self._decrypt(config.key, config.encrypted_data)
 
         # dispatch implant to be picked up by another parser.
-        self.dispatcher.add_to_queue(FileObject(implant_data))
+        self.dispatcher.add(FileObject(implant_data))
 ```
 
 

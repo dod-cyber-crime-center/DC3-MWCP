@@ -1,11 +1,44 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-
 ## [Unreleased]
+
+### Added
+- `Command` metadata element.
+- `CryptoAddress` metadata element.
+- `Report.add_tag()` which allows adding tags to the report itself.
+- Added ability to include `TAGS` attribute in `Parser` classes.
+- Added ability to include direct aliases in parser config by simply providing the name. (e.g. `FooAlias: Foo`)
+- Added `.from_PEM()`, `.from_DER()`, `.from_BLOB()`, and `.from_XML()` construction methods for `RSAPublicKey` and `RSAPrivateKey` metadata elements.
+- Added `Registry2` metadata element which includes the following changes from `Registry`:
+  - `path` attribute has been removed.
+  - `key` attribute has been renamed to `subkey` and no longer includes the root hive key.
+  - `hive` attribute has been added which is casted to a `metadata.RegistryHive` enum type. `hive` will automatically be extracted if not provided but included in `subkey`.
+  - `data_type` attribute has been added, which is a `metadata.RegistryDataType` enum type. `data_type` will automatically be inferred from the data type of `data` if not provided.
+  - Added a `.from_path()` constructor to generate an entry from a full path.
+- Added `mwcp download` CLI command to download sample files from the malware repo.
+  - Includes `--last-failed` flag to download samples from previously failed tests.
 
 ### Changed
 - Enable construct Adapters for `EpochTime`, `SystemTime`, and `FileTime` to accept a timezone, and add default helpers for UTC. (@ddash-ct)
+- Renamed `Dispatcher.add_to_queue()` to `Dispatcher.add()`.
+- Added full parameters to `C2URL` metadata function to match `URL`.
+- Updated `mwcp test` CLI command:
+  - Condensed diff and removed extraneous information for failed test reports.
+  - Added `--full-diff` flag to get the full diff. 
+  - Added `--last-failed` flag to rerun only previously failed test cases.
+    - Can also be combined with `--update` flag to update only previously failed tests.
+
+### Fixed
+- Fixed issue with `Version` table in text report stripping off 0's
+- Added detection of recursive loop parsing the same file.
+  - Duplicate files will automatically be tagged with `duplicate` and not be parsed.
+- If a parser dispatches the file it is currently processing, it will now be ignored.
+
+### Deprecated
+- `Dispacher.add_to_queue()` is deprecated in favor of `Dispatcher.add()`.
+- `Registry` is deprecated in favor of `Registry2`. 
+  - NOTE: Once deprecations are removed, `Registry2` will be renamed back to `Registry`.
 
 
 ## [3.5.0] - 2022-01-11
