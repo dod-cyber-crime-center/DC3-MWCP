@@ -92,6 +92,7 @@ def test_tagging(components):
     assert input_file.tags == {"tag_a", "SuperMalware"}
 
 
+@pytest.mark.xfail(reason="File Recursion detection temporarily disabled.")
 def test_recursion_handling(tmpdir):
     """Tests handling of avoiding a recursive loop"""
     file_A = mwcp.FileObject(b'This is file A', file_name='A_match.txt', output_file=False)

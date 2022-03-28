@@ -270,10 +270,9 @@ class Element:
             "contentEncoding": "base64",
         })
         # IntEnums are converted to their names before serialization by cattr.
-        # NOTE: Inserting hook in front to ensure we overwrite the "int" hook.
-        typing_extractor._extractor_list.insert(0, (IntEnum, lambda extractor, typ: {
+        typing_extractor.register(IntEnum, lambda extractor, typ: {
             "enum": [c.name for c in typ]
-        }))
+        })
         extractor = jsonschema_extractor.SchemaExtractorSet([typing_extractor])
         return extractor.extract(cls)
 

@@ -143,11 +143,12 @@ class Dispatcher(object):
             parent = self._current_file_object
         assert isinstance(file_object, FileObject), "Not a FileObject: {!r}".format(file_object)
 
-        if parent == file_object:
-            # Letting this be info instead of warning, since it is not necessarily
-            # a problem. (e.g. deobfuscation parser runs on already deobfuscated file)
-            logger.info(f"{parent.name} dispatched itself, ignoring...")
-            return
+        # FIXME: Disabled for now.
+        # if parent == file_object:
+        #     # Letting this be info instead of warning, since it is not necessarily
+        #     # a problem. (e.g. deobfuscation parser runs on already deobfuscated file)
+        #     logger.info(f"{parent.name} dispatched itself, ignoring...")
+        #     return
 
         # If we already have a parent, this means this file is trickling up from a sub-dispatcher.
         # Don't duplicate logs or change the parent.
@@ -263,7 +264,8 @@ class Dispatcher(object):
             try:
                 # If file has already been parsed, don't bother running it again.
                 # (This also helps with cyclic loops)
-                if file_object.md5 in report.parsed_files:
+                # FIXME: Disabled until we can fix bug with greedy parsers.
+                if file_object.md5 in report.parsed_files and False:
                     logger.info(f"File {file_object.name} has already been parsed. Ignoring...")
                     # Copy file description from the already parsed version and mark as duplicate.
                     parsed_file = report.parsed_files[file_object.md5]

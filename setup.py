@@ -42,7 +42,7 @@ setup(
         'defusedxml',
         'future',
         'jinja2',  # For construct.html_hex()
-        'jsonschema_extractor==0.9',
+        'jsonschema_extractor>=1.0',
         'pandas',
         'pefile>=2019.4.18',
         'pyasn1',

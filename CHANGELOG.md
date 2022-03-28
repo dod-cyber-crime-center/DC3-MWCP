@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+## [Unreleased]
+
+### Fixed
+- AttributeError that can occur during testing if a Registry without a path was reported.
+- Disables skipping recursive files to avoid a breaking bug with greedy parsers.
+  - This is temporary until a proper fix can be implemented.
+
+
 ## [3.6.0] - 2022-03-23
 
 ### Added

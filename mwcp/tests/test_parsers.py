@@ -114,25 +114,26 @@ def _fixup_test_cases(expected_results, actual_results):
                 if isinstance(item["value"], (int, bool)):
                     item["value"] = str(item["value"])
 
+    # TODO: File recursion to be reintroduced in 3.6.2
     # Version 3.6.0 adds "duplicate" tags to files already parsed and will not include
     # the duplicate residual files that are extracted from such files.
     # To best handle backwards compatibility we are just going to dedup all residual files
     # based on md5.
-    if expected_results_version < "3.6.0":
-        # Find and remove files with "duplicate" tag.
-        for item in list(actual_results["metadata"]):
-            if item["type"] in ("file", "residual_file") and "duplicate" in item["tags"]:
-                actual_results["metadata"].remove(item)
-
-        # Find and remove all duplicate residual files from expected results,
-        # since they may not exist in new results due to skipped processing.
-        seen_md5s = set()
-        for item in list(expected_results["metadata"]):
-            if item["type"] in ("file", "residual_file"):
-                if item["md5"] in seen_md5s:
-                    expected_results["metadata"].remove(item)
-                else:
-                    seen_md5s.add(item["md5"])
+    # if expected_results_version < "3.6.0":
+    #     # Find and remove files with "duplicate" tag.
+    #     for item in list(actual_results["metadata"]):
+    #         if item["type"] in ("file", "residual_file") and "duplicate" in item["tags"]:
+    #             actual_results["metadata"].remove(item)
+    #
+    #     # Find and remove all duplicate residual files from expected results,
+    #     # since they may not exist in new results due to skipped processing.
+    #     seen_md5s = set()
+    #     for item in list(expected_results["metadata"]):
+    #         if item["type"] in ("file", "residual_file"):
+    #             if item["md5"] in seen_md5s:
+    #                 expected_results["metadata"].remove(item)
+    #             else:
+    #                 seen_md5s.add(item["md5"])
 
     # Version 3.6.0 changes schema for Registry.
     # "path" has been removed.
@@ -141,7 +142,7 @@ def _fixup_test_cases(expected_results, actual_results):
     if expected_results_version < "3.6.0":
         for item in expected_results["metadata"]:
             if item["type"] == "registry":
-                reg = mwcp.metadata.Registry2.from_path(item["path"], data=item["data"])
+                reg = mwcp.metadata.Registry2.from_path(item["path"] or "", data=item["data"])
                 item.update(reg.as_json_dict())
                 del item["path"]
                 del item["key"]
