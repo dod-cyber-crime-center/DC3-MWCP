@@ -2,7 +2,7 @@
 All notable changes to this project will be documented in this file.
 
 
-## [Unreleased]
+## [3.6.1] - 2022-03-28
 
 ### Fixed
 - AttributeError that can occur during testing if a Registry without a path was reported.
@@ -474,7 +474,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.0...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.1...HEAD
+[3.6.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.0...3.6.1
 [3.6.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.5.0...3.6.0
 [3.5.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.4.0...3.5.0
 [3.4.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.2...3.4.0
