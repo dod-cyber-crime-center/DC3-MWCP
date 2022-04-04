@@ -73,6 +73,10 @@ class Config(dict):
         if not file_path:
             file_path = self.user_path
 
+        # Convert str file_path to maintain backwards compatibility with previous function definition
+        if isinstance(file_path, str):
+            file_path = pathlib.Path(file_path)
+
         with open(file_path, "r") as fp:
             config = dict(yaml.load(fp))
 
