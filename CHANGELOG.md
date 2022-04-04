@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## [3.6.2] - 2022-04-04
 
 ### Fixed
 - config.load now accepts file_path as a string on pathlib.Path (@rhartig-ct)
@@ -479,7 +479,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.1...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.2...HEAD
+[3.6.2]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.1...3.6.2
 [3.6.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.0...3.6.1
 [3.6.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.5.0...3.6.0
 [3.5.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.4.0...3.5.0
