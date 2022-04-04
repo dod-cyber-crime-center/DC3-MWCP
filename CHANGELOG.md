@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Fixed
+- config.load now accepts file_path as a string on pathlib.Path (@rhartig-ct)
+  - In 3.6.1 config.load was updated to take pathlib.Path, but mwcp.tools.server still used string
 
 ## [3.6.1] - 2022-03-28
 
