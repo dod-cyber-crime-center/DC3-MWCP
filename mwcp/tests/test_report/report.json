@@ -16,7 +16,8 @@
         "architecture": null,
         "compile_time": null,
         "file_path": "C:/input_file.bin",
-        "data": null
+        "data": null,
+        "derivation": null
     },
     "parser": "FooParser",
     "errors": [
@@ -32,36 +33,32 @@
             "type": "path",
             "tags": [],
             "path": "C:\\windows\\temp\\1\\log\\keydb.txt",
-            "directory_path": "C:\\windows\\temp\\1\\log",
-            "name": "keydb.txt",
             "is_dir": false,
+            "posix": false,
             "file_system": null
         },
         {
             "type": "path",
             "tags": [],
             "path": "%APPDATA%\\foo",
-            "directory_path": "%APPDATA%",
-            "name": "foo",
             "is_dir": true,
+            "posix": false,
             "file_system": null
         },
         {
             "type": "path",
             "tags": [],
             "path": "C:\\foo\\bar.txt",
-            "directory_path": "C:\\foo",
-            "name": "bar.txt",
             "is_dir": false,
+            "posix": false,
             "file_system": null
         },
         {
             "type": "path",
             "tags": [],
-            "path": null,
-            "directory_path": null,
-            "name": "malware.exe",
+            "path": "malware.exe",
             "is_dir": false,
+            "posix": null,
             "file_system": null
         },
         {
@@ -410,9 +407,8 @@
             "type": "path",
             "tags": [],
             "path": "%System%\\svohost.exe",
-            "directory_path": "%System%",
-            "name": "svohost.exe",
             "is_dir": false,
+            "posix": false,
             "file_system": null
         },
         {
@@ -441,7 +437,8 @@
             "architecture": null,
             "compile_time": null,
             "file_path": null,
-            "data": null
+            "data": null,
+            "derivation": "embedded"
         }
     ]
 }

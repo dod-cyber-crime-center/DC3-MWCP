@@ -80,13 +80,13 @@
 | ithinkimalonenow |
 
 ## Path
-| Path                            | Directory Path        | Name        | Is Dir   |
-|:--------------------------------|:----------------------|:------------|:---------|
-| C:\windows\temp\1\log\keydb.txt | C:\windows\temp\1\log | keydb.txt   | False    |
-| %APPDATA%\foo                   | %APPDATA%             | foo         | True     |
-| C:\foo\bar.txt                  | C:\foo                | bar.txt     | False    |
-|                                 |                       | malware.exe | False    |
-| %System%\svohost.exe            | %System%              | svohost.exe | False    |
+| Path                            | Is Dir   | Posix   |
+|:--------------------------------|:---------|:--------|
+| C:\windows\temp\1\log\keydb.txt | False    | False   |
+| %APPDATA%\foo                   | True     | False   |
+| C:\foo\bar.txt                  | False    | False   |
+| malware.exe                     | False    |         |
+| %System%\svohost.exe            | False    | False   |
 
 ## Pipe
 | Value             |
@@ -157,9 +157,9 @@
 | tag1   | misc_integer | 432                     |
 
 ## Residual Files
-| Filename   | Description                        | MD5                              | Arch   | Compile Time   |
-|:-----------|:-----------------------------------|:---------------------------------|:-------|:---------------|
-| config.xml | Extracted backdoor Foo config file | 8c41f2802904e53469390845cfeb2b28 |        |                |
+| Filename   | Description                        | Derivation   | MD5                              | Arch   | Compile Time   |
+|:-----------|:-----------------------------------|:-------------|:---------------------------------|:-------|:---------------|
+| config.xml | Extracted backdoor Foo config file | embedded     | 8c41f2802904e53469390845cfeb2b28 |        |                |
 
 # File Tree
 ```

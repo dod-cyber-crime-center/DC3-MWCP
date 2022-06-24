@@ -17,7 +17,9 @@ import warnings
 import ntpath
 from enum import IntEnum
 import uuid
-from typing import Any, Union, List, Optional, TypeVar, Type, Set, Iterable
+from typing import Any, Union, List, Optional, TypeVar, Type, Iterable, Tuple
+
+from stix2 import v21 as stix
 
 import attr
 from bitarray import bitarray
@@ -31,6 +33,8 @@ from pyasn1.error import PyAsn1Error
 import mwcp
 from mwcp.exceptions import ValidationError
 from mwcp.utils import construct
+from mwcp.stix import extensions as stix_extensions
+from mwcp.stix.objects import STIXResult
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +66,12 @@ def _cast(value: Any, type_: Type[T]) -> T:
     # Convert bytes to string, Python 2 style!
     if type_ is str and isinstance(value, bytes):
         return value.decode("latin1")
+
+    # Prevent accidentally casting an integer to bytes.
+    # Since bytes(some_int) will cause it to create a zero byte string with that many bytes,
+    # this can stall or crash the process if the integer is large enough.
+    if type_ is bytes and isinstance(value, int):
+        raise ValueError("Cannot convert int to bytes.")
 
     # cattr doesn't handle Unions very nicely, so we'll recursively
     # handle the innards of Union types instead.
@@ -278,6 +288,11 @@ class Element:
 
     @classmethod
     def from_dict(cls, obj: dict) -> "Element":
+        obj = obj.copy()
+        if "type" not in obj:
+            obj["type"] = cls._type()
+        if "tags" not in obj:
+            obj["tags"] = []
         return cattr.structure(obj, cls)
 
     def as_dict(self, flat=False) -> dict:
@@ -424,48 +439,177 @@ class Metadata(Element):
             ]}
         else:
             return super()._schema(extractor)
+    
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        """
+        Returns STIX content for a class.  All metadata objects should implement this, but if one does not a warning will be supplied.
+
+        """
+        warnings.warn(
+            "as_stix is not implmeneted by " + type(self).__name__ + " so data may be missing from the result",
+            UserWarning
+        )
+        return STIXResult()
+
+    def as_stix_tags(self, parent, fixed_timestamp=None):
+        """
+        Returns an object containing tag information for a given parent assuming there is content
+        """
+        if self.tags:
+            return stix.Note(
+                labels=self.tags,
+                content=f"MWCP Tags: {', '.join(self.tags)}",
+                object_refs=[parent.id],
+                created=fixed_timestamp,
+                modified=fixed_timestamp
+            )
 
 
 @attr.s(**config)
-class Path(Metadata):
-    """
-    Filesystem path used by malware. may include both a directory and filename.
+class Path2(Metadata):
+    r"""
+    Filesystem path used by malware.
+
+    Current directory (".") represents the directory of the malware sample that produced this metadata.
 
     e.g.
-        Path("C:\\windows\\temp\\1\\log\\keydb.txt", is_dir=False)  # pass full path
-        Path(directory_path=f"C:\foo\", name="bar.exe", is_dir=False)  # know location and name of dropped file
-        Path(directory_path=f"C:\foo\", name="logs", is_dir=True)   # know location and name of a directory that gets created/used
-        Path(directory_path=f"C:\foo\", is_dir=False)  # know location of dropped file but name is unknown/varies
-        Path(name="bar.exe", is_dir=False)   # know name of of dropped file, but location is unknown
-        Path(directory_path=f"C:\foo\", is_dir=True)  # know location of a directory that gets created/used, but name of directory is unknown.
-
+        Path2(r"C:\windows\temp\1\log\keydb.txt", is_dir=False)  # pass full path
+        Path2(r"C:\foo\logs", is_dir=True)
+        Path2("bar.exe", is_dir=False)  # Represents a file name with unknown location
+        Path2(".\bar.exe", is_dir=False)  # Represents a file path within the same directory as the source malware sample.
     """
-    path: str = None
-    directory_path: str = None
-    name: str = None
+    path: str
     is_dir: bool = None
+    posix: bool = None
     file_system: str = None  # NTFS, ext4, etc.
 
     def __attrs_post_init__(self):
-        if self.path:
-            if not self.directory_path:
-                self.directory_path = ntpath.dirname(self.path)
-            if not self.name:
-                self.name = ntpath.basename(self.path)
-        elif self.directory_path and self.name:
-            self.path = ntpath.join(self.directory_path, self.name)
+        # If posix wasn't provided, determine this based on presence of drive letter or separator.
+        if self.posix is None and (self.path.count("\\") or self.path.count("/")):
+            self.posix = not (re.match("^[A-Z]:\\\\", self.path) or self.path.count("\\") > self.path.count("/"))
+
+    @classmethod
+    def _type(cls):
+        return "path"
+
+    @classmethod
+    def from_segments(cls, *segments: str, is_dir: bool = None, posix: bool = False, file_system: str = None):
+        """
+        Provides ability to construct a Path from segments.
+        NOTE: Path is assumed to be Windows if posix flag is not provided.
+
+        e.g.
+            Path2.from_segments("C:", "windows", "temp", "1", "log", "keydb.txt", posix=False, is_dir=False)
+        """
+        if not segments:
+            raise ValidationError(f"from_segments() requires at least one segment.")
+        if len(segments) == 1:
+            return Path2(segments[0], is_dir=is_dir, posix=posix, file_system=file_system)
+        if posix:
+            path = pathlib.PurePosixPath(*segments)
+        else:
+            segments = list(segments)
+            # If first segment is a drive, we need to include the \ in order for pathlib to see it as such.
+            if segments[0].endswith(":"):
+                segments[0] += "\\"
+            path = pathlib.PureWindowsPath(*segments)
+        return cls.from_pathlib_path(path, is_dir=is_dir, file_system=file_system)
+
+    @classmethod
+    def from_pathlib_path(cls, path: pathlib.PurePath, is_dir: bool = None, file_system: str = None):
+        """
+        Generate Path from pathlib.PurePath instance.
+        """
+        return Path2(str(path), is_dir=is_dir, posix=isinstance(path, pathlib.PurePosixPath), file_system=file_system)
+
+    @property
+    def _pathlib_path(self) -> Optional[pathlib.PurePath]:
+        if self.posix is None:
+            return None
+        elif self.posix:
+            return pathlib.PurePosixPath(self.path)
+        else:
+            return pathlib.PureWindowsPath(self.path)
+
+    @property
+    def directory_path(self) -> Optional[str]:
+        if self.is_dir:
+            return self.path
+        else:
+            path = self._pathlib_path
+            if path:
+                return str(path.parent)
+            else:
+                return None
+
+    @property
+    def name(self) -> str:
+        path = self._pathlib_path
+        if path:
+            return path.name
+        else:
+            return self.path
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+
+        if self.is_dir:
+            result.add_linked(stix.Directory(path=self.path))
+        else:
+            file_data = {}
+
+            if self.directory_path:
+                cur_dir = stix.Directory(path=self.directory_path)
+                result.add_unlinked(cur_dir)
+                file_data["parent_directory_ref"] = cur_dir.id
+
+            if self.name:
+                file_data["name"] = self.name
+                result.add_linked(stix.File(**file_data))
+
+        result.create_tag_note(self, result.linked_stix[-1])
+
+        return result
 
 
-def Directory(path: str) -> Path:
-    return Path(path, is_dir=True)
+def Path(
+        path: str = None,
+        directory_path: str = None,
+        name: str = None,
+        is_dir: bool = None,
+        file_system: str = None
+) -> Path2:
+    warnings.warn(
+        "Path has been renamed to Path2 during a transitional period to a new version of Path " 
+        "with a new signature. "
+        "Please update to use Path2 which explicitly expects a path string with no directory/name separation."
+        "NOTE: In a future version, once this function is deprecated, Path2 will be renamed back to Path "
+        "using the new signature.",
+        DeprecationWarning
+    )
+    # Replicating original logic. (existence of directory_path and name overwrite path)
+    if directory_path and name:
+        path = ntpath.join(directory_path, name)
+    # If a directory_path was provided without a name, overwrite is_dir.
+    elif directory_path and not name:
+        path = directory_path
+        is_dir = True
+    elif name and not directory_path:
+        path = name
+        is_dir = False
+    return Path2(path, is_dir=is_dir, file_system=file_system)
 
 
-def FilePath(path: str) -> Path:
-    return Path(path, is_dir=False)
+def Directory(path: str, posix: bool = None) -> Path2:
+    return Path2(path, posix=posix, is_dir=True)
 
 
-def FileName(name: str) -> Path:
-    return Path(name=name, is_dir=False)
+def FilePath(path: str, posix: bool = None) -> Path2:
+    return Path2(path, posix=posix, is_dir=False)
+
+
+def FileName(name: str) -> Path2:
+    return Path2(name, is_dir=False)
 
 
 @attr.s(**config)
@@ -489,6 +633,14 @@ class Alphabet(Metadata):
             # TODO: Determine if this is a valid.
             # if len(alphabet) != len(set(alphabet)):
             #     raise ValidationError('mapping must be unique')
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        content = f"Alphabet: {self.alphabet}\nAlphabet Base: {self.base}"
+
+        if self.tags:
+            content += "\n    Alphabet Tags: " + ", ".join(self.tags)
+
+        return STIXResult(content)
 
 
 def Base16Alphabet(alphabet: str) -> Alphabet:
@@ -528,6 +680,16 @@ class Command(Metadata):
     """
     value: str
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        # Process generally uses a UUIDv4 but we want to deduplicate when the same command is used so we will use a v5
+        namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
+        id = "process--" + str(uuid.uuid5(namespace, f"{self.value}"))
+
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        result.add_linked(stix.Process(command_line=self.value, id=id))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
+
 
 @attr.s(**config)
 class Credential(Metadata):
@@ -539,6 +701,25 @@ class Credential(Metadata):
     """
     username: str = None
     password: str = None
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        
+        params = {}
+        if self.username:
+            params["account_login"] = self.username
+
+        if self.password:
+            params["credential"] = self.password
+
+            # the default UUIDv5 generation scheme for user-account does not factor in credentials so it is possible to overwrite the same username with separate creds
+            # since we do not want this with MWCP if a password is present will generate the ID in our own deterministic manner
+            namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
+            params["id"] = "user-account--" + str(uuid.uuid5(namespace, f"{self.username}//{self.password}"))
+
+        result.add_linked(stix.UserAccount(**params))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
 
 
 def Password(password: str) -> Credential:
@@ -564,6 +745,19 @@ class CryptoAddress(Metadata):
     """
     address: str
     symbol: str = None
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        params = {
+            "address": self.address
+        }
+
+        if self.symbol:
+            params["currency_type"] = self.symbol.lower().replace(" ", "-")
+
+        result.add_linked(stix_extensions.CryptoCurrencyAddress(**params))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
 
 
 @attr.s(**config)
@@ -611,6 +805,82 @@ class Socket(Metadata):
     def _validate_protocol(self, attribute, value):
         if value is not None and value not in self._VALID_PROTOCOLS:
             raise ValidationError(f"protocol {value} is not one of {sorted(self._VALID_PROTOCOLS)}")
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        # we define a static namespace explicitly for MWCP network traffic objects to ensure we deduplicate within MWCP
+        # in general it is bad practice to deduplicate Network Traffic but as this is static analysis we want
+        # to find correlation in a live environment this would be highly discouraged
+        namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
+
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        network_values = {
+            "is_active": False,
+            "id": "network-traffic--" + str(uuid.uuid5(
+                namespace,
+                f"{self.address}//{self.port}//{self.network_protocol}//{self.c2}//{self.listen}"
+            ))
+        }
+
+        # Make an address object if this is present but add it to the list after the network traffic
+        # for better malware analysis results
+        address = None
+        if self.address:
+            address_type = self._guess_address_type(self.address)
+            if address_type == "ipv6":
+                network_values["dst_ref"] = stix.IPv6Address(value = self.address)
+                network_values["protocols"] = ["ipv6"]
+            elif address_type == "ipv4":
+                network_values["dst_ref"] = stix.IPv4Address(value = self.address)
+                network_values["protocols"] = ["ipv4"]
+            else:
+                network_values["dst_ref"] = stix.DomainName(value = self.address)
+                # This is ultimately a guess but it is safer to assume a domain maps
+                # to ipv4 than ipv6 and we must pick one
+                network_values["protocols"] = ["ipv4"]
+        else:
+            network_values["src_ref"] = stix.IPv4Address(value = "0.0.0.0")
+            network_values["protocols"] = ["ipv4"]
+
+        # if a value was provided it should sit after ipv4 or ipv6 respectively
+        if self.network_protocol:
+            network_values["protocols"].append(self.network_protocol)
+
+        if self.port:
+            if self.listen:
+                network_values["src_port"] = self.port
+            else:
+                network_values["dst_port"] = self.port
+
+        if "src_ref" in network_values:
+            result.add_unlinked(network_values["src_ref"])
+        else:
+            result.add_unlinked(network_values["dst_ref"])
+
+        traffic = stix.NetworkTraffic(**network_values)
+        result.create_tag_note(self, traffic)
+
+        # we want the network traffic to be the last object so it is always consistently placed
+        result.add_linked(traffic)
+
+        return result
+    
+    @staticmethod
+    def _guess_address_type(address) -> str:
+        """
+        Used to see if an address is ipv4, ipv6, or a domain
+        """
+        # the fewest number of : in an ipv6 is for ::1.  A domain or IP should never have one so checking for 2 is safe
+        if address.count(":") > 1:
+            return "ipv6"
+
+        # IPv4 must be 4 octets and no TLD can be a number so checking for both gives us a good guess between the two
+        parts = address.split(".")
+        if len(parts) == 4:
+            if parts[3].isnumeric():
+                if int(parts[3]) >= 0 and int(parts[3]) < 256:
+                    return "ipv4"
+        
+        return "domain"
 
 
 def SocketAddress(*args, **kwargs) -> Socket:
@@ -753,6 +1023,26 @@ class URL(Metadata):
             self.socket = Socket()
         self.socket.listen = value
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+
+        # Some parsers can have a URL without a URL so we skip it in these cases
+        if self.url is None:
+            warnings.warn("Skipped creation of STIX URL since the parser provided no URL")
+            return result
+
+        result.add_linked(stix.URL(value = self.url))
+        result.create_tag_note(self, result.linked_stix[-1])
+
+        if self.socket:
+            result.merge(self.socket.as_stix(base_object))
+            result.add_unlinked(stix.Relationship(relationship_type="used", source_ref=result.linked_stix[-1].id, target_ref=result.linked_stix[0].id, created=fixed_timestamp, modified=fixed_timestamp))
+
+        if self.credential:
+            result.merge(self.credential.as_stix(base_object))
+            result.add_unlinked(stix.Relationship(relationship_type="contained", source_ref=result.linked_stix[0].id, target_ref=result.linked_stix[-1].id, created=fixed_timestamp, modified=fixed_timestamp))
+
+        return result
 
 def C2URL(
         url: str = None,
@@ -881,6 +1171,11 @@ class EmailAddress(Metadata):
         if "@" not in value:
             raise ValidationError(f"Email address should at least have a '@' character.")
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        result.add_linked(stix.EmailAddress(value=self.value))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
 
 @attr.s(**config)
 class Event(Metadata):
@@ -891,6 +1186,14 @@ class Event(Metadata):
         Event("MicrosoftExit")
     """
     value: str
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        content = f"Event Name: {self.value}"
+
+        if self.tags:
+            content += "\n    Event Name Tags: " + ", ".join(self.tags)
+        
+        return STIXResult(content)
 
 
 def _uuid_convert(value):
@@ -927,6 +1230,12 @@ class UUID(Metadata):
         "format": "uuid",
     }})
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        result.add_linked(stix_extensions.ObservedString(purpose="uuid", value=self.value))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
+
 
 GUID = UUID  # alias
 
@@ -941,6 +1250,11 @@ class UUIDLegacy(Metadata):
     """
     value: str
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        result.add_linked(stix_extensions.ObservedString(purpose="uuid", value=self.value))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
 
 @attr.s(**config)
 class InjectionProcess(Metadata):
@@ -954,6 +1268,15 @@ class InjectionProcess(Metadata):
     """
     value: str
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        content = f"Injects Into: {self.value}"
+
+        if self.tags:
+            content += "\n    Injects Into Tags: " + ", ".join(self.tags)
+
+        return STIXResult(content)
+        
+
 
 @attr.s(**config)
 class Interval(Metadata):
@@ -966,6 +1289,15 @@ class Interval(Metadata):
     """
     value: float
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        content = f"Interval: {self.value}"
+
+        if self.tags:
+            content += "\n    Interval Tags: " + ", ".join(self.tags)
+        
+        return STIXResult(content)
+
+
 
 @attr.s(**config)
 class IntervalLegacy(Metadata):
@@ -977,6 +1309,14 @@ class IntervalLegacy(Metadata):
     WARNING: This should not be used in new code!
     """
     value: str
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        content = f"Interval: {self.value}"
+
+        if self.tags:
+            content += "\n    Interval Tags: " + ", ".join(self.tags)
+        
+        return STIXResult(content)
 
 
 @attr.s(**config)
@@ -1034,6 +1374,23 @@ class EncryptionKey(Metadata):
             "iv": f"0x{self.iv.hex()}" if self.iv else None,
         }
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        params = { "key_hex": self.key.hex() }
+
+        if self.algorithm:
+            params["algorithm"] = self.algorithm
+
+        if self.mode:
+            params["mode"] = self.mode
+
+        if self.iv:
+            params["iv_hex"] = self.iv.hex()
+
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        result.add_linked(stix_extensions.SymmetricEncryption(**params))
+        result.create_tag_note(self, result.linked_stix[-1])
+
+        return result
 
 def EncryptionKeyLegacy(key: str) -> EncryptionKey:
     """
@@ -1060,6 +1417,26 @@ class DecodedString(Metadata):
     value: str
     encryption_key: EncryptionKey = None
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+
+        # sometimes empty strings come up so we should just discard these
+        if not self.value:
+            return result
+
+        
+
+        cur = stix_extensions.ObservedString(purpose="decoded", value=self.value)
+        result.add_linked(cur)
+        result.create_tag_note(self, cur)
+
+        if self.encryption_key:
+            sub = self.encryption_key.as_stix(base_object)
+            result.merge(sub)
+            result.add_unlinked(stix.Relationship(relationship_type="outputs", source_ref=sub.linked_stix[0].id, target_ref=cur.id, allow_custom=True, created=fixed_timestamp, modified=fixed_timestamp))
+            
+        return result
+        
 
 @attr.s(**config)
 class MissionID(Metadata):
@@ -1072,6 +1449,12 @@ class MissionID(Metadata):
         MissionID("201412")
     """
     value: str
+    
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        result.add_linked(stix_extensions.ObservedString(purpose="mission-id", value=self.value))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
 
 
 @attr.s(**config)
@@ -1084,6 +1467,12 @@ class Mutex(Metadata):
         Mutex("0036a8117afa")
     """
     value: str
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        result.add_linked(stix.Mutex(name=self.value))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
 
 
 @attr.s(**config)
@@ -1124,6 +1513,27 @@ class Other(Metadata):
         del ret["value_format"]
         return ret
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        # boolean values and numbers should be appended as a single master Note instead of using this mechanism
+        if self.value_format in ("boolean", "integer") or self.value in (b"", ""):
+            content = f"{self.key}: {self.value}"
+
+            if self.tags:
+                content += f"\n    {self.key} Tags: " + ", ".join(self.tags)
+
+            result = STIXResult(content)
+        else:
+            content = {
+                "purpose": self.key.replace("_", "-").replace(" ", "-").lower(),
+                "value": self.value
+            }
+
+            result = STIXResult(fixed_timestamp=fixed_timestamp)
+            result.add_linked(stix_extensions.ObservedString(**content))
+            result.create_tag_note(self, result.linked_stix[-1])
+
+        return result
+
 
 @attr.s(**config)
 class Pipe(Metadata):
@@ -1134,6 +1544,12 @@ class Pipe(Metadata):
         Pipe("\\.\\pipe\\namedpipe")
     """
     value: str
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        result.add_linked(stix_extensions.ObservedString(purpose="pipe", value=self.value))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
 
 
 class RegistryHive(IntEnum):
@@ -1282,6 +1698,29 @@ class Registry2(Metadata):
             "data_type": self.data_type.name if self.data_type is not None else None,
         }
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        value = {}
+        properties = {}
+
+        if self.key:
+            properties["key"] = self.key
+
+        if self.value:
+            value["data"] = self.value
+        
+        # this will be read as a string with the class name included so we need to strip out the class time
+        if self.data_type:
+            value["data_type"] = str(self.data_type).split(".")[-1]
+
+        if value:
+            properties["values"] = [value]
+
+        
+        result.add_linked(stix.WindowsRegistryKey(**properties))
+        result.create_tag_note(self, result.linked_stix[-1])
+
+        return result
 
 def Registry(path: str = None, key: str = None, value: str = None, data: Union[bytes, str, int] = None) -> Registry2:
     """
@@ -1510,6 +1949,32 @@ class RSAPrivateKey(Metadata):
 
         return {"tags": self.tags, "value": value or None}
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+
+        # x509 specifies hashes and serial for deterministic IDs in most cases, but we will never have that
+        # As such we are using our own namespace to generate a deterministic ID instead of forcing it to be a UUIDv4
+        # We only use the properties for the public key to make this ID so that we can avoid duplicating the public + private key data when both are present
+        namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
+        params = {
+            "id": "x509-certificate--" + str(uuid.uuid5(namespace, f"{self.public_exponent}//{self.modulus}"))
+        }
+
+        if self.public_exponent:
+            params["subject_public_key_exponent"] = self.public_exponent
+
+        if self.modulus:
+            params["subject_public_key_modulus"] = str(self.modulus)
+
+        extensions = stix_extensions.rsa_private_key_extension(self.private_exponent, self.p, self.q, self.d_mod_p1, self.d_mod_q1, self.q_inv_mod_p)
+
+        if extensions:
+            params["extensions"] = extensions
+
+        result.add_linked(stix.X509Certificate(**params))
+        result.create_tag_note(self, result.linked_stix[-1])
+
+        return result        
 
 @attr.s(**config)
 class RSAPublicKey(Metadata):
@@ -1611,6 +2076,26 @@ class RSAPublicKey(Metadata):
 
         return {"tags": self.tags, "value": value or None}
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+
+        # x509 specifies hashes and serial for deterministic IDs in most cases, but we will never have that
+        # As such we are using our own namespace to generate a deterministic ID instead of forcing it to be a UUIDv4
+        namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
+        params = {
+            "id": "x509-certificate--" + str(uuid.uuid5(namespace, f"{self.public_exponent}//{self.modulus}"))
+        }
+
+        if self.public_exponent:
+            params["subject_public_key_exponent"] = self.public_exponent
+
+        if self.modulus:
+            params["subject_public_key_modulus"] = str(self.modulus)
+
+        result.add_linked(stix.X509Certificate(**params))
+        result.create_tag_note(self, result.linked_stix[-1])
+
+        return result
 
 @attr.s(**config)
 class Service(Metadata):
@@ -1650,6 +2135,44 @@ class Service(Metadata):
         if self.dll:
             report.add(FilePath(self.dll))
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        # Process generally uses a UUIDv4 but we want to deduplicate when the same command is used so we will use a v5
+        namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
+        
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        params = {
+            "id": "process--" + str(uuid.uuid5(namespace, f"{self.image}/{self.name}/{self.display_name}/{self.description}/{self.image}/{self.dll}"))
+        }
+        extension = {}
+
+        if self.name:
+            extension["service_name"] = self.name
+
+        if self.display_name:
+            extension["display_name"] = self.display_name
+
+        if self.description:
+            extension["descriptions"] = [self.description]
+
+        if self.image:
+            params["command_line"] = self.image
+        
+        if self.dll and self.dll != self.image:
+            dir_path = str(pathlib.Path(self.dll).parent)
+
+            if dir_path:
+                result.add_unlinked(stix.Directory(path = dir_path))
+                result.add_unlinked(stix.File(name = self.image, parent_directory_ref = result.unlinked_stix[-1].id))
+                params["image_ref"] = result.unlinked_stix[-1].id
+
+        if extension:
+            params["extensions"] = {"windows-service-ext": extension}
+
+        
+        result.add_linked(stix.Process(**params))
+        result.create_tag_note(self, result.linked_stix[-1])
+
+        return result
 
 # TODO: legacy helpers
 def ServiceName(name: str) -> Service:
@@ -1712,6 +2235,12 @@ class SSLCertSHA1(Metadata):
         if not self._SHA1_RE.match(value):
             raise ValidationError(f"Invalid SHA1 hash found: {value!r}")
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        result.add_linked(stix.x509Certificate(hashes={"SHA-1": self.value}))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
+
 
 @attr.s(**config)
 class UserAgent(Metadata):
@@ -1722,6 +2251,13 @@ class UserAgent(Metadata):
         UserAgent("Mozilla/4.0 (compatible; MISE 6.0; Windows NT 5.2)")
     """
     value: str
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+        result.add_linked(stix_extensions.ObservedString(purpose="user-agent", value=self.value))
+        result.create_tag_note(self, result.linked_stix[-1])
+        return result
+
 
 
 @attr.s(**config)
@@ -1736,11 +2272,20 @@ class Version(Metadata):
     """
     value: str
 
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        content = f"Version: {self.value}"
+
+        if self.tags:
+            content += "\n    Version: " + ", ".join(self.tags)
+        
+        return STIXResult(content)
+
 
 @attr.s(**config)
 class File(Metadata):
     """
-    The original input malware file that triggered parsing or extracted file.
+    Represents a file, which is either the original input file, a file dispatched by the parser,
+    or a supplemental file generated by the parser
 
     :var name: Name of the file.
     :var description: Description of the file.
@@ -1751,6 +2296,8 @@ class File(Metadata):
     :var compile_time: UTC Timestamp the file was compiled as reported (if applicable)
     :var file_path: Path where the file exists or has been written out to on the local file system.
     :var data: Raw bytes of the file.
+    :var derivation: Description of how the file was obtained or its categorization.
+        e.g. "decrypted", "deobfuscated", "supplemental"
     """
     name: str = None
     description: str = None
@@ -1764,6 +2311,7 @@ class File(Metadata):
     }})
     file_path: str = None
     data: bytes = None
+    derivation: str = None
 
     def __attrs_post_init__(self):
         if self.data is not None:
@@ -1775,6 +2323,38 @@ class File(Metadata):
                 self.sha256 = hashlib.sha256(self.data).hexdigest()
 
     # TODO: Add validation for hashes.
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        hashes = {}
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+
+        if self.md5:
+            hashes["MD5"] = self.md5
+        if self.sha1:
+            hashes["SHA-1"] = self.sha1
+        if self.sha1:
+            hashes["SHA-256"] = self.sha256
+        
+        params = {
+            "name": self.name
+            , "hashes": hashes
+        }
+
+        if self.data:
+            result.add_unlinked(stix.Artifact(payload_bin=base64.b64encode(self.data)))
+            params["content_ref"] = result.unlinked_stix[0].id
+
+        result.add_linked(stix.File(**params))
+
+        # description is skipped because that is added to the malware-analysis that is later built for the
+        # file by the report writer
+
+        if self.compile_time or self.architecture:
+            result.note_content = f"Compiled on: {self.compile_time}\nFor architecture: {self.architecture}"
+        
+        result.note_labels = self.tags
+        
+        return result
 
     @classmethod
     def from_file_object(cls, file_object):
@@ -1789,12 +2369,43 @@ class File(Metadata):
             # TODO: Update this when .file_path deprecation is removed.
             file_path=file_object.file_path if file_object._exists else None,
             data=file_object.data,
+            derivation=file_object.derivation,
         ).add_tag(*file_object.tags)
 
 
 # Helper aliases
 InputFile = File  # Original input malware file that triggered parsing.
 ResidualFile = File  # Relevant or related file created during parsing of malware.
+
+
+def SupplementalFile(
+        name: str = None,
+        description: str = None,
+        md5: str = None,
+        sha1: str = None,
+        sha256: str = None,
+        architecture: str = None,
+        compile_time: str = None,
+        file_path: str = None,
+        data: bytes = None
+) -> File:
+    """
+    Helper function for creating a file that supplements the malware sample but isn't
+    something obtained from the sample.
+    e.g. string dump, annotated IDB, etc.
+    """
+    return File(
+        name=name,
+        description=description,
+        md5=md5,
+        sha1=sha1,
+        sha256=sha256,
+        architecture=architecture,
+        compile_time=compile_time,
+        file_path=file_path,
+        data=data,
+        derivation="supplemental",
+    )
 
 
 @attr.s(**config)

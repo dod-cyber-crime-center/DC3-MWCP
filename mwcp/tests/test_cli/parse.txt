@@ -21,9 +21,9 @@ Url               Address    Application Protocol
 http://127.0.0.1  127.0.0.1  http
 
 ---- Residual Files ----
-Filename           Description          MD5                               Arch    Compile Time
------------------  -------------------  --------------------------------  ------  --------------
-fooconfigtest.txt  example output file  5eb63bbbe01eeed093cb22bb8f5acdc3
+Filename           Description          Derivation                  MD5                               Arch    Compile Time
+-----------------  -------------------  --------------------------  --------------------------------  ------  --------------
+fooconfigtest.txt  example output file  extracted and decompressed  5eb63bbbe01eeed093cb22bb8f5acdc3
 
 ---- Logs ----
 [+] File test.txt identified as Foo.

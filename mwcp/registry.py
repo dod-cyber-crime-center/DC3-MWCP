@@ -172,7 +172,7 @@ def _load_config(config_file_path):
 
 def register_parser_directory(directory, config_file_path=None, source_name=None):
     """
-    Registers parsers found in parser_dir. This function allows you to register one-off parsers
+    Registers parsers found in directory. This function allows you to register one-off parsers
     that are not part of an installed python package.
 
     :param str directory: An extra directory to look for one-off parsers.

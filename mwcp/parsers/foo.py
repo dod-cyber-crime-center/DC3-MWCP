@@ -35,7 +35,10 @@ class Foo(Parser):
 
         # Dispatch residual files to also be processed.
         self.dispatcher.add(FileObject(
-            b"hello world", file_name="fooconfigtest.txt", description="example output file"
+            b"hello world",
+            file_name="fooconfigtest.txt",
+            description="example output file",
+            derivation="extracted and decompressed",
         ))
         #  Alternatively we can manually report a residual file without being processed.
         if False:

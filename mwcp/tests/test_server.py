@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 import textwrap
 
@@ -45,9 +46,9 @@ def _get_expected_results(legacy: bool):
         http://127.0.0.1  127.0.0.1  http
 
         ---- Residual Files ----
-        Filename           Description          MD5                               Arch    Compile Time
-        -----------------  -------------------  --------------------------------  ------  --------------
-        fooconfigtest.txt  example output file  5eb63bbbe01eeed093cb22bb8f5acdc3
+        Filename           Description          Derivation                  MD5                               Arch    Compile Time
+        -----------------  -------------------  --------------------------  --------------------------------  ------  --------------
+        fooconfigtest.txt  example output file  extracted and decompressed  5eb63bbbe01eeed093cb22bb8f5acdc3
 
         ----- File Tree -----
         <33fb2ffd28461fa230b730f0d9db81c9.bin (33fb2ffd28461fa230b730f0d9db81c9) : Foo>
@@ -86,7 +87,8 @@ def _get_expected_results(legacy: bool):
                 "sha256": "cc4fafa4c90b4e4c08ade61acfa63add6a3fc31aa58d3f217eb199f557512e2a",
                 "compile_time": None,
                 "file_path": None,
-                "data": "VGhpcyBpcyBhIHRlc3QgZmlsZSEK"
+                "data": "VGhpcyBpcyBhIHRlc3QgZmlsZSEK",
+                "derivation": None,
             },
             "parser": "foo",
             "metadata": [
@@ -129,6 +131,7 @@ def _get_expected_results(legacy: bool):
                     "compile_time": None,
                     "data": "aGVsbG8gd29ybGQ=",
                     "file_path": None,
+                    "derivation": "extracted and decompressed",
                 }
             ],
             "output_text": output_text,
@@ -208,7 +211,8 @@ def test_run_parser(client, make_test_buffer, url, options, legacy):
     }
     rv = client.post(url, data=options)
     results = rv.json
-    print(results)
+    print(results["output_text"])
+    print(json.dumps(results, indent=4))
     # Remove logs and errors entries so make testing easier.
     results.pop("errors", None)
     results.pop("debug", None)
@@ -222,14 +226,30 @@ def test_run_parser_errors(client, make_test_buffer):
 
     assert rv.status_code == 400
     print(rv.json)
-    assert {"errors": ["No parser specified"]} == rv.json
+    # ignore output_text since matching everything else covers it and this avoids worrying about formatting
+    result = rv.json
+    del result["output_text"]
+    assert {"errors": ["[!] No parser specified"], "debug": ["[!] No parser specified"]} == result
 
     # No file
     rv = client.post("/run_parser", data={"parser": "foo"})
 
     assert rv.status_code == 400
     print(rv.json)
-    assert {"errors": ["No input file provided"]} == rv.json
+    # ignore output_text since matching everything else covers it and this avoids worrying about formatting
+    result = rv.json
+    del result["output_text"]
+    assert {"errors": ["[!] No input file provided"], "debug": ["[!] No input file provided"]} == result
+
+    # No file and no parser
+    rv = client.post("/run_parser")
+
+    assert rv.status_code == 400
+    print(rv.json)
+    # ignore output_text since matching everything else covers it and this avoids worrying about formatting
+    result = rv.json
+    del result["output_text"]
+    assert {"errors": ["[!] No parser specified", "[!] No input file provided"], "debug": ["[!] No parser specified", "[!] No input file provided"]} == result
 
 
 @pytest.mark.parametrize("legacy", [True, False])

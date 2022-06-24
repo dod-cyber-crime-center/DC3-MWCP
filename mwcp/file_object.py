@@ -1,6 +1,7 @@
 """
 Implements FileObject class used to provide an interface for the file being parsed.
 """
+from __future__ import annotations
 import contextlib
 import datetime
 import hashlib
@@ -8,15 +9,17 @@ import io
 import logging
 import os
 import pathlib
+import shutil
 import sys
 import tempfile
 import warnings
-from typing import List, Optional, Iterable
+from typing import List, Optional, Iterable, Union, TYPE_CHECKING, ContextManager
 
 import pefile
 
 from mwcp import metadata
 from mwcp.utils import elffileutils, pefileutils
+from mwcp.utils.stringutils import convert_to_unicode, sanitize_filename
 
 try:
     import kordesii
@@ -24,7 +27,15 @@ except ImportError:
     # Kordesii support is optional.
     kordesii = None
 
-from mwcp.utils.stringutils import convert_to_unicode
+try:
+    import dragodis
+except ImportError:
+    dragodis = None
+
+
+if TYPE_CHECKING:
+    from mwcp import Report
+
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +65,7 @@ class FileObject(object):
         use_supplied_fname=True,
         use_arch=False,
         ext=".bin",
+        derivation: str = None,
     ):
         """
         Initializes the FileObject.
@@ -70,6 +82,8 @@ class FileObject(object):
         :param str def_stub: def_stub argument to pass to obtain_original_filename()
         :param bool use_arch: use_arch argument to pass to obtain_original_filename()
         :param str ext: default extension to use if not determined from pe file.
+        :param derivation: Description of how the file was obtained or its categorization.
+            e.g. "decrypted", "deobfuscated", "supplemental"
         """
         if reporter:
             warnings.warn(
@@ -106,6 +120,7 @@ class FileObject(object):
         self._def_stub = def_stub
         self._report = reporter  # DEPRECATED
         self.description = description
+        self.derivation = derivation
         self.knowledge_base = {}
         self.tags = set()
 
@@ -141,6 +156,14 @@ class FileObject(object):
 
     def __repr__(self):
         return f"<{self.name} ({self.md5}) : {self.description}>"
+
+    @classmethod
+    def from_path(cls, file_path: Union[str, os.PathLike], **kwargs) -> "FileObject":
+        """
+        Generate FileObject from existing file on system by path.
+        """
+        with open(file_path, "rb") as fo:
+            return FileObject(fo.read(), file_path=str(file_path), **kwargs)
 
     @contextlib.contextmanager
     def open(self):
@@ -320,7 +343,7 @@ class FileObject(object):
         # TODO: Provide and option to change location of temporary files through the use
         #   of the configuration file.
         with tempfile.TemporaryDirectory(prefix="mwcp_") as tmpdir:
-            temp_file = os.path.join(tmpdir, self.md5)
+            temp_file = os.path.join(tmpdir, sanitize_filename(self.name) if self.name else self.md5)
             with open(temp_file, "wb") as fo:
                 fo.write(self.data)
             yield temp_file
@@ -364,7 +387,7 @@ class FileObject(object):
         self._exists = bool(value)
 
     @property
-    def stack_strings(self):
+    def stack_strings(self) -> List[str]:
         """
         Returns the stack strings for the file.
         """
@@ -376,14 +399,14 @@ class FileObject(object):
     # TODO: Create a static_strings property?
 
     @property
-    def resources(self):
+    def resources(self) -> List[pefileutils.Resource]:
         """Returns a list of the PE resources for the given file."""
         if self.pe and not self._resources:
             self._resources = list(pefileutils.iter_rsrc(self.pe))
         return self._resources
 
     @property
-    def is_64bit(self):
+    def is_64bit(self) -> Optional[bool]:
         """
         Evaluates whether the file is a 64 bit pe file.
 
@@ -413,12 +436,58 @@ class FileObject(object):
         Outputs FileObject instance to reporter if it hasn't already been outputted.
         """
         warnings.warn(
-            "output() is deprecated. Please call report.add_metadata() on a ResidualFile metadata "
+            "output() is deprecated. Please call report.add() on a File metadata "
             "object to report and output on a file instead.",
             DeprecationWarning
         )
         if self.output_file:
             self._report.add(metadata.File.from_file_object(self))
+
+    @contextlib.contextmanager
+    def disassembly(self, disassembler: str = None, report: Report = None, **config) -> ContextManager["dragodis.Disassembler"]:
+        """
+        Produces a Dragodis Disassembler object for the file.
+        Dragodis must be installed for this work.
+
+        e.g.
+            with self.file_object.disassembly() as dis:
+                mnemonic = dis.get_instruction(0x1234).mnemonic
+
+        :param disassembler: Name of the backend disassembler to use.
+            (e.g. "ida" or "ghidra")
+            If not provided, the disassembler setup in the environment variable
+            DRAGODIS_DISASSEMBLER will be used.
+            (It is usually recommended to not set the variable so the parser is cross
+            compatible with any disassembler Dragodis supports.)
+        :param report: Provide the Report object if you want the annotated disassembler project file to
+            be added after processing.
+            This is usually only recommended if the parser plans to annotate the disassembly. e.g. API resolution
+        """
+        if not dragodis:
+            raise RuntimeError("Please install Dragodis to use this function.")
+
+        with self.temp_path() as file_path:
+            with dragodis.open_program(file_path, disassembler, **config) as dis:
+                yield dis
+
+            # After processing we want to save the annotated project file if report was provided.
+            if report:
+                project_file = None
+                if dis.name.casefold() == "ida":
+                    project_file = dis.input_path.parent / (dis.input_path.name + ".idb")
+                elif dis.name.casefold() == "ghidra":
+                    folder_path = dis.input_path.parent / (dis.input_path.name + "_ghidra")
+                    project_file = pathlib.Path(shutil.make_archive(
+                        str(folder_path), format="zip", root_dir=folder_path
+                    ))
+                if project_file and project_file.exists():
+                    data = project_file.read_bytes()
+                    report.add(metadata.File(
+                        name=project_file.name,
+                        data=data,
+                        description=f"{dis.name} Project File",
+                        derivation="supplemental",
+                    ))
 
     def run_kordesii_decoder(self, decoder_name: str, warn_no_strings=True, **run_config):
         """

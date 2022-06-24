@@ -2,6 +2,11 @@ import json
 
 import pytest
 
+try:
+    import dragodis
+except ImportError:
+    dragodis = None
+
 import mwcp
 import mwcp.metadata
 from mwcp import testing
@@ -142,10 +147,53 @@ def _fixup_test_cases(expected_results, actual_results):
     if expected_results_version < "3.6.0":
         for item in expected_results["metadata"]:
             if item["type"] == "registry":
-                reg = mwcp.metadata.Registry2.from_path(item["path"] or "", data=item["data"])
+                reg = mwcp.metadata.Registry2.from_path(item["path"] or "", data=item["data"]).add_tag(*item["tags"])
                 item.update(reg.as_json_dict())
                 del item["path"]
                 del item["key"]
+
+    # Version 3.7.0 changes schema for Path
+    # "directory_path", and "name" as been removed in exchange for just a "path" element.
+    # Update path entries in expected results to account for new schema.
+    if expected_results_version < "3.7.0":
+        for item in expected_results["metadata"]:
+            if item["type"] == "path":
+                # Recreate path using backwards compatibility wrapper.
+                if item["path"] is not None:
+                    path = mwcp.metadata.Path(
+                        path=item["path"],
+                        is_dir=item["is_dir"],
+                        file_system=item["file_system"],
+                    )
+                else:
+                    path = mwcp.metadata.Path(
+                        directory_path=item["directory_path"],
+                        name=item["name"],
+                        is_dir=item["is_dir"],
+                        file_system=item["file_system"],
+                    )
+                path.add_tag(*item["tags"])
+                item.update(path.as_json_dict())
+                del item["directory_path"]
+                del item["name"]
+
+        # "derivation" field was also added. Remove it for older test cases.
+        del actual_results["input_file"]["derivation"]
+        for item in actual_results["metadata"]:
+            if item["type"] in ("file", "residual_file"):
+                del item["derivation"]
+
+    # For now, we are going to remove any supplemental generated files created by IDA or Ghidra.
+    # These are not deterministic, changing the md5 on each run. Plus the backend disassembler
+    # could be different based what the user setup as their default backend disassembler.
+    if expected_results_version >= "3.7.0":
+        # TODO: make this check less hardcoded.
+        is_supplemental = lambda item: (
+            item["type"] == "file"
+            and item["description"] in ("IDA Project File", "Ghidra Project File")
+        )
+        expected_results["metadata"] = [item for item in expected_results["metadata"] if not is_supplemental(item)]
+        actual_results["metadata"] = [item for item in actual_results["metadata"] if not is_supplemental(item)]
 
     # The order the metadata comes in doesn't matter and shouldn't fail the test.
     # (Using custom repr to ensure dictionary keys are sorted before repr is applied.)
@@ -154,20 +202,19 @@ def _fixup_test_cases(expected_results, actual_results):
     actual_results["metadata"] = sorted(actual_results["metadata"], key=custom_repr)
 
 
-@pytest.mark.parsers  # Custom mark
-def test_parser(pytestconfig, md5, results_path):
-    input_file_path = testing.get_path_in_malware_repo(md5=md5)
-
+def _test_parser(pytestconfig, input_file_path, results_path):
     # Grab expected results.
     with open(results_path, "r") as fo:
         expected_results = json.load(fo)
 
     # Get full parser name from expected results.
     parser_name = expected_results["parser"]
+    md5 = expected_results["input_file"]["md5"]
 
     # NOTE: Reading bytes of input file instead of passing in file path to ensure everything gets run in-memory
     #   and no residual artifacts (like idbs) are created in the malware repo.
     report = mwcp.run(parser_name, data=input_file_path.read_bytes(), include_logs=False)
+
     actual_results = report.as_json_dict()
 
     _fixup_test_cases(expected_results, actual_results)
@@ -181,3 +228,9 @@ def test_parser(pytestconfig, md5, results_path):
 
     assert actual_results == expected_results, \
         f"Parser Test Failed \n\tparser = {parser_name}\n\tmd5 = {md5}\n\ttest_case = {results_path}"
+
+
+@pytest.mark.parsers  # Custom mark
+def test_parser(pytestconfig, md5, results_path):
+    input_file_path = testing.get_path_in_malware_repo(md5=md5)
+    _test_parser(pytestconfig, input_file_path, results_path)

@@ -26,14 +26,13 @@ def test_tags():
 
 def test_serialization():
     # Test simple metadata.
-    p = metadata.Path("C:\\hello\\world.txt").add_tag("download")
+    p = metadata.Path2("C:\\hello\\world.txt").add_tag("download")
     p_dict = p.as_dict()
     assert p_dict == {
         'type': 'path',
         'tags': ['download'],
-        'path': 'C:\\hello\\world.txt',
-        'directory_path': 'C:\\hello',
-        'name': 'world.txt',
+        'path': r"C:\hello\world.txt",
+        'posix': False,
         'is_dir': None,
         'file_system': None,
     }
@@ -45,13 +44,12 @@ def test_serialization():
                 "download"
             ],
             "path": "C:\\hello\\world.txt",
-            "directory_path": "C:\\hello",
-            "name": "world.txt",
             "is_dir": null,
+            "posix": false,
             "file_system": null
         }
     """).strip()
-    assert metadata.Path.from_dict(p_dict) == p
+    assert metadata.Path2.from_dict(p_dict) == p
     assert metadata.Metadata.from_dict(p_dict) == p
 
     # Test nested metadata.
@@ -127,3 +125,23 @@ def test_schema_validation(report, metadata_items):
         logger.debug("Test debug log")
 
     jsonschema.validate(report.as_json_dict(), mwcp.schema())
+
+
+def test_path_alternative_constructors():
+    """
+    Tests alternative constructors for path.
+    """
+    path = metadata.Path2.from_segments("C:", "hello", "world.txt")
+    assert path.path == "C:\\hello\\world.txt"
+    path = metadata.Path2.from_segments("C:", "hello", "world.txt", posix=True)
+    assert path.path == "C:/hello/world.txt"
+    path = metadata.Path2.from_segments("world.txt")
+    assert path.path == "world.txt"
+    assert path.posix is False
+
+    path = metadata.Path2.from_pathlib_path(pathlib.PureWindowsPath("C:\\hello\\world.txt"))
+    assert path.path == "C:\\hello\\world.txt"
+    assert path.posix is False
+    path = metadata.Path2.from_pathlib_path(pathlib.PurePosixPath("/home/user/test.txt"))
+    assert path.path == "/home/user/test.txt"
+    assert path.posix is True

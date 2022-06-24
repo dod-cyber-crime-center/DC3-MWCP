@@ -52,17 +52,19 @@ setup(
         'pytest>=6.0.0',
         'pytest-datadir',
         'pytest-xdist',
+        'pytest-mock',
         'pyyaml',
         'requests',
         'ruamel.yaml',
         'six',
         'tabulate[widechars]<1.0.0',
-
+        'stix2',
         # For the server and API
         'flask',
         'pygments',
     ],
     extras_require={
+        'dragodis': ['dragodis>=0.2.0'],
         'kordesii': ['kordesii>=2.0.0'],
         'testing': [
             'jsonschema',

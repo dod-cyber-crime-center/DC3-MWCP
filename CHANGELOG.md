@@ -1,6 +1,34 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- STIX 2.1 output format that includes three SCO extensions and one property extension.  This generates a STIX package containing the results of the full analysis.
+  - SCO Extensions
+    - observed-string
+    - crypto-currency-address
+    - symmetric-encryption
+  - Property Extensions
+    - extension-definition--b84c95f5-d48d-4e4a-b723-7d209a02deb9 -- RSA Private key extension for x509-certificate
+- Added `Path2` metadata element which simplifies fields from `Path` and better supports non-Windows paths.
+  - `name` and `directory_path` are removed in favor of just having a `path` element.
+  - Added `posix` field to indicated if path is Posix or Windows based.
+  - Added `.from_segments()` and `.from_pathlib_path()` constructors.
+- Added `derivation` field to `FileObject` object and `File` metadata element.
+- Added `FileObject.disassembly()` function for obtaining Dragodis dissassembler.
+
+### Fixed
+- AttributeError that can occur during testing if a Registry without a path was reported.
+- Disables skipping recursive files to avoid a breaking bug with greedy parsers.
+  - This is temporary until a proper fix can be implemented.
+- Fixed issue with process stalling when integer is provided in a bytes metadata field.
+
+### Deprecated
+- `Path` is deprecated in favor of `Path2`.
+  - NOTE: Once deprecations are removed, `Path2` will be renamed back to `Path`.
+
+
 ## [3.6.2] - 2022-04-04
 
 ### Fixed

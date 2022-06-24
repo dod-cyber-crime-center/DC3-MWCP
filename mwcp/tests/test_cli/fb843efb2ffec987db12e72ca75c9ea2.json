@@ -13,7 +13,8 @@
         "architecture": null,
         "compile_time": null,
         "file_path": null,
-        "data": null
+        "data": null,
+        "derivation": null
     },
     "parser": "mwcp:foo",
     "errors": [],
@@ -63,7 +64,8 @@
             "architecture": null,
             "compile_time": null,
             "file_path": null,
-            "data": null
+            "data": null,
+            "derivation": "extracted and decompressed"
         }
     ]
 }

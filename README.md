@@ -10,12 +10,14 @@ large-scale automated execution, utilizing either the native python API, a REST 
 command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 
 - [Install](#install)
+- [Dragodis Support](#dragodis-support)
 - [DC3-Kordesii Support](#dc3-kordesii-support)
 - [Usage](#usage)
     - [CLI Tool](#cli-tool)
     - [REST API](#rest-api)
     - [Python API](#python-api)
 - [Schema](#schema)
+- [STIX Output](#stix-output)
 - [Helper Utilities](#helper-utilities)
 
 ### Guides
@@ -46,6 +48,25 @@ For a development mode use the `-e` flag to install in editable mode:
 > git clone https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP.git
 > pip install -e ./DC3-MWCP
 ```
+
+## Dragodis Support
+DC3-MWCP optionally supports [Dragodis](https://github.com/Defense-Cyber-Crime-Center/Dragodis)
+if it is installed. This allows you to obtain a disassembler agnostic interface for parsing
+the file's disassembly from the `mwcp.FileObject` object with the `.disassembly()` function.
+
+You can install Dragodis along with DC3-MWCP by adding `[dragodis]` to your appropriate install command:
+```
+pip install mwcp[dragodis]
+pip install ./DC3-MWCP[dragodis]
+pip install -e ./DC3-MWCP[dragodis]
+```
+
+After installation make sure to follow Dragodis's [installation instructions](https://github.com/Defense-Cyber-Crime-Center/Dragodis/blob/master/docs/install.rst) to setup
+a backend disassembler.
+
+*It is recommended to also install [Rugosa](https://github.com/Defense-Cyber-Crime-Center/rugosa) 
+for emulation and regex/yara matching capabilities using Dragodis.*
+
 
 ## DC3-Kordesii Support
 DC3-MWCP optionally supports [DC3-Kordesii](https://github.com/Defense-Cyber-Crime-Center/kordesii)
@@ -141,7 +162,12 @@ Then you can either use an HTTP client to create REST requests.
 
 Using cURL:
 ```console
+# Get JSON for processing README.md with foo parser
 > curl --form data=@README.md http://localhost:8080/run_parser/foo
+# Get STIX 2.1 JSON for processing README.md with foo parser
+> curl --form data=@README.md --form output=stix http://localhost:8080/run_parser/foo
+# Get STIX 2.1 JSON  without artifacts for processing README.md with foo parser
+> curl --form data=@README.md --form output=stix --form no_file_data=1 http://localhost:8080/run_parser/foo
 ```
 
 Using Python requests:
@@ -266,6 +292,7 @@ to help transition your automation platform to use the new schema.
 A simple HTML interface is also available at the same address. By default this
 is `http://localhost:8080/`. Individual samples can be submitted and results
 saved as JSON, plain text, or ZIP archives.
+
 
 ### Python API
 DC3-MWCP can be run directly from Python.
@@ -447,6 +474,80 @@ import mwcp
 with open("schema.json", "w") as fo:
     json.dump(mwcp.schema(id="https://acme.org/0.1/schema.json"), fo, indent=4)
 ```
+
+
+## STIX Output
+
+MWCP can generate a [STIX 2.1](https://www.oasis-open.org/standard/stix-version-2-1/) JSON output that is suitable for integration into many
+systems that support the STIX standard. This output format makes use of three SCO 
+extensions and one property extension in addition to the currently defined STIX
+objects order to accurately convey MWCP's scan results.
+
+Some tools may not support these extensions yet which can result in the following data
+being omitted when ingesting MWCP's STIX output.  The following provides a list of STIX
+objects and extensions are used and what MWCP classes these are associated with:
+
+1. artifact (SCO)
+    1. File -- only used if the original binary is requested
+2. crypto-currency-address (SCO Extension)
+    1. CryptoAddress
+3. directory (SCO)
+    1. File
+    2. Path
+    3. Service
+4. domain-name (SCO)
+    1. Socket
+    2. URL
+5. email-address (SCO)
+    1. EmailAddress
+6. file (SCO)
+    1. File
+    2. Path
+    3. Service
+7. ipv4-address (SCO)
+    1. Socket
+    2. URL
+8. ipv6-address (SCO)
+    1. Socket
+    2. URL
+9. malware-analysis (SDO)
+    1. MWCP's scan results are tied together via a malware-analysis object showing the input object and the outputs
+10. mutex (SCO)
+    1. Mutex
+11. network-traffic (SCO)
+    1. Socket
+    2. URL
+12. note (SDO)
+    1. Boolean and Integer values for Other.  These are added to the description of the Note.
+    2. Descriptions and other narrative text tied to SCOs
+    3. Tags for SCOs excluding files
+13. observed-string (SCO Extension)
+    1. DecodedString
+    2. MissionID
+    3. Other
+    4. Pipe
+    5. User Agent
+    6. UUID
+14. process (SCO)
+    1. Command
+    2. Service
+15. relationship (SRO)
+    1. DecodedString
+    2. URL
+16. RSA Private Key (Property Extension for x509-certificate)
+    1. RSAPrivateKey
+17. symmetric-encryption (SCO)
+    1. EncryptionKey
+18. user-account (SCO)
+    1. Credential
+19. url (SCO)
+    1. URL
+20. x509-certificate (SCO)
+    1. RSAPrivateKey
+    2. RSAPublicKey
+    3. SSLCertSHA1
+21. windows-registry-key (SCO)
+    1. Registry2
 
 
 ## Helper Utilities

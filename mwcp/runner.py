@@ -211,8 +211,7 @@ class Runner:
         self._managed_tempdir = None
 
         if file_path:
-            with open(file_path, "rb") as f:
-                input_file = mwcp.FileObject(f.read(), file_path=file_path, output_file=False)
+            input_file = mwcp.FileObject.from_path(file_path, output_file=False)
         elif data is not None:
             input_file = mwcp.FileObject(data, output_file=False)
         else:

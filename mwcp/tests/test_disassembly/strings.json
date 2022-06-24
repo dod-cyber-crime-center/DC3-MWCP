@@ -1,0 +1,416 @@
+{
+    "type": "report",
+    "tags": [],
+    "mwcp_version": "3.7.0",
+    "input_file": {
+        "type": "file",
+        "tags": [],
+        "name": "e1b6be6c0c2db8b3d4dca56062ca6301_x86.exe",
+        "description": "Sample Implant",
+        "md5": "e1b6be6c0c2db8b3d4dca56062ca6301",
+        "sha1": "cccaee2efcbff0adf63cf30469c3496c871f0b64",
+        "sha256": "217f42d5348d490ebd09d4055b9b74e522208fa293d21c29eb13df5fae19cf92",
+        "architecture": "x86",
+        "compile_time": "2017-11-16T16:41:19+00:00",
+        "file_path": null,
+        "data": null,
+        "derivation": null
+    },
+    "parser": "Sample.Implant",
+    "errors": [],
+    "logs": [],
+    "metadata": [
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "AQ==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "Hello World!",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "AQ==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "Ag==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "Test string with key 0x02",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "Ag==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "Aw==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "The quick brown fox jumps over the lazy dog.",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "Aw==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "BA==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "Oak is strong and also gives shade.",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "BA==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "BQ==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "Acid burns holes in wool cloth.",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "BQ==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "Bg==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "Cats and dogs each hate the other.",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "Bg==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "Ew==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "Open the crate but don't break the glass.",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "Ew==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "Fw==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "There the flood mark is ten inches.",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "Fw==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "Gg==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "1234567890",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "Gg==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "Iw==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "CreateProcessA",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "Iw==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "Jw==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "StrCat",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "Jw==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "QA==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "ASP.NET",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "QA==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "Rg==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "kdjsfjf0j24r0j240r2j09j222",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "Rg==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "cw==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "32897412389471982470",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "cw==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "dQ==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "The past will look brighter tomorrow.",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "dQ==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "dw==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "Cars and busses stalled in sand drifts.",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "dw==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "eg==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "The jacket hung on the back of the wide chair.",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "eg==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "fw==",
+            "algorithm": "xor",
+            "mode": null,
+            "iv": null
+        },
+        {
+            "type": "decoded_string",
+            "tags": [],
+            "value": "32908741328907498134712304814879837483274809123748913251236598123056231895712",
+            "encryption_key": {
+                "type": "encryption_key",
+                "tags": [],
+                "key": "fw==",
+                "algorithm": "xor",
+                "mode": null,
+                "iv": null
+            }
+        },
+        {
+            "type": "file",
+            "tags": [],
+            "name": "strings.exe.idb",
+            "description": "IDA Project File",
+            "md5": "aa3aad4bcf448206a22d724125e3f10c",
+            "sha1": "1c331ce5f442a022c76889c4cfd80495749b34cf",
+            "sha256": "b54afdf8a40e5bbe58410bf63f75229bb85dfad78942f84860bed61157bdcb06",
+            "architecture": null,
+            "compile_time": null,
+            "file_path": null,
+            "data": null,
+            "derivation": "supplemental"
+        }
+    ]
+}

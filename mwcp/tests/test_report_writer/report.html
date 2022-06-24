@@ -147,14 +147,14 @@
 <h2>Path</h2>
 <table>
 <thead>
-<tr><th>Path                           </th><th>Directory Path       </th><th>Name       </th><th>Is Dir  </th></tr>
+<tr><th>Path                           </th><th>Is Dir  </th><th>Posix  </th></tr>
 </thead>
 <tbody>
-<tr><td>C:\windows\temp\1\log\keydb.txt</td><td>C:\windows\temp\1\log</td><td>keydb.txt  </td><td>False   </td></tr>
-<tr><td>%APPDATA%\foo                  </td><td>%APPDATA%            </td><td>foo        </td><td>True    </td></tr>
-<tr><td>C:\foo\bar.txt                 </td><td>C:\foo               </td><td>bar.txt    </td><td>False   </td></tr>
-<tr><td>                               </td><td>                     </td><td>malware.exe</td><td>False   </td></tr>
-<tr><td>%System%\svohost.exe           </td><td>%System%             </td><td>svohost.exe</td><td>False   </td></tr>
+<tr><td>C:\windows\temp\1\log\keydb.txt</td><td>False   </td><td>False  </td></tr>
+<tr><td>%APPDATA%\foo                  </td><td>True    </td><td>False  </td></tr>
+<tr><td>C:\foo\bar.txt                 </td><td>False   </td><td>False  </td></tr>
+<tr><td>malware.exe                    </td><td>False   </td><td>       </td></tr>
+<tr><td>%System%\svohost.exe           </td><td>False   </td><td>False  </td></tr>
 </tbody>
 </table>
 
@@ -304,10 +304,10 @@ Public Exponent (e):
 <h2>Residual Files</h2>
 <table>
 <thead>
-<tr><th>Filename  </th><th>Description                       </th><th>MD5                             </th><th>Arch  </th><th>Compile Time  </th></tr>
+<tr><th>Filename  </th><th>Description                       </th><th>Derivation  </th><th>MD5                             </th><th>Arch  </th><th>Compile Time  </th></tr>
 </thead>
 <tbody>
-<tr><td>config.xml</td><td>Extracted backdoor Foo config file</td><td>8c41f2802904e53469390845cfeb2b28</td><td>      </td><td>              </td></tr>
+<tr><td>config.xml</td><td>Extracted backdoor Foo config file</td><td>embedded    </td><td>8c41f2802904e53469390845cfeb2b28</td><td>      </td><td>              </td></tr>
 </tbody>
 </table>
 

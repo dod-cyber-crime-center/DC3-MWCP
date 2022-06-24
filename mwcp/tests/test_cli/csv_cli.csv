@@ -4,6 +4,7 @@ fb843efb2ffec987db12e72ca75c9ea2,0,Input File,filename,test.txt
 fb843efb2ffec987db12e72ca75c9ea2,0,Input File,description,Foo
 fb843efb2ffec987db12e72ca75c9ea2,0,Input File,architecture,
 fb843efb2ffec987db12e72ca75c9ea2,0,Input File,compile_time,
+fb843efb2ffec987db12e72ca75c9ea2,0,Input File,derivation,
 fb843efb2ffec987db12e72ca75c9ea2,1,URL,url,http://127.0.0.1
 fb843efb2ffec987db12e72ca75c9ea2,1,URL,address,127.0.0.1
 fb843efb2ffec987db12e72ca75c9ea2,1,URL,port,
@@ -28,4 +29,5 @@ fb843efb2ffec987db12e72ca75c9ea2,3,File,architecture,
 fb843efb2ffec987db12e72ca75c9ea2,3,File,compile_time,
 fb843efb2ffec987db12e72ca75c9ea2,3,File,file_path,
 fb843efb2ffec987db12e72ca75c9ea2,3,File,data,
+fb843efb2ffec987db12e72ca75c9ea2,3,File,derivation,extracted and decompressed
 

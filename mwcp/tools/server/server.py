@@ -24,6 +24,9 @@ from pygments.lexers.data import JsonLexer
 from pygments.lexers.special import TextLexer
 from werkzeug.utils import secure_filename
 
+from mwcp.report import Report
+from mwcp.stix.report_writer import STIXWriter
+
 bp = flask.Blueprint("mwcp", __name__)
 
 
@@ -86,7 +89,9 @@ def run_parsers(parsers):
         )
         for parser in parsers.split("/"):
             if parser:
-                output[parser] = _run_parser(parser, data=data)
+                # TODO: Determine if it should be possible to specify the output format and have file data not be included
+                report = _run_parser(parser, data=data)
+                output[parser] = _format_report(report)
     else:
         output.setdefault("errors", []).append("No input file provided")
         flask.current_app.logger.error("run_parsers %s no input file", parsers)
@@ -310,22 +315,35 @@ def _build_parser_response(parser=None, **kwargs):
     """
     output = kwargs.get("output", "") or flask.request.values.get("output", "json")
     output = output.lower()
-    if output not in ("json", "text", "zip"):
+    if output not in ("json", "text", "zip", "stix"):
         flask.current_app.logger.warning(
             "Unknown output type received: '{}'".format(output)
         )
         output = "json"
     highlight = kwargs.get("highlight") or flask.request.values.get("highlight")
+    include_file_data = not (kwargs.get("no_file_data") or flask.request.values.get("no_file_data"))
 
     if not highlight:
         json_response = flask.jsonify
     else:
         json_response = _highlight
 
-    parser_results, response_code = _run_parser_request(parser)
+    report, response_code = _run_parser_request(parser, include_file_data=include_file_data)
 
     if response_code != 200:
+        parser_results = _format_report(report)
         return json_response(parser_results), response_code
+
+    if output == "stix":
+        writer = STIXWriter()
+        report.as_stix(writer)
+
+        if highlight:
+            return json_response(writer.serialize())
+        else:
+            return writer.serialize()
+    else:
+        parser_results = _format_report(report)
 
     # A ZIP returns both JSON and plain text, and has no highlighting
     if output == "zip":
@@ -343,7 +361,18 @@ def _build_parser_response(parser=None, **kwargs):
     return json_response(parser_results)
 
 
-def _run_parser_request(parser=None, upload_name="data", output_text=True):
+def _format_report(report: Report):
+    if _legacy():
+        output = report.as_dict_legacy()
+    else:
+        output = report.as_json_dict()
+
+    output["output_text"] = report.as_text()
+
+    return output
+
+
+def _run_parser_request(parser=None, upload_name="data", include_file_data=True) -> (Report, int):
     """
     Run a parser based on the data in the current request.
 
@@ -358,9 +387,9 @@ def _run_parser_request(parser=None, upload_name="data", output_text=True):
     :param str parser: The name of the parser to run. Pulled from `parser`
         URL parameter or form field if not specified.
     :param str upload_name: The name of the field of the uploaded sample
-    :param bool output_text: If the `output_text` key should be included in the output
+    :param boolean include_file_data: If the parser should include file data
     :return: The results from the parser run and/or errors and an appropriate status code
-    :rtype: (dict, int)
+    :rtype: (Report, int)
     """
     errors = []
 
@@ -377,7 +406,10 @@ def _run_parser_request(parser=None, upload_name="data", output_text=True):
 
     # Client errors
     if errors:
-        return {"errors": errors}, 400
+        report = Report()
+        for error in errors:
+            flask.current_app.logger.error(error)
+        return report, 400
 
     data = uploaded_file.read()
     flask.current_app.logger.info(
@@ -386,12 +418,12 @@ def _run_parser_request(parser=None, upload_name="data", output_text=True):
         secure_filename(uploaded_file.filename),
         hashlib.md5(data).hexdigest(),
     )
-    parser_results = _run_parser(parser, data=data, append_output_text=output_text)
+    report = _run_parser(parser, data=data, include_file_data=include_file_data)
 
-    return parser_results, 200
+    return report, 200
 
 
-def _run_parser(name, data=b"", append_output_text=True):
+def _run_parser(name, data=b"", include_file_data=True) -> Report:
     """
     Run an MWCP parser on given data.
 
@@ -399,12 +431,11 @@ def _run_parser(name, data=b"", append_output_text=True):
 
     :param str name: Name of the parser to run
     :param bytes data: Data to run parser on
-    :param bool append_output_text: If the text that would otherwise be printed is
-        added to the output data
+    :param boolean include_file_data: If the parser should include file data
     :return: Output from the reporter
-    :rtype: dict
+    :rtype: Report
     """
-    output = {}
+    report = Report()
     log_filter = None
     try:
         include_logs = _include_logs()
@@ -412,20 +443,12 @@ def _run_parser(name, data=b"", append_output_text=True):
             log_filter = RequestFilter(flask.request)
 
         # Tell mwcp to not include logs, since we are going to collect them.
-        report = mwcp.run(name, data=data, include_file_data=True, include_logs=include_logs, log_filter=log_filter)
+        report = mwcp.run(name, data=data, include_file_data=include_file_data, include_logs=include_logs, log_filter=log_filter)
 
-        if _legacy():
-            output = report.as_dict_legacy()
-        else:
-            output = report.as_json_dict()
-
-        if append_output_text:
-            output["output_text"] = report.as_text()
     except Exception as e:
-        output = {"errors": [str(e)]}
         if flask.has_app_context():
-            flask.current_app.logger.exception(
+            flask.current_app.logger.error(
                 "Error running parser '%s': %s", name, str(e)
             )
     finally:
-        return output
+        return report

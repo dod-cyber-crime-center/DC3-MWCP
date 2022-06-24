@@ -14,7 +14,8 @@
             "architecture": null,
             "compile_time": null,
             "file_path": "test.txt",
-            "data": null
+            "data": null,
+            "derivation": null
         },
         "parser": "foo",
         "errors": [],
@@ -64,7 +65,8 @@
                 "architecture": null,
                 "compile_time": null,
                 "file_path": null,
-                "data": null
+                "data": null,
+                "derivation": "extracted and decompressed"
             }
         ]
     }

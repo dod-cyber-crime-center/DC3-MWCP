@@ -19,6 +19,7 @@ import mwcp
 from mwcp import metadata, FileObject
 from mwcp.metadata import Report as ReportModel, Metadata, File
 from mwcp.report_writers import DataFrameWriter, SimpleTextWriter, MarkdownWriter, HTMLWriter
+from mwcp.stix.report_writer import STIXWriter
 from mwcp.utils import logutil
 from mwcp.utils.stringutils import convert_to_unicode, sanitize_filename
 
@@ -238,7 +239,7 @@ class Report:
         # noinspection PyTypeChecker
         results["other"] = {}  # "other" is the only field that is not a list.
         for element in self:
-            if isinstance(element, metadata.Path):
+            if isinstance(element, metadata.Path2):
                 if element.is_dir:
                     results["directory"].append(element.path or element.directory_path)
                 else:
@@ -563,6 +564,13 @@ class Report:
         """
         return json.dumps(self.as_dict_legacy(include_filename=include_filename), indent=4)
 
+    def as_stix(self, reporter: STIXWriter):
+        """
+        Updates the reporter with STIX content
+        """
+        for report_model in self._report_models:
+            reporter.write(report_model)
+
     def as_text(self, format="simple", split=False) -> Optional[str]:
         """
         Returns a custom text representation of the report.
@@ -854,7 +862,7 @@ class Report:
 
     def get(
             self,
-            *element_type: Tuple[Type[T]],
+            *element_type: Type[T],
             source: Union[None, str, FileObject] = None
     ) -> List[T]:
         """

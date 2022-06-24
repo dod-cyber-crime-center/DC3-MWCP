@@ -36,9 +36,9 @@ import tabulate
 
 import mwcp
 from mwcp import testing
+from mwcp.stix.report_writer import STIXWriter
 from mwcp.tester import Tester
 from mwcp.utils.stringutils import convert_to_unicode
-
 
 logger = logging.getLogger("mwcp")
 
@@ -247,7 +247,7 @@ def _write_csv(input_files, results, csv_path=None):
 @main.command()
 @click.option(
     "-f", "--format",
-    type=click.Choice(["csv", "json", "simple", "markdown", "html"]),
+    type=click.Choice(["csv", "json", "simple", "markdown", "html", "stix"]),
     default="simple",
     show_default=True,
     help="Displays results in another format.",
@@ -375,6 +375,15 @@ def parse(parser, input, format, split, output_dir, output_files, cleanup, prefi
                 else:
                     df = pandas.concat([report.as_dataframe(split=split) for report in reports])
                 print(df.to_csv(line_terminator="\n"))
+
+        elif format == "stix":
+            writer = STIXWriter()
+
+            # aggregate the report details
+            for report in reports:
+                report.as_stix(writer)
+                
+            print(writer.serialize())
 
     except Exception as e:
         error_message = "Error running DC3-MWCP: {}".format(e)

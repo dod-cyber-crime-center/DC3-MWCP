@@ -237,6 +237,7 @@ def metadata_items() -> List[Metadata]:
         metadata.File(
             name="config.xml",
             description="Extracted backdoor Foo config file",
-            data=b"foo = bar"
+            data=b"foo = bar",
+            derivation="embedded"
         ),
     ]

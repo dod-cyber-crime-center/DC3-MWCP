@@ -59,6 +59,7 @@ class DataFrameWriter(ReportWriter):
             [md5, 0, category, "description", report.input_file.description],
             [md5, 0, category, "architecture", report.input_file.architecture],
             [md5, 0, category, "compile_time", report.input_file.compile_time],
+            [md5, 0, category, "derivation", report.input_file.derivation],
         ])
         # Split tags into their own rows.
         for tag in report.input_file.tags:
@@ -215,6 +216,8 @@ class MarkupWriter(ReportWriter):
                 ["SHA256", input_file.sha256],
                 ["Compile Time", input_file.compile_time],
             ]
+            if input_file.derivation:
+                tabular_data.append(["Derivation", input_file.derivation])
             if input_file.tags:
                 tabular_data.append(["Tags", ", ".join(input_file.tags)])
             # For this view, we will include the global report tags in this table as well.
@@ -249,6 +252,7 @@ class MarkupWriter(ReportWriter):
             self.h2("Miscellaneous")
             self._write_table(misc_elements)
 
+        # TODO: Use as_formatted_dict() instead?
         # Write out output/residual files. (Customized columns)
         residual_files = metadata_dict.get(metadata.File, [])
         if residual_files:
@@ -257,13 +261,17 @@ class MarkupWriter(ReportWriter):
             tabular_data = []
             for residual_file in residual_files:
                 row = [
-                    residual_file.name, residual_file.description, residual_file.md5,
-                    residual_file.architecture, residual_file.compile_time
+                    residual_file.name,
+                    residual_file.description,
+                    residual_file.derivation,
+                    residual_file.md5,
+                    residual_file.architecture,
+                    residual_file.compile_time
                 ]
                 if include_tags:
                     row = [", ".join(residual_file.tags)] + row
                 tabular_data.append(row)
-            headers = ["Filename", "Description", "MD5", "Arch", "Compile Time"]
+            headers = ["Filename", "Description", "Derivation", "MD5", "Arch", "Compile Time"]
             if include_tags:
                 headers = ["Tags"] + headers
             self.table(tabular_data, headers=headers)
