@@ -9,14 +9,14 @@ Usage:
 import nox
 
 
-@nox.session(python="3.7")
+@nox.session(python="3.8")
 def test(session):
     """Run pytests"""
     session.install("-e", ".[testing]")
     session.run("pytest")
 
 
-@nox.session(python="3.7")
+@nox.session(python="3.8")
 def build(session):
     """Build source and wheel distribution"""
     session.run("python", "setup.py", "sdist")
