@@ -4,7 +4,7 @@
         "tagging",
         "test"
     ],
-    "mwcp_version": "3.7.0",
+    "mwcp_version": "MWCP_VERSION",
     "input_file": {
         "type": "file",
         "tags": [],

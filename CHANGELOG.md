@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [3.8.0] - 2022-09-14
 
 ### Added
 - Added `Report.strings()` convenience function for obtaining reported decoded strings.
@@ -528,7 +528,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.7.0...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.8.0...HEAD
+[3.8.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.7.0...3.8.0
 [3.7.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.2...3.7.0
 [3.6.2]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.1...3.6.2
 [3.6.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.0...3.6.1

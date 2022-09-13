@@ -68,6 +68,8 @@ setup(
         'kordesii': ['kordesii>=2.0.0'],
         'testing': [
             'jsonschema',
+            'dragodis',
+            'rugosa',
         ],
     }
 )
