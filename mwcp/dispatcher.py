@@ -202,19 +202,31 @@ class Dispatcher(object):
 
         # If a description wasn't set for the file, use the parser's
         # (But ignore setting it for sub dispatchers)
+        orig_description = file_object.description
         if (not file_object.description or self._overwrite_descriptions) and not isinstance(parser, Dispatcher):
             file_object.description = parser.DESCRIPTION
 
         # Add tags to the file.
+        orig_tags = set(file_object.tags)
         for tag in parser.TAGS:
             file_object.add_tag(tag)
 
         # Set parser class used in order to keep a history.
+        orig_parser = file_object.parser
         file_object.parser = parser
 
         try:
             parser.parse(file_object, report, *run_args, dispatcher=self)
         except UnableToParse as exception:
+            # Undo setting parser metadata to file if we misidentify.
+            file_object.description = orig_description
+            file_object.tags = orig_tags
+            file_object.parser = orig_parser
+
+            # Mark identify cache as failure, so we don't need to go through this again.
+            self._identify_cache[(parser, file_object)] = False
+
+            # Log to user before reraising.
             if isinstance(parser, Dispatcher):
                 # Parser is a group, change wording
                 logger.info(
@@ -280,7 +292,7 @@ class Dispatcher(object):
                         logger.info(f"File {file_object.name} identified with {parser.DESCRIPTION} parser.")
                     else:
                         logger.info(f"File {file_object.name} identified as {parser.DESCRIPTION}.")
-                    logger.debug(u"{} identified with {!r}".format(file_object.name, parser))
+                    logger.debug(f"{file_object.name} identified with {parser!r}")
 
                     try:
                         self._parse(file_object, parser, report, *_run_args)
@@ -293,8 +305,11 @@ class Dispatcher(object):
 
                 if identified:
                     continue
-                elif unable_to_parse_error and parent:
-                    # Pass UnableToParse exception up the chain to notify parent
+
+                # If this is the first file in the buffer and we get UnableToParse, that means one of the parsers
+                # that identified it to use this dispatcher instance is wrong.
+                # Propogate that up.
+                if unable_to_parse_error and parent and first:
                     raise unable_to_parse_error
 
                 # Give it to the parent dispatcher if we can't identify it.
@@ -305,7 +320,7 @@ class Dispatcher(object):
                 # If no parsers match and developer didn't set a description,
                 # mark as unidentified file and run default.
                 if not file_object.description:
-                    logger.info(u"Supplied file {} was not identified.".format(file_object.file_name))
+                    logger.info(f"Supplied file {file_object.name} was not identified.")
                     if self.default:
                         try:
                             self._parse(file_object, self.default, report)

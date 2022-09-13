@@ -1,6 +1,6 @@
 {
     "type": "bundle",
-    "id": "bundle--00000000-0000-4006-9000-000000000109",
+    "id": "bundle--00000000-0000-4006-9000-000000000111",
     "objects": [
         {
             "type": "file",
@@ -358,6 +358,20 @@
             }
         },
         {
+            "type": "note",
+            "spec_version": "2.1",
+            "id": "note--00000000-0000-4006-9000-000000000082",
+            "created": "2022-01-01T07:32:00.000Z",
+            "modified": "2022-01-01T07:32:00.000Z",
+            "content": "MWCP Tags: something",
+            "object_refs": [
+                "observed-string--b864bf21-56c6-5463-8090-fbed73fe8c0a"
+            ],
+            "labels": [
+                "something"
+            ]
+        },
+        {
             "type": "observed-string",
             "spec_version": "2.1",
             "id": "observed-string--6e755f94-3ae0-55cb-8b91-9b4fa681f53d",
@@ -412,7 +426,7 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000092",
+            "id": "note--00000000-0000-4006-9000-000000000094",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "MWCP Tags: tag2",
@@ -495,7 +509,7 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000105",
+            "id": "note--00000000-0000-4006-9000-000000000107",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "Description: SuperMalware Implant\nAlphabet: 0123456789ABCDEF\nAlphabet Base: 16\nAlphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567=\nAlphabet Base: 32\nAlphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\nAlphabet Base: 64\nEvent Name: MicrosoftExist\nInjects Into: svchost\nInterval: 3.0\nkeylogger: True\nmisc_integer: 432\n    misc_integer Tags: tag1\nVersion: 3.1\nVersion: 403.10",
@@ -506,11 +520,11 @@
         {
             "type": "malware-analysis",
             "spec_version": "2.1",
-            "id": "malware-analysis--00000000-0000-4006-9000-000000000107",
+            "id": "malware-analysis--00000000-0000-4006-9000-000000000109",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "product": "mwcp",
-            "version": "3.6.1",
+            "version": "3.7.0",
             "analysis_sco_refs": [
                 "crypto-currency-address--e2e281c7-65af-5545-970a-8348106e4e15",
                 "directory--a85fb8f4-0b2b-5c61-9cff-fc777cfd6286",

@@ -286,6 +286,13 @@ def _write_csv(input_files, results, csv_path=None):
          "If turned off, unique files with the same file name will be overwritten."
 )
 @click.option(
+    "--string-report/--no-string-report",
+    default=False,
+    show_default=True,
+    help="Whether to report decoded strings into a separate external report output "
+         "as a supplemental file."
+)
+@click.option(
     "-i",
     "--include-filename",
     is_flag=True,
@@ -300,7 +307,7 @@ def _write_csv(input_files, results, csv_path=None):
 )
 @click.argument("parser", required=True)
 @click.argument("input", nargs=-1, type=click.Path())
-def parse(parser, input, format, split, output_dir, output_files, cleanup, prefix, include_filename, legacy):
+def parse(parser, input, format, split, output_dir, output_files, cleanup, prefix, string_report, include_filename, legacy):
     """
     Parses given input with given parser.
 
@@ -338,6 +345,7 @@ def parse(parser, input, format, split, output_dir, output_files, cleanup, prefi
                     if output_files else None,
                 cleanup_temp_files=cleanup,
                 prefix_output_files=prefix,
+                external_strings_report=string_report,
             )
             logger.info("Parsing: {}".format(path))
             # TODO: This is temporary, make real fix.

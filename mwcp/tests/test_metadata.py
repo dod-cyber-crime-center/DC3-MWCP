@@ -13,7 +13,7 @@ from mwcp import metadata
 
 
 def test_tags():
-    p = metadata.Path("C:\\hello\\world.txt")
+    p = metadata.Path2("C:\\hello\\world.txt")
 
     # test single
     assert p.add_tag("download") is p
@@ -145,3 +145,15 @@ def test_path_alternative_constructors():
     path = metadata.Path2.from_pathlib_path(pathlib.PurePosixPath("/home/user/test.txt"))
     assert path.path == "/home/user/test.txt"
     assert path.posix is True
+
+
+def test_path_absolute_segment_issue():
+    """
+    Tests issue with absolute path causing previous segments being excluded in Path2.from_segments()
+    """
+    assert metadata.Path2.from_segments("hello", "\\world").path == r"hello\world"
+    assert metadata.Path2.from_segments("\\hello", "\\world").path == r"\hello\world"
+    assert metadata.Path2.from_segments("C:\\hello", "\\world").path == r"C:\hello\world"
+    assert metadata.Path2.from_segments("hello", "\\world", posix=True).path == r"hello/\world"
+    assert metadata.Path2.from_segments("hello", "/\\world", posix=True).path == r"hello/\world"
+    assert metadata.Path2.from_segments("/hello", "/world", posix=True).path == r"/hello/world"

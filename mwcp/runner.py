@@ -54,6 +54,7 @@ class Runner:
         cleanup_temp_files: bool = False,
         include_file_data: bool = False,
         prefix_output_files: bool = True,
+        external_strings_report: bool = False,
         include_logs: bool = True,
         log_level: int = None,
         log_filter: logging.Filter = None,
@@ -74,6 +75,8 @@ class Runner:
         :param prefix_output_files: Whether to include a prefix of the first 5 characters
             of the md5 on output files. This is to help avoid overwriting multiple
             output files with the same name.
+        :param external_string_report: Whether to output reported DecodedString elements into a
+            separate strings report.
         :param include_logs: Whether to include error and debug logs in the generated report.
         :param log_level: If including logs, the logging level to be collected.
             (Defaults to currently set effective log level)
@@ -96,6 +99,7 @@ class Runner:
             "include_logs": include_logs,
             "include_file_data": include_file_data,
             "prefix_output_files": prefix_output_files,
+            "external_strings_report": external_strings_report,
             "output_directory": self._output_dir,  # TODO: does runner still need output_dir?
             "log_level": log_level,
             "log_filter": log_filter,

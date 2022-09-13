@@ -17,6 +17,7 @@ def run(
         output_directory: Union[str, pathlib.Path] = None,
         include_file_data: bool = False,
         prefix_output_files: bool = True,
+        external_strings_report: bool = False,
         include_logs: bool = True,
         log_level: int = None,
         log_filter: logging.Filter = None,
@@ -34,9 +35,11 @@ def run(
         If not provided, files will not be written out.
     :param include_file_data: Whether to include file data in the generated report.
         If disabled, only metadata such as the file path, description, and md5 will be included.
-    :param prefix_output_files: Whether to includes a prefix of the first 5 characters
+    :param prefix_output_files: Whether to include a prefix of the first 5 characters
         of the md5 on output files. This is to help avoid overwriting multiple
         output files with the same name.
+    :param external_strings_report: Whether to output reported DecodedString elements into a
+        separate strings report.
     :param include_logs: Whether to include error and debug logs in the generated report.
     :param log_level: If including logs, the logging level to be collected.
         (Defaults to currently set effective log level)
@@ -51,6 +54,7 @@ def run(
         output_directory=output_directory,
         include_file_data=include_file_data,
         prefix_output_files=prefix_output_files,
+        external_strings_report=external_strings_report,
         include_logs=include_logs,
         log_level=log_level,
         log_filter=log_filter,

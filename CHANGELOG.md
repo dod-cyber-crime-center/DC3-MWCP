@@ -1,6 +1,27 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Added `Report.strings()` convenience function for obtaining reported decoded strings.
+- Added option to produce external string reports for decoded strings instead of being included in the main report.
+  -  Reports will be added as supplemental files with original name suffixed with `_strings.json` and `_strings.txt`.
+  - Use the `--string-report` flag to enable this in the CLI tool.
+  - Use the `external_strings` field to enable this in the server.
+
+### Changed
+- `DecodedString` metadata is now included in legacy report output.
+
+### Fixed
+- Fixed issue with `Path2.from_segments()` ignoring previous segments when another segment starts with a slash.
+- Fixed issue with throwing of `UnableToParse` sometimes causing the residual file not to be reported.
+- Files for which a parser throws an `UnableToParse` and end up not getting identified by any other parsers will
+  now appropriately be identified as "Unidentified file". (NOTE: This change may cause previous test cases to fail.)
+- Fixed bug with `Report.get()` and `Report.iter()` returning elements that don't match requested type.
+- Fixed bug in STIX output when a parser added a tag to a piece of metadata that translated to an observed-string.
+
+
 ## [3.7.0] - 2022-06-28
 
 ### Added

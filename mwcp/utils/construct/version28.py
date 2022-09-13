@@ -48,7 +48,7 @@ from __future__ import absolute_import
 from future.builtins import bytes, str
 
 import codecs
-import collections
+import collections.abc
 import sys
 
 import construct
@@ -123,7 +123,7 @@ class Range(Subconstruct):
         max_ = evaluate(self.max, context)
         if not 0 <= min_ <= max_ <= sys.maxsize:
             raise RangeError("[{}] unsane min {} and max {}".format(path, min_, max_))
-        if not isinstance(obj, collections.Sequence):
+        if not isinstance(obj, collections.abc.Sequence):
             raise RangeError("[{}] expected sequence type, found {}".format(path, type(obj)))
         if not min_ <= len(obj) <= max_:
             raise RangeError("[{}] expected from {} to {} elements, found {}".format(path, min_, max_, len(obj)))

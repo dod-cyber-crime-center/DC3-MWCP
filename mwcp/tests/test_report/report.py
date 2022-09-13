@@ -250,7 +250,7 @@ report = {
         {"tags": [], "type": "mutex", "value": "ithinkimalonenow"},
         {
             "key": "misc_info",
-            "tags": [],
+            "tags": ["something"],
             "type": "other",
             "value": "some miscellaneous info",
             "value_format": "string",

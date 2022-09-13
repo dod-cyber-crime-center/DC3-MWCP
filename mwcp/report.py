@@ -114,6 +114,8 @@ class Report:
         (Defaults to currently set effective log level)
     :param log_filter: If including logs, this can be used to pass in a custom filter for the logs.
         Should be a valid argument for logging.Handler.addFilter()
+    :param external_strings_report: Whether to output reported DecodedString elements into a
+        separate strings report.
     """
 
     def __init__(
@@ -126,6 +128,7 @@ class Report:
             output_directory: Union[pathlib.Path, str] = None,
             log_level: int = None,
             log_filter: logging.Filter = None,
+            external_strings_report: bool = False,
     ):
         if output_directory:
             output_directory = pathlib.Path(output_directory)
@@ -136,6 +139,7 @@ class Report:
         self._include_logs = include_logs
         self._include_file_data = include_file_data
         self._prefix_output_files = prefix_output_files
+        self._external_strings_report = external_strings_report
 
         self.input_file = input_file
         self.parser = parser
@@ -436,6 +440,9 @@ class Report:
                     output_file.append(base64.b64encode(element.data).decode())
                 results["outputfile"].append(output_file)
 
+            elif isinstance(element, metadata.DecodedString):
+                self._insert_into_other(results, "decoded_string", element.value)
+
         # None is not a thing in the legacy schema.
         # Replace all None's with empty strings.
         for key, value in results.items():
@@ -472,6 +479,13 @@ class Report:
             metadata=deepcopy(metadata_entries),
         ).add_tag(*self.tags)
         report_model.validate()
+
+        # Remove DecodedString element if external strings report was requested.
+        # (These are included as a supplemental file in the report.)
+        if self._external_strings_report:
+            report_model.metadata = [
+                element for element in report_model.metadata if not isinstance(element, metadata.DecodedString)
+            ]
 
         # Remove raw file data from report model if requested.
         if not self._include_file_data:
@@ -564,12 +578,12 @@ class Report:
         """
         return json.dumps(self.as_dict_legacy(include_filename=include_filename), indent=4)
 
-    def as_stix(self, reporter: STIXWriter):
+    def as_stix(self, writer: STIXWriter):
         """
         Updates the reporter with STIX content
         """
         for report_model in self._report_models:
-            reporter.write(report_model)
+            writer.write(report_model)
 
     def as_text(self, format="simple", split=False) -> Optional[str]:
         """
@@ -629,6 +643,12 @@ class Report:
         :return:
         """
         return str(RenderTree(self.input_file))
+
+    def strings(self, source: Union[None, str, FileObject] = None) -> List[str]:
+        """
+        Returns reported decoded string values.
+        """
+        return [element.value for element in self.iter(metadata.DecodedString, source=source)]
 
     def add_tag(self, *tags: Iterable[str]) -> "Report":
         """
@@ -762,11 +782,11 @@ class Report:
         )
         residual_file = metadata.File(name=filename, description=description, data=data)
         self.add(residual_file)
-        # In order to be backwards compatible, we have to write out the file here so we can
+        # In order to be backwards compatible, we have to write out the file here, so we can
         # return a file path.
-        return self._write_residual_file(residual_file)
+        return self._write_file(residual_file)
 
-    def _write_residual_file(self, residual_file: File) -> Optional[str]:
+    def _write_file(self, file: File) -> Optional[str]:
         """
         Writes out the given File metadata object and returns the file path to the written file
         or None on failure.
@@ -775,17 +795,17 @@ class Report:
             return
 
         # Create a safe filename that won't have any name collisions.
-        safe_filename = sanitize_filename(residual_file.name)
+        safe_filename = sanitize_filename(file.name)
         if self._prefix_output_files:
-            safe_filename = f"{residual_file.md5[:5]}_{safe_filename}"
+            safe_filename = f"{file.md5[:5]}_{safe_filename}"
         full_path = self._output_directory / safe_filename
 
         try:
             # TODO: Should we attach the real file path?
-            full_path.write_bytes(residual_file.data)
+            full_path.write_bytes(file.data)
             logger.debug(f"Output file: {full_path}")
             full_path = str(full_path)
-            residual_file.file_path = full_path
+            file.file_path = full_path
             return full_path
         except Exception as e:
             logger.error(f"Failed to write output file {full_path} with error: {e}")
@@ -794,13 +814,34 @@ class Report:
     def finalize(self):
         """
         This should be called after parsing is complete.
-        This performs post processing tasks such as validation and cleaning up the log handler.
+        This performs post-processing tasks such as validation and cleaning up the log handler.
         """
+        # If external string report enabled, create supplemental file containing
+        # reported DecodedString elements.
+        if self._external_strings_report:
+            for file_object, metadata_list in self._metadata.items():
+                string_report = metadata.StringReport(
+                    file=metadata.File.from_file_object(file_object),
+                    strings=[element for element in metadata_list if isinstance(element, metadata.DecodedString)]
+                )
+                string_report.file.data = None
+                if string_report.strings:
+                    self.add(metadata.SupplementalFile(
+                        name=f"{file_object.name}_strings.json",
+                        description=f"Decoded Strings",
+                        data=string_report.as_json().encode("utf8"),
+                    ))
+                    self.add(metadata.SupplementalFile(
+                        name=f"{file_object.name}_strings.txt",
+                        description=f"Decoded Strings",
+                        data="\n".join(string.value for string in string_report.strings).encode("utf8")
+                    ))
+
         # TODO: move this to post_processing of File?
         # Write out residual files to file system if requested.
         if self._write_output_files:
             for residual_file in self.iter(metadata.File):
-                self._write_residual_file(residual_file)
+                self._write_file(residual_file)
 
         # Remove log handler.
         if self._log_handler:
@@ -816,7 +857,7 @@ class Report:
 
     def iter(
             self,
-            *element_type: Tuple[Type[T]],
+            *element_type: Type[T],
             source: Union[None, str, FileObject] = None
     ) -> Iterable[T]:
         """
@@ -853,8 +894,8 @@ class Report:
         yielded = []
         for metadata_list in metadata_lists:
             for element in metadata_list:
-                if not element_type or isinstance(element, element_type):
-                    for _element in element.elements():
+                for _element in element.elements():
+                    if not element_type or isinstance(_element, element_type):
                         # Metadata elements are not hashable, so we need to check equality of each.
                         if not any(_element == yielded_element for yielded_element in yielded):
                             yielded.append(_element)

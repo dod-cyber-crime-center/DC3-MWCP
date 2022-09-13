@@ -217,6 +217,14 @@ def _include_logs():
     return include_logs
 
 
+def _external_strings():
+    """Whether to create external string reports for reported decoded strings."""
+    external_strings = flask.request.values.get("external_strings", default=False)
+    if isinstance(external_strings, str):
+        external_strings = external_strings.lower() == "true"
+    return external_strings
+
+
 def _highlight(data, is_json=True):
     """
     Render an HTML page with a highlighted JSON string or plain text.
@@ -443,7 +451,14 @@ def _run_parser(name, data=b"", include_file_data=True) -> Report:
             log_filter = RequestFilter(flask.request)
 
         # Tell mwcp to not include logs, since we are going to collect them.
-        report = mwcp.run(name, data=data, include_file_data=include_file_data, include_logs=include_logs, log_filter=log_filter)
+        report = mwcp.run(
+            name,
+            data=data,
+            include_file_data=include_file_data,
+            include_logs=include_logs,
+            log_filter=log_filter,
+            external_strings_report=_external_strings(),
+        )
 
     except Exception as e:
         if flask.has_app_context():

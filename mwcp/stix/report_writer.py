@@ -77,7 +77,8 @@ class STIXWriter(ReportWriter):
                 "content": "\n".join(note_content),
                 "object_refs": [base_file.id],
                 "created": self.fixed_timestamp,
-                "modified": self.fixed_timestamp
+                "modified": self.fixed_timestamp,
+                "allow_custom": True
             }
 
             if len(file_result.note_labels) > 0:

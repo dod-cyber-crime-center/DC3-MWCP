@@ -1,3 +1,4 @@
+import base64
 import io
 import json
 import logging
@@ -218,6 +219,40 @@ def test_run_parser(client, make_test_buffer, url, options, legacy):
     results.pop("debug", None)
     results.pop("logs", None)
     assert results == expected_results
+
+
+def test_external_strings_report(datadir, client, make_test_buffer):
+    """
+    Tests creating an external strings report.
+    """
+    mwcp.register_parser_directory(str(datadir), source_name="test")
+
+    options = {
+        "data": (make_test_buffer(), "test.file"),
+        "external_strings": "True",
+        "legacy": "False",
+    }
+    rv = client.post("/run_parser/DecodedStringTestParser.Implant", data=options)
+    results = rv.json
+    print(results["output_text"])
+    print(json.dumps(results, indent=4))
+    files = [element for element in results["metadata"] if element["type"] == "file"]
+
+    assert len(files) == 2
+    assert all(file["description"] == "Decoded Strings" for file in files)
+
+    strings_json = files[0]
+    assert strings_json["name"].endswith("_strings.json")
+    string_report = json.loads(base64.b64decode(strings_json["data"]))
+    assert [string["value"] for string in string_report["strings"]] == ["string A", "string B"]
+    enc_key = string_report["strings"][1]["encryption_key"]
+    assert enc_key
+    assert base64.b64decode(enc_key["key"]) == b"\xde\xad\xbe\xef"
+
+    strings_txt = files[1]
+    strings = base64.b64decode(strings_txt["data"])
+    assert strings == b"string A\nstring B"
+
 
 
 def test_run_parser_errors(client, make_test_buffer):

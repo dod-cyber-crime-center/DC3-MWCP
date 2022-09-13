@@ -157,7 +157,7 @@ def metadata_items() -> List[Metadata]:
     This is used in number of different basic tests.
     """
     return [
-        metadata.Path("C:\\windows\\temp\\1\\log\\keydb.txt", is_dir=False),
+        metadata.Path2("C:\\windows\\temp\\1\\log\\keydb.txt", is_dir=False),
         metadata.Directory("%APPDATA%\\foo"),
         metadata.FilePath("C:\\foo\\bar.txt"),
         metadata.FileName("malware.exe"),
@@ -199,7 +199,7 @@ def metadata_items() -> List[Metadata]:
             encryption_key=metadata.EncryptionKey(b"\xff\xff", algorithm="xor")),
         metadata.MissionID("target4"),
         metadata.Mutex("ithinkimalonenow"),
-        metadata.Other("misc_info", "some miscellaneous info"),
+        metadata.Other("misc_info", "some miscellaneous info").add_tag("something"),
         metadata.Other("random_data", b"\xde\xad\xbe\xef"),
         metadata.Other("keylogger", True),
         metadata.Other("misc_integer", 432).add_tag("tag1"),

@@ -461,7 +461,8 @@ class Metadata(Element):
                 content=f"MWCP Tags: {', '.join(self.tags)}",
                 object_refs=[parent.id],
                 created=fixed_timestamp,
-                modified=fixed_timestamp
+                modified=fixed_timestamp,
+                allow_custom=True
             )
 
 
@@ -505,6 +506,13 @@ class Path2(Metadata):
             raise ValidationError(f"from_segments() requires at least one segment.")
         if len(segments) == 1:
             return Path2(segments[0], is_dir=is_dir, posix=posix, file_system=file_system)
+
+        # Ensure we do not have secondary segments starting with a slash.
+        # This would cause pathlib's constructor to just take the last absolute path ignored the ones before it.
+        # Which is something we don't want in this context.
+        slash = "/" if posix else "\\"
+        segments = [segments[0], *(segment.lstrip(slash) for segment in segments[1:])]
+
         if posix:
             path = pathlib.PurePosixPath(*segments)
         else:
@@ -1808,7 +1816,7 @@ def _parse_rsa_xml(data: str):
         try:
             fields[child.tag] = int.from_bytes(base64.b64decode(child.text), byteorder="big")
         except binascii.Error as e:
-            logger.warning(f"Failed to base64 decode data in '{child.tag}': {e}")
+            logger.warning(f"Failed to base64 decode data in '{child.tag}': '{child.text}' with error: {e}")
 
     if not fields:
         raise ValueError(f"Failed to parse any RSA key data from XML.")
@@ -2426,3 +2434,12 @@ class Report(Element):
     errors: List[str] = attr.ib(factory=list)
     logs: List[str] = attr.ib(factory=list)
     metadata: List[Metadata] = attr.ib(factory=list)
+
+
+@attr.s(**config)
+class StringReport(Element):
+    """
+    Defines a report of decoded strings for a file.
+    """
+    file: File
+    strings: List[DecodedString] = attr.ib(factory=list)

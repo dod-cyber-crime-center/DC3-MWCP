@@ -167,12 +167,12 @@ Value
 403.10
 
 ---- Miscellaneous ----
-Tags    Key           Value
-------  ------------  -----------------------
-        misc_info     some miscellaneous info
-        random_data   b'\xde\xad\xbe\xef'
-        keylogger     True
-tag1    misc_integer  432
+Tags       Key           Value
+---------  ------------  -----------------------
+something  misc_info     some miscellaneous info
+           random_data   b'\xde\xad\xbe\xef'
+           keylogger     True
+tag1       misc_integer  432
 
 ---- Residual Files ----
 Filename    Description                         Derivation    MD5                               Arch    Compile Time
