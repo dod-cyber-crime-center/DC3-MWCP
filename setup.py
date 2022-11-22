@@ -28,7 +28,7 @@ setup(
             'mwcp_update_legacy_tests = mwcp.tools.update_legacy_tests:main',
         ],
         'mwcp.parsers': [
-            'mwcp = mwcp.parsers',
+            'dc3 = mwcp.parsers',
         ]
     },
     install_requires=[
@@ -59,9 +59,15 @@ setup(
         'six',
         'tabulate[widechars]<1.0.0',
         'stix2',
+        'yara-python',
         # For the server and API
         'flask',
         'pygments',
+
+        # Dependencies for builtin parsers.
+        'isoparser',
+        'pycryptodome',
+        'olefile',
     ],
     extras_require={
         'dragodis': ['dragodis>=0.2.0'],

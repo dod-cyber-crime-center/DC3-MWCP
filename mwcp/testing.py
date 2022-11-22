@@ -71,7 +71,7 @@ def get_path_in_malware_repo(file_path: Union[str, pathlib.Path] = None, md5: st
     """
     malware_repo = mwcp.config.get("MALWARE_REPO")
     if not malware_repo:
-        raise ValueError("Malware Repository not set.")
+        raise ValueError(f"MALWARE_REPO field not set in '{mwcp.config.user_path}'. Try running `mwcp config` to set this.")
     if file_path:
         with open(file_path, "rb") as fo:
             md5 = hashlib.md5(fo.read()).hexdigest()

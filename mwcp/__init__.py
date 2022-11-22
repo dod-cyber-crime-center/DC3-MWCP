@@ -16,7 +16,6 @@ from mwcp.registry import (
     clear_default_source,
     ParserNotFoundError
 )
-from mwcp.reporter import Reporter  # DEPRECATED
 from mwcp.runner import Runner
 from mwcp.report import Report
 from mwcp.dispatcher import Dispatcher, UnidentifiedFile

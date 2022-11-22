@@ -1,6 +1,38 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+## [Unreleased]
+### Added
+- Added `FileObject.ext` property for getting and setting the file's extension.
+- Added builtin parsers.
+- Added YARA matching capability to automatically determine which parser(s) to run. (see [documentation](README.md#yara-matching)) 
+
+### Changed
+- Improved aliasing in parser configuration file.
+  - Aliases can now be used for pointing to individual parser components. (e.g. `PDF: .Document`) This helps to avoid the need to create parser groups just for pointing to a single parser component.
+  - External pointers are no longer limited to just inside parser groups. Aliases can now also point to external parsers (e.g. `DecoyDOC: dc3:Decoy.DOC`) 
+
+### Removed
+- Removed legacy `mwcp.Reporter` object.  
+- Removed `cleanup_temp_files` option from `mwcp.Runner` object.
+- Removed `temp_directory` option from `mwcp.Runner` object.
+- Removed deprecated components from `mwcp.Runner` (these components should be pulled from the generated Report object instead):
+  - `.managed_tempdir`
+  - `.add_metadata()`
+  - `.input_file`
+  - `.metadata`
+  - `.output_file()`
+  - `.errors`
+  - `.run_parser()`
+  - `.print_report()`
+  - `.print_report()`
+  - `.get_output_text()`
+  - `.fields`
+- Removed deprecated `.managed_tempdir` from `mwcp.Report` object.
+- Removed `--cleanup` CLI flag.
+
+
 ## [3.8.0] - 2022-09-14
 
 ### Added

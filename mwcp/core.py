@@ -3,18 +3,21 @@ import pathlib
 from typing import Union, Type
 
 import mwcp
-from mwcp.runner import Runner
+from mwcp.runner import Runner, YaraRunner
 from mwcp.report import Report
 from mwcp.parser import Parser
+from mwcp import config
 from mwcp import metadata
 
 
 def run(
-        parser: Union[str, Type[Parser]],
+        parser: Union[str, Type[Parser]] = None,
         file_path: Union[str, pathlib.Path] = None,
         data: bytes = None,
         *,
         output_directory: Union[str, pathlib.Path] = None,
+        yara_repo: Union[str, pathlib.Path] = None,
+        recursive: bool = True,
         include_file_data: bool = False,
         prefix_output_files: bool = True,
         external_strings_report: bool = False,
@@ -25,13 +28,16 @@ def run(
     """
     Runs a specified parser on a given file path or data.
 
-    :param parser: Name or class of parser to run
+    :param parser: Name or class of parser to run.
+        Can be excluded to use YARA matching to determine parser.
         (use ":" notation to specify source if necessary e.g. "acme:Foo")
     :param file_path: File path to parse
     :param data: File data to parse
+    :param yara_repo: Path to directory of yara signatures.
+    :param recursive: Whether to recursively match and run parsers for unidentified files.
+        (Only applicable if given a yara_repo to match files to parsers.)
     :param output_directory:
-        sets directory for output_file(). Should not be written to (or read from) by parsers
-        directly (use tempdir)
+        Directory to write out files.
         If not provided, files will not be written out.
     :param include_file_data: Whether to include file data in the generated report.
         If disabled, only metadata such as the file path, description, and md5 will be included.
@@ -50,7 +56,8 @@ def run(
     """
     if file_path:
         file_path = str(file_path)
-    runner = Runner(
+
+    report_config = dict(
         output_directory=output_directory,
         include_file_data=include_file_data,
         prefix_output_files=prefix_output_files,
@@ -59,6 +66,16 @@ def run(
         log_level=log_level,
         log_filter=log_filter,
     )
+    if not yara_repo:
+        yara_repo = config.get("YARA_REPO")
+
+    # Only run YARA runner if repo has been setup and we can benefit from it.
+    if yara_repo and (not parser or recursive):
+        runner = YaraRunner(yara_repo=yara_repo, recursive=recursive, **report_config)
+    elif parser:
+        runner = Runner(**report_config)
+    else:
+        raise ValueError(f"Must provide either a parser to run or a yara_repo for file matching.")
     return runner.run(parser, file_path=file_path, data=data)
 
 

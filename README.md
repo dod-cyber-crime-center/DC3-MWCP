@@ -10,6 +10,7 @@ large-scale automated execution, utilizing either the native python API, a REST 
 command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 
 - [Install](#install)
+- [Builtin Parsers](#builtin-parsers)
 - [Dragodis Support](#dragodis-support)
 - [DC3-Kordesii Support](#dc3-kordesii-support)
 - [Usage](#usage)
@@ -18,6 +19,7 @@ command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
     - [Python API](#python-api)
 - [Schema](#schema)
 - [STIX Output](#stix-output)
+- [YARA Matching](#yara-matching)
 - [Helper Utilities](#helper-utilities)
 
 ### Guides
@@ -48,6 +50,30 @@ For a development mode use the `-e` flag to install in editable mode:
 > git clone https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP.git
 > pip install -e ./DC3-MWCP
 ```
+
+## Builtin Parsers
+DC3-MWCP includes a handful of builtin [parsers](./mwcp/parsers) to get you started.
+These can be used as-is, subclassed, or included in your own parser groups.
+
+To view the available parsers:
+```bash
+$ mwcp list
+```
+
+Parsers are installed under the `dc3` source name. To include them in a group simply add them with
+the `dc3:` prefix.
+
+```yml
+SuperMalware:
+    description: SuperMalware component
+    author: acme
+    parsers:
+      - dc3:Archive.Zip
+      - .Dropper
+      - .Implant
+      - dc3:Decoy
+```
+
 
 ## Dragodis Support
 DC3-MWCP optionally supports [Dragodis](https://github.com/Defense-Cyber-Crime-Center/Dragodis)
@@ -199,9 +225,7 @@ Output:
             "aGVsbG8gd29ybGQ="
         ]
     ],
-    "output_text": "\n----Standard Metadata----\n\nurl                  http://127.0.0.1\naddress              127.0.0.1\n\n----Debug----\n\nsize of inputfile
-is 7128 bytes\noutputfile: fooconfigtest.txt\noperating on inputfile C:\\Users\\JOHN.DOE\\AppData\\Local\\Temp\\mwcp-managed_tempdir-pk0f12oh\\mwcp-inputfi
-le-n4mw7uw3\n\n----Output Files----\n\nfooconfigtest.txt    example output file\n                     5eb63bbbe01eeed093cb22bb8f5acdc3\n"
+    "output_text": "\n----Standard Metadata----\n\nurl                  http://127.0.0.1\naddress              127.0.0.1\n\n----Debug----\n\nsize of inputfile is 7128 bytes\noutputfile: fooconfigtest.txt\noperating on inputfile C:\\Users\\JOHN.DOE\\AppData\\Local\\Temp\\mwcp-managed_tempdir-pk0f12oh\\mwcp-inputfile-n4mw7uw3\n\n----Output Files----\n\nfooconfigtest.txt    example output file\n                     5eb63bbbe01eeed093cb22bb8f5acdc3\n"
 }
 ```
 
@@ -548,6 +572,54 @@ objects and extensions are used and what MWCP classes these are associated with:
     3. SSLCertSHA1
 21. windows-registry-key (SCO)
     1. Registry2
+
+
+## YARA Matching
+
+MWCP includes a runner that can use YARA match results to determine which parser(s) to run on a given file.
+
+This will be used whenever you use `-` instead of specifying a parser on the command line,
+when a parser isn't specified in `mwcp.run()`, or when a parser isn't specified in a server request.
+
+```bash
+$ mwcp parse - input.exe
+$ curl --form data=@input.exe http://localhost:8080/run_parser
+```
+
+```python
+import mwcp 
+mwcp.register_entry_points()
+
+report = mwcp.run(data=b"file data")
+```
+
+As well, YARA matching will be recursively used on unidentified residual files.
+If you want to disable this, either set `--no-recursive` on the command line or set `recursive=False` on `mwcp.run()`.
+
+### Setup
+
+To enable YARA matching you'll need to specify a directory containing YARA signatures which use the `mwcp` 
+meta field to map a signature to a comma delimited list of parsers. Parsers can be specified in the same
+way as on the command line or Python API. That is, parser group names, `.` notation for specific parser components,
+and the use of `:` for specifying a parser source are all valid.
+
+Any signatures that don't have the `mwcp` meta field will be ignored.
+
+```yara
+rule SuperMalware {
+    meta:
+        mwcp = "SuperMalware"
+    ...
+}
+```
+
+To setup a YARA repo, set the `YARA_REPO` field to point to a directory containing YARA signatures (subdirectories allowed)
+in the configuration file that appears when you call `mwcp config`.
+If you have upgraded from an older version of MWCP, you may need to first backup and remove the original configuration file and
+then run `mwcp config` again to have MWCP recreate the file.
+
+Alternatively, the yara repo can be specified in the command line with `--yara-repo`. But the former method
+is necessary to use YARA matching with the server.
 
 
 ## Helper Utilities

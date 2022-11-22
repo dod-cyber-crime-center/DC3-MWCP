@@ -246,6 +246,18 @@ def _write_csv(input_files, results, csv_path=None):
 
 @main.command()
 @click.option(
+    "--yara-repo",
+    type=click.Path(file_okay=False),
+    help="Directory containing YARA signatures used for auto detection.",
+)
+@click.option(
+    "--recursive/--no-recursive",
+    default=True,
+    show_default=True,
+    help="Whether to recursively parse unidentified residual files using YARA match. "
+         "(Only works if a YARA repo has been provided through command line or configuration)"
+)
+@click.option(
     "-f", "--format",
     type=click.Choice(["csv", "json", "simple", "markdown", "html", "stix"]),
     default="simple",
@@ -271,12 +283,6 @@ def _write_csv(input_files, results, csv_path=None):
     default=True,
     show_default=True,
     help="Whether to output files to filesystem."
-)
-@click.option(
-    "--cleanup/--no-cleanup",
-    default=True,
-    show_default=True,
-    help="Whether to cleanup temporary files after parsing."
 )
 @click.option(
     "--prefix/--no-prefix",
@@ -307,12 +313,12 @@ def _write_csv(input_files, results, csv_path=None):
 )
 @click.argument("parser", required=True)
 @click.argument("input", nargs=-1, type=click.Path())
-def parse(parser, input, format, split, output_dir, output_files, cleanup, prefix, string_report, include_filename, legacy):
+def parse(parser, input, yara_repo, recursive, format, split, output_dir, output_files, prefix, string_report, include_filename, legacy):
     """
     Parses given input with given parser.
 
     \b
-    PARSER: Name of parser to run.
+    PARSER: Name of parser to run. (or "-" for YARA matching)
     INPUT: One or more input file paths. (Wildcards are allowed).
 
     \b
@@ -321,7 +327,12 @@ def parse(parser, input, format, split, output_dir, output_files, cleanup, prefi
         mwcp parse foo ./repo/*                               - Run foo parser on files found in repo directory.
         mwcp parse -f json foo ./malware.bin                  - Run foo parser and display results as json.
         mwcp parse -f csv foo ./repo/* > ./results.csv        - Run foo parser on a directory and output results as a csv file.
+        mwcp parse - ./malware.bin --yara-repo=./rules        - Run a parser on ./malware.bin where the parser is detected by YARA.
+        mwcp parse - ./malware.bin                            - yara_repo can be omitted if included in configuration.
     """
+    if yara_repo:
+        mwcp.config["YARA_REPO"] = yara_repo
+
     # Python won't process wildcards when used through Windows command prompt.
     if any("*" in path for path in input):
         new_input = []
@@ -339,20 +350,20 @@ def parse(parser, input, format, split, output_dir, output_files, cleanup, prefi
     try:
         reports = []
         for path in input_files:
-            runner = mwcp.Runner(
-                # Store output files to a folder with the same name as the input file.
-                output_directory=os.path.join(output_dir, os.path.basename(path) + "_mwcp_output")
-                    if output_files else None,
-                cleanup_temp_files=cleanup,
+            config = dict(
+                output_directory=os.path.join(output_dir, os.path.basename(path) + "_mwcp_output") if output_files else None,
                 prefix_output_files=prefix,
                 external_strings_report=string_report,
+                recursive=recursive,
             )
+            if parser == "-":
+                parser = None
             logger.info("Parsing: {}".format(path))
             # TODO: This is temporary, make real fix.
             if path == "-":
-                report = runner.run(parser, data=sys.stdin.read().encode())
+                report = mwcp.run(parser, data=sys.stdin.read().encode(), **config)
             else:
-                report = runner.run(parser, path)
+                report = mwcp.run(parser, file_path=path, **config)
             reports.append(report)
 
         # TODO: Perhaps split up results with header of input file?

@@ -16,7 +16,7 @@ import pandas
 from anytree import RenderTree
 
 import mwcp
-from mwcp import metadata, FileObject
+from mwcp import config, metadata, FileObject
 from mwcp.metadata import Report as ReportModel, Metadata, File
 from mwcp.report_writers import DataFrameWriter, SimpleTextWriter, MarkdownWriter, HTMLWriter
 from mwcp.stix.report_writer import STIXWriter
@@ -194,6 +194,15 @@ class Report:
         else:
             # normal insert of single value
             other_dict[key] = value
+
+    @property
+    def fields(self):
+        warnings.warn(
+            "Usage of the fields attribute is deprecated. ",
+            DeprecationWarning
+        )
+        with open(config.get("FIELDS_PATH"), "rb") as f:
+            return json.load(f)
 
     def get_logs(self, source: Optional[FileObject] = None, errors_only=False) -> List[str]:
         """

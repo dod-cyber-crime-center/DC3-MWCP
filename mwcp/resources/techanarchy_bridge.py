@@ -3,6 +3,9 @@
 technanarchy_bridge -- library to execute techanarchy ratdecoders and parse output for DC3-MWCP framework
 """
 from __future__ import print_function
+
+import tempfile
+
 from future.builtins import str, zip
 from six import iteritems
 
@@ -376,39 +379,39 @@ def run_decoder(parser, script, scriptname=""):
     if not scriptname:
         scriptname = os.path.basename(script)[:-3]
 
-    tempdir = parser.reporter.managed_tempdir
-    outputfile = os.path.join(tempdir, "techanarchy_output")
+    with tempfile.TemporaryDirectory("_techanarchy") as tempdir:
+        outputfile = os.path.join(tempdir, "techanarchy_output")
 
-    if interpreter_path():
-        command = [interpreter_path(), script,
-                   parser.file_object.file_path, outputfile]
-    else:
-        command = [script, parser.file_object.file_path, outputfile]
+        if interpreter_path():
+            command = [interpreter_path(), script,
+                       parser.file_object.file_path, outputfile]
+        else:
+            command = [script, parser.file_object.file_path, outputfile]
 
-    parser.logger.info("Running %s using %s" % (scriptname, " ".join(command)))
+        parser.logger.info("Running %s using %s" % (scriptname, " ".join(command)))
 
-    popen_object = subprocess.Popen(
-        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = popen_object.communicate(None)
+        popen_object = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = popen_object.communicate(None)
 
-    termhandle = BytesIO(stdout)
-    for line in termhandle:
-        parser.logger.info(line.rstrip())
+        termhandle = BytesIO(stdout)
+        for line in termhandle:
+            parser.logger.info(line.rstrip())
 
-    termhandle = BytesIO(stderr)
-    for line in termhandle:
-        parser.logger.warning(line.rstrip())
+        termhandle = BytesIO(stderr)
+        for line in termhandle:
+            parser.logger.warning(line.rstrip())
 
-    if popen_object.returncode != 0:
-        parser.logger.error("Error running script. Return code: %i" %
-                       popen_object.returncode)
+        if popen_object.returncode != 0:
+            parser.logger.error("Error running script. Return code: %i" %
+                           popen_object.returncode)
 
-    configlist = []
-    try:
-        with open(outputfile, "rb") as f:
-            configlist = [line.rstrip("\n\r") for line in f]
-    except Exception as e:
-        parser.logger.error("Error reading script output file: %s" % str(e))
+        configlist = []
+        try:
+            with open(outputfile, "rb") as f:
+                configlist = [line.rstrip("\n\r") for line in f]
+        except Exception as e:
+            parser.logger.error("Error reading script output file: %s" % str(e))
 
     output_re = re.compile(TECHANARCHY_OUTPUT_RE)
     output_data = {}

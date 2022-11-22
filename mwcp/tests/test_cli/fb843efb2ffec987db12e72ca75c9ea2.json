@@ -16,7 +16,7 @@
         "data": null,
         "derivation": null
     },
-    "parser": "mwcp:foo",
+    "parser": "dc3:foo",
     "errors": [],
     "logs": [
         "[+] File fb843efb2ffec987db12e72ca75c9ea2.bin identified as Foo.",

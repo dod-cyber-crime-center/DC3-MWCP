@@ -28,6 +28,7 @@ from mwcp.report import Report
 from mwcp.stix.report_writer import STIXWriter
 
 bp = flask.Blueprint("mwcp", __name__)
+YARA_MATCH = "-- YARA Match --"
 
 
 def init_app(app):
@@ -125,8 +126,11 @@ def parsers_list():
 def upload():
     """Upload page"""
     flask.g.title = "Upload"
-    parsers_info = mwcp.get_parser_descriptions()
-    return flask.render_template("upload.html", parsers=parsers_info)
+    parsers = [parser.name for parser in mwcp.get_parser_descriptions()]
+    # Add yara match option if user has setup a yara repo.
+    if mwcp.config.get("YARA_REPO"):
+        parsers = [YARA_MATCH, *parsers]
+    return flask.render_template("upload.html", parsers=parsers)
 
 
 @bp.route("/descriptions")
@@ -201,28 +205,35 @@ class RequestFilter(logging.Filter):
         return flask.request == self._request
 
 
+def _get_option(name, default=False) -> bool:
+    """Obtains flask request boolean option."""
+    option = flask.request.values.get(name, default=default)
+    if isinstance(option, str):
+        option = option.lower() == "true"
+    return option
+
+
 def _legacy():
     """Whether we are using legacy or new metadata schema."""
-    legacy = flask.request.values.get("legacy", default=True)
-    if isinstance(legacy, str):
-        legacy = legacy.lower() == "true"
-    return legacy
+    return _get_option("legacy", True)
 
 
 def _include_logs():
     """Whether to include logs in parse report."""
-    include_logs = flask.request.values.get("include_logs", default=True)
-    if isinstance(include_logs, str):
-        include_logs = include_logs.lower() == "true"
-    return include_logs
+    return _get_option("include_logs", True)
 
 
 def _external_strings():
     """Whether to create external string reports for reported decoded strings."""
-    external_strings = flask.request.values.get("external_strings", default=False)
-    if isinstance(external_strings, str):
-        external_strings = external_strings.lower() == "true"
-    return external_strings
+    return _get_option("external_strings")
+
+
+def _recursive():
+    """
+    Whether to recursively process unidentified files with YARA matched parsers.
+    (Yara repo must be setup for this option to be active.)
+    """
+    return _get_option("recursive", True)
 
 
 def _highlight(data, is_json=True):
@@ -394,6 +405,7 @@ def _run_parser_request(parser=None, upload_name="data", include_file_data=True)
 
     :param str parser: The name of the parser to run. Pulled from `parser`
         URL parameter or form field if not specified.
+        Can be blank to use YARA matching.
     :param str upload_name: The name of the field of the uploaded sample
     :param boolean include_file_data: If the parser should include file data
     :return: The results from the parser run and/or errors and an appropriate status code
@@ -402,13 +414,11 @@ def _run_parser_request(parser=None, upload_name="data", include_file_data=True)
     errors = []
 
     parser = parser or flask.request.values.get("parser")
-    if not parser:
-        errors.append("No parser specified")
 
     uploaded_file = flask.request.files.get(upload_name)
     if not uploaded_file:
         flask.current_app.logger.error(
-            "Error running parser '{}' no input file".format(parser)
+            f"Error running parser '{parser or '-'}' no input file"
         )
         errors.append("No input file provided")
 
@@ -426,6 +436,8 @@ def _run_parser_request(parser=None, upload_name="data", include_file_data=True)
         secure_filename(uploaded_file.filename),
         hashlib.md5(data).hexdigest(),
     )
+    if parser == YARA_MATCH:
+        parser = None
     report = _run_parser(parser, data=data, include_file_data=include_file_data)
 
     return report, 200
@@ -437,7 +449,7 @@ def _run_parser(name, data=b"", include_file_data=True) -> Report:
 
     Logs to a list handler that is locked to the current request.
 
-    :param str name: Name of the parser to run
+    :param str name: Name of the parser to run (or None for YARA match)
     :param bytes data: Data to run parser on
     :param boolean include_file_data: If the parser should include file data
     :return: Output from the reporter
@@ -450,10 +462,10 @@ def _run_parser(name, data=b"", include_file_data=True) -> Report:
         if include_logs:
             log_filter = RequestFilter(flask.request)
 
-        # Tell mwcp to not include logs, since we are going to collect them.
         report = mwcp.run(
             name,
             data=data,
+            recursive=_recursive(),
             include_file_data=include_file_data,
             include_logs=include_logs,
             log_filter=log_filter,

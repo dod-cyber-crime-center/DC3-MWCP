@@ -1,14 +1,69 @@
-bar:
-  description: example parser that uses dispatcher components
+Archive:
+  description: Archive file types
   author: DC3
   parsers:
-    - .Carrier
-    - .Dropper
-    - .Implant
-    - .ImplantV2
+    - .Zip
+    - .Gzip
+
+Decoy:
+  description: Generic file types described as a decoy file
+  author: DC3
+  parsers:
+    - .DOC
+    - .PDF
+    - .RTF
+    - .JPG
+    - .DOCX
+    - .XLSX
+    - .PPTX
 
 foo:
   description: example parser that works on any file
   author: DC3
   parsers:
     - .Foo
+
+GenericDropper:
+  description: Generic Dropper
+  author: DC3
+  parsers:
+    - .Overlay
+    - .RSRC
+
+ISO: .ImageFile
+
+PDF: .Document
+
+PowerShell: .Script
+
+Python:
+  description: Python artifacts
+  author: DC3
+  parsers:
+    - .PyInstaller
+
+Quarantined:
+  description: Anti-Virus Quarantined File
+  author: DC3
+  parsers:
+    - .McAfee
+    - .Defender
+    - .SymantecQB
+    - .SymantecSubSDK
+    - .AhnLab
+    - .Avast
+
+RSA:
+  description: RSA artifacts
+  author: DC3
+  parsers:
+    - .DigitalCertificate
+    - .PrivateKey
+
+VisualBasic:
+  description: VisualBasic Script
+  author: DC3
+  parsers:
+    - .EncodedASP  # must come first
+    - .VBE
+    - .VBScript

@@ -328,8 +328,8 @@ class Dropper(Parser):
                 \x68(?P<config_offset>.{4})     # push  <config_offset>
                 \xE8.{4}                        # call  process_config
             ''', re.DOTALL | re.VERBOSE),
-            config_offset=construct.Int32ul
-        ),
+                               config_offset=construct.Int32ul
+                               ),
         'config' / construct.PEPointer(this.re.config_offset, CONFIG)
     )
 
@@ -406,13 +406,12 @@ else:
 - Standardized field mapping:
     - Let data type dictate field selection
     - Use most complete field possible
-- Include additional context using the "other" field
+- Include additional context using the "Other" metadata element.
 - Keep your parsers organized and maintainable! Each parser should only handle a single component and should dispatch all embedded files for other parsers to pick up.
-- Let DC3-MWCP manage your temp files: see reporter.managed_tempdir
 - Stay portable:
     - Respect interfaces
     - Use common modules for dependencies
     - Maintain cross platform functionality: *nix and windows
 - The parser should never try to write output files directly to the filesystem.
-    - Use the Reporter's `output_file()` or let the `mwcp.Dispatcher` output it for you.
+    - Either add `File` metadata element to the report or let the `Dispatcher` output it for you.
 - Use [mwcp.utils.construct](construct.ipynb) to help organize your config structures.

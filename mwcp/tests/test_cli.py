@@ -81,7 +81,7 @@ def test_list(tmp_path, make_sample_parser):
         results = json.loads(ret.stdout, encoding="utf8")
         assert len(results) > 1
         for name, source_name, author, description in results:
-            if name == u"foo" and source_name == u"mwcp":
+            if name == u"foo" and source_name == u"dc3":
                 assert author == u"DC3"
                 assert description == u"example parser that works on any file"
                 break
@@ -198,7 +198,7 @@ def test_add_testcase(tmp_path, datadir):
     malware_repo.mkdir()
     test_case_dir = tmp_path / "testcases"
     test_case_dir.mkdir()
-    (test_case_dir / "mwcp").mkdir()  # directory for parser source must also be created
+    (test_case_dir / "dc3").mkdir()  # directory for parser source must also be created
     test_file = tmp_path / "test.txt"
     test_file.write_bytes(b"This is some test data!")
 
@@ -219,7 +219,7 @@ def test_add_testcase(tmp_path, datadir):
     assert test_sample.read_bytes() == test_file.read_bytes()
 
     # Ensure the test case was created correctly.
-    test_case_file = test_case_dir / "mwcp" / "foo" / "fb843efb2ffec987db12e72ca75c9ea2.json"
+    test_case_file = test_case_dir / "dc3" / "foo" / "fb843efb2ffec987db12e72ca75c9ea2.json"
     assert test_case_file.exists()
     expected = (datadir / "fb843efb2ffec987db12e72ca75c9ea2.json").read_text().replace("MWCP_VERSION", mwcp.__version__)
     assert test_case_file.read_text() == expected
@@ -284,7 +284,7 @@ def test_add_filelist_testcase(tmp_path):
     malware_repo.mkdir()
     test_case_dir = tmp_path / "testcases"
     test_case_dir.mkdir()
-    (test_case_dir / "mwcp").mkdir()  # directory for parser source must also be created
+    (test_case_dir / "dc3").mkdir()  # directory for parser source must also be created
 
     # Create a file list of paths.
     filelist = []
@@ -311,4 +311,4 @@ def test_add_filelist_testcase(tmp_path):
     # Ensure a sample and test case was added for each file.
     for _, md5 in filelist:
         assert (malware_repo / md5[:4] / md5).exists()
-        assert (test_case_dir / "mwcp" / "foo" / f"{md5}.json").exists()
+        assert (test_case_dir / "dc3" / "foo" / f"{md5}.json").exists()

@@ -190,7 +190,7 @@ class FileObject(object):
             self._temp_path_ctx = None
             self._temp_path = None
 
-    def add_tag(self, *tags: Iterable[str]) -> "FileObject":
+    def add_tag(self, *tags: Iterable[str]) -> FileObject:
         """
         Adds tag(s) for the file.
 
@@ -210,11 +210,26 @@ class FileObject(object):
         return self._report
 
     @property
-    def siblings(self) -> List["FileObject"]:
+    def siblings(self) -> List[FileObject]:
         """List of FileObjects that came from the same parent."""
         if not self.parent:
             return []
         return [fo for fo in self.parent.children if fo is not self]
+
+    @property
+    def ancestors(self) -> List[FileObject]:
+        """List of FileObjects for the full parental hierarchy."""
+        if not self.parent:
+            return []
+        return [self.parent, *self.parent.ancestors]
+
+    @property
+    def descendants(self) -> List[FileObject]:
+        """List of FileObjects that came from the current file."""
+        ret = list(self.children)
+        for child in self.children:
+            ret.extend(child.descendants)
+        return ret
 
     @property
     def file_data(self):
@@ -272,6 +287,18 @@ class FileObject(object):
         if self._name != value:
             logger.info("Renamed {} to {}".format(self._name, value))
         self._name = value
+
+    @property
+    def ext(self):
+        """The extension of the file."""
+        return pathlib.PurePath(self.name).suffix
+
+    @ext.setter
+    def ext(self, new_ext: str):
+        """Sets a new extension for the file."""
+        if not new_ext.startswith("."):
+            new_ext = f".{new_ext}"
+        self.name = pathlib.PurePath(self.name).stem + new_ext
 
     @property
     def parser_history(self):

@@ -6,19 +6,10 @@ These features are now replaced by test_report.py and test_runner.py
 """
 
 import os
-import json
 
 import pytest
 
 import mwcp
-# from mwcp.reporter import STANDARD_FIELD_ORDER, INFO_FIELD_ORDER
-
-
-def test_managed_tempdir(tmpdir):
-    runner = mwcp.Runner(temp_directory=str(tmpdir))
-    managed_tempdir = runner.managed_tempdir
-    assert os.path.exists(managed_tempdir)
-    assert managed_tempdir.startswith(os.path.join(str(tmpdir), 'mwcp-managed_tempdir-'))
 
 
 @pytest.mark.parametrize('key,value,expected', [

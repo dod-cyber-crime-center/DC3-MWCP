@@ -157,10 +157,8 @@ def _load_config(config_file_path):
     for key, value in config.items():
         if "." in key:
             raise ValueError(f'"." in group name is not allowed: {key}')
-        if isinstance(value, str):
-            if value not in config.keys():
-                raise ValueError(f'Unable to find "{value}" aliased by "{key}"')
-        else:
+        # Validate if parser group. Ignore alias strings.
+        if not isinstance(value, str):
             if "description" not in value:
                 raise ValueError(f'Missing "description" field in group: {key}')
             if "parsers" not in value:
@@ -344,8 +342,9 @@ def _generate_parser(name: str, source: Source, recursive=True, _visiting=None):
 
     # If value is a string, this is an alias.
     if isinstance(config_value, str):
-        parser = _generate_parser(config_value, source, recursive=recursive, _visiting=_visiting)
+        parser = _generate_parser_aux(config_value, name, source, _visiting)
         parser.name = name
+        _visiting.remove((name, source.name))
         return parser
 
     # Otherwise, instantiate a mwcp.Dispatcher class for the parser group.

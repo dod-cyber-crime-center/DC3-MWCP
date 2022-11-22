@@ -15,7 +15,7 @@
         "file_path": null,
         "data": null
     },
-    "parser": "mwcp:foo",
+    "parser": "dc3:foo",
     "errors": [],
     "logs": [
         "[+] File f144899b86766688991c5d0d10902f4a.bin identified as Foo.",

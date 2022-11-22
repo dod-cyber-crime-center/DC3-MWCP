@@ -1432,8 +1432,6 @@ class DecodedString(Metadata):
         if not self.value:
             return result
 
-        
-
         cur = stix_extensions.ObservedString(purpose="decoded", value=self.value)
         result.add_linked(cur)
         result.create_tag_note(self, cur)

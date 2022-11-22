@@ -256,16 +256,6 @@ def test_external_strings_report(datadir, client, make_test_buffer):
 
 
 def test_run_parser_errors(client, make_test_buffer):
-    # No parser
-    rv = client.post("/run_parser", data={"data": (make_test_buffer(), "test.file")})
-
-    assert rv.status_code == 400
-    print(rv.json)
-    # ignore output_text since matching everything else covers it and this avoids worrying about formatting
-    result = rv.json
-    del result["output_text"]
-    assert {"errors": ["[!] No parser specified"], "debug": ["[!] No parser specified"]} == result
-
     # No file
     rv = client.post("/run_parser", data={"parser": "foo"})
 
@@ -284,7 +274,7 @@ def test_run_parser_errors(client, make_test_buffer):
     # ignore output_text since matching everything else covers it and this avoids worrying about formatting
     result = rv.json
     del result["output_text"]
-    assert {"errors": ["[!] No parser specified", "[!] No input file provided"], "debug": ["[!] No parser specified", "[!] No input file provided"]} == result
+    assert {"errors": ["[!] No input file provided"], "debug": ["[!] No input file provided"]} == result
 
 
 @pytest.mark.parametrize("legacy", [True, False])

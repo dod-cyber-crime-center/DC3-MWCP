@@ -17,10 +17,10 @@ yaml = YAML()
 class Config(dict):
 
     CONFIG_FILE_NAME = "config.yml"
-    USER_CONFIG_DIR = pathlib.Path(appdirs.user_config_dir("mwcp", appauthor=False))
+    USER_CONFIG_DIR = pathlib.Path(appdirs.user_config_dir("mwcp"))
 
     # Fields which contain a file or directory path.
-    PATH_FIELDS = ["LOG_CONFIG_PATH", "TESTCASE_DIR", "MALWARE_REPO", "PARSER_DIR", "PARSER_CONFIG_PATH"]
+    PATH_FIELDS = ["LOG_CONFIG_PATH", "TESTCASE_DIR", "MALWARE_REPO", "PARSER_DIR", "PARSER_CONFIG_PATH", "YARA_REPO"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -48,7 +48,7 @@ class Config(dict):
         # Get user directory.
         cfg_dir = self.user_config_dir
 
-        # Create a user copy if it doesn"t exist.
+        # Create a user copy if it doesn't exist.
         cfg_file_path = cfg_dir / self.CONFIG_FILE_NAME
         if not cfg_file_path.exists():
             with pkg_resources.resource_stream("mwcp.config", self.CONFIG_FILE_NAME) as default_cfg:
