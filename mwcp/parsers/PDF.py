@@ -14,9 +14,9 @@ class Document(Parser):
     AUTHOR = "DC3"
 
     IGNORE_DOMAINS = [
-        "www.w3.org",
-        "ns.adobe.com",
-        "purl.org",
+        b"www.w3.org",
+        b"ns.adobe.com",
+        b"purl.org",
     ]
 
     # 2-6 character protocol -> :// -> Up to 253 alphanumeric, "-", "_", or "." characters, (which should include all

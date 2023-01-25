@@ -111,6 +111,11 @@ class Dispatcher(object):
     def __repr__(self):
         return "{}({})".format(self.name, ", ".join(repr(parser) for parser in self.parsers))
 
+    @classmethod
+    def _cleanup(cls):
+        # Clear identify cache to prevent memory leaking.
+        cls._identify_cache = {}
+
     def identify(self, file_object):
         """
         Determines if this dispatcher is identified to support the given file_object.
@@ -343,4 +348,4 @@ class Dispatcher(object):
                         report.parsed_files[file_object.md5] = file_object
 
                 # Cleanup any temporary files the file_object may have created.
-                file_object._cleanup()
+                file_object._clear_temp_path_ctx()

@@ -5,18 +5,21 @@ from __future__ import annotations
 import contextlib
 import logging
 import pathlib
+import re
 from typing import TYPE_CHECKING, Union, Type, Tuple, Iterable
 
 import yara
 
 import mwcp
+from mwcp import metadata
 from mwcp.file_object import FileObject
+from mwcp.dispatcher import Dispatcher
 from mwcp.report import Report
 from mwcp.registry import iter_parsers
 from mwcp.dispatcher import UnidentifiedFile
 
 if TYPE_CHECKING:
-    from mwcp import Parser, Dispatcher
+    from mwcp import Parser
     Parser = Union[Type[Parser], Dispatcher]
 
 logger = logging.getLogger(__name__)
@@ -113,12 +116,10 @@ class Runner:
 
     def _cleanup(self):
         """
-        Cleanup things
+        Cleanup class based objects.
         """
-        # Cleanup temporary files created by FileObject.
-        for file_object in FileObject._instances:
-            file_object._cleanup()
-        FileObject._instances = []
+        FileObject._cleanup()
+        Dispatcher._cleanup()
 
     def __del__(self):
         self._cleanup()
@@ -155,9 +156,11 @@ class YaraRunner(Runner):
         rule_paths = []
         for file_path in yara_repo.rglob("*"):
             if file_path.suffix in (".yara", ".yar"):
-                # Make sure rule file compiles successfully before including.
-                # TODO: Determine if there is a way we can filter out rules without any "mwcp" metadata.
-                #   And possibly validate the provided parser names as well?
+                # Ignore rules files without any "mwcp" meta elements.
+                if not re.search("mwcp\s*=", file_path.read_text()):
+                    logger.debug(f"Ignoring rule file without 'mwcp' metadata: {file_path}")
+                    continue
+
                 try:
                     yara.compile(filepath=str(file_path))
                     rule_paths.append(file_path)
@@ -210,9 +213,16 @@ class YaraRunner(Runner):
                     if not parsers:
                         self._attempted.add(child)  # Avoid running yara multiple times.
                         continue
+
                     # Clear identification markings and try again.
                     child.parser = None
                     child.description = None
+
+                    # Remove child from report. (It will get re-added when we parse.)
+                    for file in report.get(metadata.File, source=child.parent):
+                        if file.md5 == child.md5:
+                            report.remove(file)
+
                     self._parse(child, parsers, report)
 
     def run(
@@ -237,7 +247,12 @@ class YaraRunner(Runner):
         if parser and not isinstance(parser, str):
             parser_name = parser.__name__
 
-        report = Report(input_file=input_file, parser=parser_name or "-", **self._report_config)
+        report = Report(
+            input_file=input_file,
+            parser=parser_name or "-",
+            recursive=self._recursive,
+            **self._report_config
+        )
 
         # We also have to include the report in the input_file incase the parser tries to dereference
         # reporter.

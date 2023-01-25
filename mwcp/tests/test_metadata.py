@@ -157,3 +157,32 @@ def test_path_absolute_segment_issue():
     assert metadata.Path2.from_segments("hello", "\\world", posix=True).path == r"hello/\world"
     assert metadata.Path2.from_segments("hello", "/\\world", posix=True).path == r"hello/\world"
     assert metadata.Path2.from_segments("/hello", "/world", posix=True).path == r"/hello/world"
+
+
+@pytest.mark.parametrize("key,encoding,display", [
+    (b"hello", "ascii", '0x68656c6c6f ("hello")'),
+    (b"ab16", "ascii", '0x61623136 ("ab16")'),
+    (b"\xde\xad\xbe\xef", None, '0xdeadbeef'),
+    (b"\xe60\xfc0\xb60\xfc0%R\xb50\xa40\xc80", "utf-16-le", '0xe630fc30b630fc302552b530a430c830 ("ユーザー別サイト")'),
+])
+def test_encryption_key_detect_encoding(key, encoding, display):
+    """
+    Tests displaying of encryption key in report.
+    """
+    key = metadata.EncryptionKey(key)
+    assert key._detect_encoding() == encoding
+    assert key.as_formatted_dict()["key"] == display
+
+
+@pytest.mark.parametrize("key,encoding,display", [
+    (b"hello", "ascii", '0x68656c6c6f ("hello")'),
+    (b"hello", None, '0x68656c6c6f'),
+    (b"\xde\xad\xbe\xef", None, '0xdeadbeef'),
+    (b"\xde\xad\xbe\xef", "latin1", '0xdeadbeef ("Þ\xad¾ï")'),
+])
+def test_encryption_key_with_encoding(key, encoding, display):
+    """
+    Tests EncryptionKey.with_encoding()
+    """
+    key = metadata.EncryptionKey(key).with_encoding(encoding)
+    assert key.as_formatted_dict()["key"] == display

@@ -622,6 +622,21 @@ Alternatively, the yara repo can be specified in the command line with `--yara-r
 is necessary to use YARA matching with the server.
 
 
+### Testing
+
+Recursive YARA matching for unidentified files can be done when creating test cases. Simply include the `--recursive` flag
+when adding a new or updating an existing test case.
+
+```bash
+$ mwcp test SuperMalware --add="C:\input.exe" --recursive
+$ mwcp test SuperMalware -u --recursive
+```
+
+Once a test case is created with recursion turned on, anybody running your test case must also have a YARA repo setup
+with the same YARA signatures so the test will pass for them.
+For this reason, it is recommended to turn on recursion for a test **only** if the parser's full functionality depends on it.
+
+
 ## Helper Utilities
 MWCP comes with a few helper utilities (located in `mwcp.utils`) that may become useful for parsing malware files.
 

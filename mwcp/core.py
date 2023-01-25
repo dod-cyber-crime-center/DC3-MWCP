@@ -10,6 +10,9 @@ from mwcp import config
 from mwcp import metadata
 
 
+logger = logging.getLogger(__name__)
+
+
 def run(
         parser: Union[str, Type[Parser]] = None,
         file_path: Union[str, pathlib.Path] = None,

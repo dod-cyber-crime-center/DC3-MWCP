@@ -627,11 +627,25 @@ def _run_tests(tester, silent=False, show_passed=False):
     is_flag=True,
     help="Whether to display a full diff for failed tests. Disables custom unified diff display."
 )
+@click.option(
+    "--yara-repo",
+    type=click.Path(file_okay=False),
+    help="Directory containing YARA signatures used for auto detection.",
+)
+@click.option(
+    "--recursive/--no-recursive",
+    default=None,
+    show_default=True,
+    help="Whether to recursively parse unidentified residual files using YARA match. "
+         "When updating tests, this will force all tests to be either recursive or non-recursive. "
+         "Do not set if you would like to use what is currently set in the test case. "
+         "(Only works if a YARA repo has been provided through command line or configuration). "
+)
 # Parser to process.
 @click.argument("parser", nargs=-1, required=False)
 def test(
     testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete, yes, force, last_failed, show_passed,
-    silent, legacy, exit_on_first, command, full_diff, parser,
+    silent, legacy, exit_on_first, command, full_diff, yara_repo, recursive, parser,
 ):
     """
     Testing utility to create and execute parser test cases.
@@ -644,10 +658,12 @@ def test(
         mwcp test                                             - Run all tests cases.
         mwcp test foo                                         - Run test cases for foo parser.
         mwcp test foo -u                                      - Update existing test cases for foo parser.
+        mwcp test foo -u --recursive                          - Update existing test cases for foo parser with recursive YARA matching for undientified files.
         mwcp test -u                                          - Update existing test cases for all parsers.
         mwcp test --lf                                        - Rerun previously failed test cases.
         mwcp test --lf -u                                     - Update test cases that previously failed.
         mwcp test foo --add=./malware.bin                     - Add test case for malware.bin sample for foo parser.
+        mwcp test foo --add=./malware.bin --recursive         - Add test case for malware.bin sample for foo parser with recursive YARA matching for unidentified files.
         mwcp test foo -u --add=./malware.bin                  - Add test case for malware.bin sample.
                                                                 Allow updating if a test case for this file already exists.
         mwcp test foo --add-filelist=./paths.txt              - Add tests cases for foo parser using text file of paths.
@@ -658,6 +674,8 @@ def test(
         mwcp.config["TESTCASE_DIR"] = testcase_dir
     if malware_repo:
         mwcp.config["MALWARE_REPO"] = malware_repo
+    if yara_repo:
+        mwcp.config["YARA_REPO"] = yara_repo
 
     # Add files listed in filelist to add option.
     if add_filelist:
@@ -688,7 +706,7 @@ def test(
                 tester.remove_test(file_path)
         else:
             for file_path in add:
-                testing.add_tests(file_path, parsers=parser, force=force, update=update)
+                testing.add_tests(file_path, parsers=parser, force=force, update=update, recursive=recursive or False)
 
             for file_path in delete:
                 testing.remove_tests(file_path, parsers=parser)
@@ -710,7 +728,7 @@ def test(
                 test_cases = testing.iter_test_cases(parsers=parser)
             for test_case in test_cases:
                 click.secho(f"Updating {test_case.name}-{test_case.md5}...", fg="green")
-                test_case.update(force=force)
+                test_case.update(force=force, recursive=recursive)
 
     # Run tests
     else:
@@ -727,6 +745,14 @@ def test(
 
         # Run pytest with "parsers" marker to run parsing tests.
         else:
+            # If user set the `--recursive` flag, warn them that this is ignored.
+            if recursive:
+                logger.warning(
+                    "'--recursive' flag is ignored when running tests. "
+                    "Recursion is determined by the test case file itself. "
+                    "Update the test case with '--recursive' and '-u' if you want recursion for this test."
+                )
+
             # Due to bug in pytest, we won't get our custom command line arguments
             # registered just by using "--pyargs mwcp".
             # Therefore, we need to explicitly define the full path.

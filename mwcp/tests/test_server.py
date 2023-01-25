@@ -92,6 +92,7 @@ def _get_expected_results(legacy: bool):
                 "derivation": None,
             },
             "parser": "foo",
+            "recursive": True,
             "metadata": [
                 {
                     'application_protocol': 'http',

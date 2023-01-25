@@ -363,6 +363,7 @@ report = {
     ],
     "mwcp_version": mwcp.__version__,
     "parser": "FooParser",
+    "recursive": False,
     "tags": ["tagging", "test"],
     "type": "report",
 }

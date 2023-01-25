@@ -20,6 +20,7 @@
         "derivation": null
     },
     "parser": "FooParser",
+    "recursive": false,
     "errors": [
         "[!] Test error log"
     ],

@@ -48,6 +48,7 @@ split_report = [
             }
         ],
         "parser": None,
+        "recursive": False,
         "tags": ["tagging", "test"],
         "type": "report"
     },
@@ -82,6 +83,7 @@ split_report = [
             }
         ],
         "parser": None,
+        "recursive": False,
         "tags": ["tagging", "test"],
         "type": "report"
     }

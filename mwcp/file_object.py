@@ -50,7 +50,7 @@ class FileObject(object):
     # This is necessary so the Runner can cleanup temp files that have been created
     # for backwards compatibility.
     # TODO: Remove this when original implementation of .file_path is removed.
-    _instances = []
+    _instances: List[FileObject] = []
 
     def __init__(
         self,
@@ -180,7 +180,7 @@ class FileObject(object):
         with io.BytesIO(self.data) as fo:
             yield fo
 
-    def _cleanup(self):
+    def _clear_temp_path_ctx(self):
         """
         Cleans up temporary file if created.
         TODO: This is temporary in order to support backwards compatibility.
@@ -189,6 +189,15 @@ class FileObject(object):
             self._temp_path_ctx.__exit__(*sys.exc_info())
             self._temp_path_ctx = None
             self._temp_path = None
+
+    @classmethod
+    def _cleanup(cls):
+        """
+        Cleans up instances of FileObject.
+        """
+        for file_object in cls._instances:
+            file_object._clear_temp_path_ctx()
+        cls._instances = []
 
     def add_tag(self, *tags: Iterable[str]) -> FileObject:
         """
@@ -399,7 +408,7 @@ class FileObject(object):
             return self._file_path
 
         if not self._temp_path:
-            self._cleanup()
+            self._clear_temp_path_ctx()
             self._temp_path_ctx = self.temp_path()
             self._temp_path = self._temp_path_ctx.__enter__()
         return self._temp_path
@@ -495,13 +504,15 @@ class FileObject(object):
 
         with self.temp_path() as file_path:
             with dragodis.open_program(file_path, disassembler, **config) as dis:
+                bit_size = dis.bit_size
                 yield dis
 
             # After processing we want to save the annotated project file if report was provided.
             if report:
                 project_file = None
                 if dis.name.casefold() == "ida":
-                    project_file = dis.input_path.parent / (dis.input_path.name + ".idb")
+                    ext = ".i64" if bit_size == 64 else ".idb"
+                    project_file = dis.input_path.parent / (dis.input_path.name + ext)
                 elif dis.name.casefold() == "ghidra":
                     folder_path = dis.input_path.parent / (dis.input_path.name + "_ghidra")
                     project_file = pathlib.Path(shutil.make_archive(

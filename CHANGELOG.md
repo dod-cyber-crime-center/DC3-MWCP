@@ -1,6 +1,21 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Added `.with_encoding()` function on `EncryptionKey` metadata elements for telling MWCP how to display encryption keys in the text report.
+
+### Changed
+- Improved handling of displaying decodable encryption keys.
+- YaraRunner will now skip compiling rule files without 'mwcp' meta defined.
+- Parser test cases can now be added or updated with recursive YARA matching by adding the `--recursive` flag to the `mwcp test` command.
+
+### Fixed
+- Fixed IDA project file not being output for 64-bit samples.
+- Fixed issue with duplicate residual files when using recursive YARA matching.
+- Fixed memory leak that occurs when processing multiple runs subsequently in the same process.
+
 
 ## [3.9.0] - 2022-11-22
 ### Added

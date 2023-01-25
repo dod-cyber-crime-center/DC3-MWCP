@@ -1349,29 +1349,98 @@ class EncryptionKey(Metadata):
     mode: str = None
     iv: bytes = None
 
+    # Tests encodings in order by preference.
+    TEST_ENCODINGS = [
+        "ascii",
+        "utf-32-be", "utf-32-le", "utf-16-be", "utf-16-le", "utf-8",  # General (utf-7 omitted)
+    ]
+
     def __attrs_post_init__(self):
-        # Determines if key is an encoded utf8 string.
+        # Determines if user passed in key is an encoded utf8 string.
         # (Used for backwards compatibility support.)
-        self._raw_string = False
+        self._legacy = False
+        # Used to allow user to provide display encoding.
+        self._encoding_set = False
+        self._encoding = None
+
+    def with_encoding(self, encoding: Optional[str], raise_error=False) -> "EncryptionKey":
+        """
+        Allows you to set the encoding to use when displayed in the text report.
+        This can also be used to tell MWCP not to try to decode the key.
+
+        e.g.
+            metadata.EncryptionKey(b"hello").with_encoding("ascii")  # will ensure ascii is used when displayed in report.
+            metadata.EncryptionKey(b"hello").with_encoding(None)  # won't display ascii representation in report.
+
+        (If not provided, MWCP will do its best to guess the right encoding.)
+        
+        :param encoding: Encoding to use or None to not decode key in report.
+        :param raise_error: Whether to raise a ValidationError if the given encoding would fail to decode the key.
+            Defaults to ignoring the encoding otherwise.
+        
+        :raises ValidationError: If given encoding fails to decode key. (if raise_error is True)
+        """
+        if not (isinstance(encoding, str) or encoding is None):
+            raise ValueError(f"Encoding must be string or None. Got {type(encoding)}")
+        if encoding:
+            try:
+                self.key.decode(encoding)
+            except UnicodeDecodeError:
+                if raise_error:
+                    raise ValidationError(f"Failed to decode key {self.key!r} with given encoding: {encoding}")
+                else:
+                    logger.warning(f"Failed to decode key {self.key!r} with given encoding: {encoding}. Ignoring...")
+                    return self
+        self._encoding = encoding
+        self._encoding_set = True
+        return self
+
+    @staticmethod
+    def _num_raw_bytes(string: str) -> int:
+        """
+        Returns the number of raw bytes found in the given unicode string
+        """
+        count = 0
+        for char in string:
+            char = char.encode("unicode-escape")
+            count += char.startswith(b"\\x") + char.startswith(b"\\u") * 2
+        return count
+
+    def _detect_encoding(self) -> Optional[str]:
+        """
+        Attempts to determine if the key can be encoded as a string.
+
+        :returns: Best guess encoding if successful.
+        """
+        # If user gave us the encoding, use that.
+        if self._encoding_set:
+            return self._encoding
+
+        # NOTE: Much of this is taken from rugosa.detect_encoding()
+        data = self.key
+        best_score = len(data)  # lowest score is best
+        best_code_page = None
+        for code_page in self.TEST_ENCODINGS:
+            try:
+                output = data.decode(code_page)
+                if not output.isprintable():
+                    continue
+            except UnicodeDecodeError:
+                continue
+
+            score = self._num_raw_bytes(output)
+            if not best_code_page or score < best_score:
+                best_score = score
+                best_code_page = code_page
+
+        return best_code_page
 
     def as_formatted_dict(self, flat=False) -> dict:
         # Convert key into hex number
         key = f"0x{self.key.hex()}"
 
         # Add context if encoding can be detected from key.
-        encoding = None
-        if self._raw_string:
-            encoding = "utf-8"
-        else:
-            # Test for encoding by determining which encoding creates pure ascii.
-            for test_encoding in ["utf-16", "ascii", "utf-8"]:
-                try:
-                    if self.key.decode(test_encoding).isprintable():
-                        encoding = test_encoding
-                        break
-                except UnicodeDecodeError:
-                    continue
-        if encoding:
+        if encoding := self._detect_encoding():
             key += f' ("{self.key.decode(encoding)}")'
 
         return {
@@ -1400,6 +1469,7 @@ class EncryptionKey(Metadata):
 
         return result
 
+
 def EncryptionKeyLegacy(key: str) -> EncryptionKey:
     """
     Legacy version of 'key' field which takes a string value instead of bytes.
@@ -1408,8 +1478,8 @@ def EncryptionKeyLegacy(key: str) -> EncryptionKey:
         "EncryptionKeyLegacy is only for backwards compatibility support. Please use EncryptionKey instead.",
         DeprecationWarning
     )
-    encryption_key = EncryptionKey(key.encode("utf-8"))
-    encryption_key._raw_string = True
+    encryption_key = EncryptionKey(key.encode("utf-8")).with_encoding("utf-8")
+    encryption_key._legacy = True
     return encryption_key
 
 
@@ -2429,6 +2499,7 @@ class Report(Element):
     mwcp_version: str = attr.ib(init=False, factory=lambda: mwcp.__version__)
     input_file: File = None
     parser: str = None
+    recursive: bool = False
     errors: List[str] = attr.ib(factory=list)
     logs: List[str] = attr.ib(factory=list)
     metadata: List[Metadata] = attr.ib(factory=list)

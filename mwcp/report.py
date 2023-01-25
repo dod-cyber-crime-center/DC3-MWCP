@@ -122,6 +122,7 @@ class Report:
             self,
             input_file: mwcp.FileObject = None,
             parser: str = None,
+            recursive: bool = False,
             include_logs: bool = True,
             include_file_data: bool = False,
             prefix_output_files: bool = True,
@@ -143,6 +144,7 @@ class Report:
 
         self.input_file = input_file
         self.parser = parser
+        self.recursive = recursive
         self.tags = set()
         # Holds logs per file. (This is used by the ReportLogHandler)
         self._logs: List[LogRecord] = []
@@ -244,7 +246,7 @@ class Report:
             Please update your code to use the new schema found in as_dict() or as_json()
         """
         warnings.warn(
-            "metadata attributes is deprecated. Please access report data using "
+            "metadata attribute is deprecated. Please access report data using "
             "as_dict(), as_json(), as_text(), etc.",
             DeprecationWarning
         )
@@ -360,7 +362,7 @@ class Report:
 
             elif isinstance(element, metadata.EncryptionKey):
                 key = element.key
-                if element._raw_string:
+                if element._legacy:
                     key = key.decode("utf-8")
                 else:
                     # Display key as hex string for old display.
@@ -483,6 +485,7 @@ class Report:
         report_model = metadata.Report(
             input_file=metadata.File.from_file_object(input_file) if input_file else None,
             parser=(input_file.parser and input_file.parser.name) if source else self.parser,
+            recursive=self.recursive,
             errors=self.get_logs(source, errors_only=True),
             logs=self.get_logs(source),
             metadata=deepcopy(metadata_entries),
@@ -737,6 +740,17 @@ class Report:
             element.validate()
             metadata_list.append(element)
             element.post_processing(self)
+
+    def remove(self, element: Metadata):
+        """
+        Remove metadata element from report.
+        """
+        if self.finalized:
+            raise RuntimeError("Report has already been finalized. Metadata can no longer be removed.")
+
+        for source, entries in self._metadata.items():
+            if element in entries:
+                entries.remove(element)
 
     def set_file(self, file_object: FileObject):
         """

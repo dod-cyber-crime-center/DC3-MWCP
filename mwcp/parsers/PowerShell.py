@@ -38,9 +38,7 @@ class Script(Parser):
 
     @classmethod
     def identify(cls, file_object):
-        return file_object.name.endswith(".ps1") or any(
-            regex.search(file_object.data) for regex in cls.URL_RES
-        )
+        return file_object.name.endswith(".ps1")
 
     def extract_urls(self, data: bytes) -> List[str]:
         """

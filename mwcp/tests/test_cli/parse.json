@@ -18,6 +18,7 @@
             "derivation": null
         },
         "parser": "foo",
+        "recursive": true,
         "errors": [],
         "logs": [
             "[+] File test.txt identified as Foo.",

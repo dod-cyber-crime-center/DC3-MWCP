@@ -2,7 +2,6 @@
 Utilities for managing parser tests (and the malware repository)
 """
 
-import collections
 import hashlib
 import json
 import logging
@@ -15,7 +14,7 @@ from typing import Iterable, Union, List
 import pkg_resources
 
 import mwcp
-from mwcp import registry
+from mwcp import registry, config
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +25,14 @@ class TestCase:
     md5: str
     results_path: pathlib.Path
 
-    def update(self, force=False) -> bool:
+    def update(self, force: bool = False, recursive: bool = None) -> bool:
         """
         Updates test case based on currently generated results.
 
         :param force: Whether to force adding the test case even if errors are encountered
+        :param recursive: Whether to recursive parse unidentified files using YARA matching.
+            (Set to None to use whatever is set in the test case.)
+
         :returns: Whether update was successful.
         """
         results_path = self.results_path
@@ -43,7 +45,20 @@ class TestCase:
             logger.warning(f"Unable to update {self.name}. Missing {file_path}")
             return False
 
-        report = mwcp.run(parser_name, data=file_path.read_bytes(), log_level=logging.INFO)
+        if recursive is None:
+            recursive = old_results.get("recursive", False)
+
+        # Error out if test case is recursive, but user hasn't setup a yara repo.
+        if recursive and not config.get("YARA_REPO", None):
+            logger.warning(
+                f"Unable to update {self.name}-{self.md5}. "
+                f"Test case is recursive, but YARA_REPO hasn't been setup. "
+                f"Please run `mwcp config` and set a path to 'YARA_REPO'. "
+                f"Alternatively, rerun the update with the `--no-recursive` flag to turn off recursion."
+            )
+            return False
+
+        report = mwcp.run(parser_name, data=file_path.read_bytes(), log_level=logging.INFO, recursive=recursive)
         if report.errors and not force:
             logger.warning(f"Results for {self.name} has the following errors, not updating:")
             logger.warning("\n".join(report.errors))
@@ -269,7 +284,9 @@ def download(md5: str, output_dir: pathlib.Path = None):
     return output_path
 
 
-def add_tests(file_path: Union[str, pathlib.Path], parsers: List[str] = None, force=False, update=True) -> bool:
+def add_tests(
+        file_path: Union[str, pathlib.Path], parsers: List[str] = None, force=False, update=True, recursive=False
+) -> bool:
     """
     Adds a test case for the given parser and md5 for malware sample.
 
@@ -278,6 +295,7 @@ def add_tests(file_path: Union[str, pathlib.Path], parsers: List[str] = None, fo
         (Or None to use all registered parsers)
     :param force: Whether to force adding the test case even if errors are encountered
     :param update: Whether to allow updating the test case if a test for this file already exists.
+    :param recursive: Whether to recursive parse unidentified files using YARA matching.
 
     :returns: Whether we were able successfully add all test cases.
     """
@@ -305,7 +323,7 @@ def add_tests(file_path: Union[str, pathlib.Path], parsers: List[str] = None, fo
                 )
                 continue
 
-            report = mwcp.run(full_parser_name, data=file_data, log_level=logging.INFO)
+            report = mwcp.run(full_parser_name, data=file_data, log_level=logging.INFO, recursive=recursive)
 
             if report.errors and not force:
                 logger.warning(

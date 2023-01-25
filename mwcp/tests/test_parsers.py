@@ -211,9 +211,15 @@ def _test_parser(pytestconfig, input_file_path, results_path):
     parser_name = expected_results["parser"]
     md5 = expected_results["input_file"]["md5"]
 
+    # Older versions (<=3.9.0) of MWCP don't have the "recursive" flag.
+    if "recursive" not in expected_results:
+        recursive = expected_results["recursive"] = False
+    else:
+        recursive = expected_results["recursive"]
+
     # NOTE: Reading bytes of input file instead of passing in file path to ensure everything gets run in-memory
     #   and no residual artifacts (like idbs) are created in the malware repo.
-    report = mwcp.run(parser_name, data=input_file_path.read_bytes(), include_logs=False, recursive=False)
+    report = mwcp.run(parser_name, data=input_file_path.read_bytes(), include_logs=False, recursive=recursive)
 
     actual_results = report.as_json_dict()
 
