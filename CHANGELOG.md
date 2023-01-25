@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [3.10.0] - 2023-01-25
 
 ### Added
 - Added `.with_encoding()` function on `EncryptionKey` metadata elements for telling MWCP how to display encryption keys in the text report.
@@ -575,7 +575,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.9.0...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.10.0...HEAD
+[3.10.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.9.0...3.10.0
 [3.9.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.8.0...3.9.0
 [3.8.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.7.0...3.8.0
 [3.7.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.2...3.7.0

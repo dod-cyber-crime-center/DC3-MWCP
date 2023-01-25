@@ -658,7 +658,7 @@ def test(
         mwcp test                                             - Run all tests cases.
         mwcp test foo                                         - Run test cases for foo parser.
         mwcp test foo -u                                      - Update existing test cases for foo parser.
-        mwcp test foo -u --recursive                          - Update existing test cases for foo parser with recursive YARA matching for undientified files.
+        mwcp test foo -u --recursive                          - Update existing test cases for foo parser with recursive YARA matching for unidentified files.
         mwcp test -u                                          - Update existing test cases for all parsers.
         mwcp test --lf                                        - Rerun previously failed test cases.
         mwcp test --lf -u                                     - Update test cases that previously failed.
