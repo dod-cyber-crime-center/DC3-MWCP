@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [3.10.1] - 2023-02-03
+
+### Added
+- [packaging](https://pypi.org/project/packaging/) dependency
+
+### Fixed
+- Use `packaging.version` for version comparison with test results
+
+
 ## [3.10.0] - 2023-01-25
 
 ### Added
@@ -575,7 +584,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.10.0...HEAD
+[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.10.1...HEAD
+[3.10.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.10.0...3.10.1
 [3.10.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.9.0...3.10.0
 [3.9.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.8.0...3.9.0
 [3.8.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.7.0...3.8.0
