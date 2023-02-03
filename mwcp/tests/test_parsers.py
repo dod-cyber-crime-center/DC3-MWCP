@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from packaging import version
 
 try:
     import dragodis
@@ -64,17 +65,17 @@ def _fixup_test_cases(expected_results, actual_results):
 
     # Remove mwcp version since we don't want to be updating our tests cases every time
     # there is a new version.
-    expected_results_version = expected_results.pop("mwcp_version")
-    actual_results_version = actual_results.pop("mwcp_version")
+    expected_results_version = version.parse(expected_results.pop("mwcp_version"))
+    actual_results_version = version.parse(actual_results.pop("mwcp_version"))
 
     # Version 3.3.2 introduced "mode" property in encryption_key. Remove property for older tests.
-    if expected_results_version < "3.3.2":
+    if expected_results_version < version.parse("3.3.2"):
         for item in actual_results["metadata"]:
             if item["type"] == "encryption_key":
                 del item["mode"]
 
     # Version 3.3.3 set "residual_file" and "input_file" types to just "file".
-    if expected_results_version < "3.3.3":
+    if expected_results_version < version.parse("3.3.3"):
         actual_results["input_file"]["type"] = "input_file"
         for item in actual_results["metadata"]:
             if item["type"] == "file":
@@ -82,7 +83,7 @@ def _fixup_test_cases(expected_results, actual_results):
 
     # Version 3.3.3 also changed the types for legacy interval and uuid to
     # "interval_legacy" and "uuid_legacy" respectively.
-    if expected_results_version < "3.3.3":
+    if expected_results_version < version.parse("3.3.3"):
         for item in actual_results["metadata"]:
             if item["type"].endswith("_legacy"):
                 item["type"] = item["type"][:-len("_legacy")]
@@ -90,7 +91,7 @@ def _fixup_test_cases(expected_results, actual_results):
     # Version 3.3.3 no longer automatically adds tcp into a socket for url,
     # therefore just clear the network_protocol when it's set to tcp for
     # older versions
-    if expected_results_version < "3.3.3":
+    if expected_results_version < version.parse("3.3.3"):
         for item in actual_results["metadata"] + expected_results["metadata"]:
             if item["type"] == "socket" and item["network_protocol"] == "tcp":
                 item["network_protocol"] = None
@@ -110,7 +111,7 @@ def _fixup_test_cases(expected_results, actual_results):
 
     # Version 3.5.0 adds "value_format" to Other metadata elements
     # and allows for new value types.
-    if expected_results_version < "3.5.0":
+    if expected_results_version < version.parse("3.5.0"):
         for item in actual_results["metadata"]:
             if item["type"] == "other":
                 del item["value_format"]
@@ -144,7 +145,7 @@ def _fixup_test_cases(expected_results, actual_results):
     # "path" has been removed.
     # "key" has been replaced with a "hive"/"subkey" combo.
     # Update registry entries in expected results to account for new schema.
-    if expected_results_version < "3.6.0":
+    if expected_results_version < version.parse("3.6.0"):
         for item in expected_results["metadata"]:
             if item["type"] == "registry":
                 reg = mwcp.metadata.Registry2.from_path(item["path"] or "", data=item["data"]).add_tag(*item["tags"])
@@ -155,7 +156,7 @@ def _fixup_test_cases(expected_results, actual_results):
     # Version 3.7.0 changes schema for Path
     # "directory_path", and "name" as been removed in exchange for just a "path" element.
     # Update path entries in expected results to account for new schema.
-    if expected_results_version < "3.7.0":
+    if expected_results_version < version.parse("3.7.0"):
         for item in expected_results["metadata"]:
             if item["type"] == "path":
                 # Recreate path using backwards compatibility wrapper.
@@ -186,7 +187,7 @@ def _fixup_test_cases(expected_results, actual_results):
     # For now, we are going to remove any supplemental generated files created by IDA or Ghidra.
     # These are not deterministic, changing the md5 on each run. Plus the backend disassembler
     # could be different based what the user setup as their default backend disassembler.
-    if expected_results_version >= "3.7.0":
+    if expected_results_version >= version.parse("3.7.0"):
         # TODO: make this check less hardcoded.
         is_supplemental = lambda item: (
             item["type"] == "file"

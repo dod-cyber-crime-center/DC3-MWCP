@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Added
+- [packaging](https://pypi.org/project/packaging/) dependency
+
+### Fixed
+- Use `packaging.version` for version comparison with test results
+
+
 ## [3.10.0] - 2023-01-25
 
 ### Added

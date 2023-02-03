@@ -43,6 +43,7 @@ setup(
         'future',
         'jinja2',  # For construct.html_hex()
         'jsonschema_extractor>=1.0',
+        'packaging',
         'pandas',
         'pefile>=2019.4.18',
         'pyasn1',
