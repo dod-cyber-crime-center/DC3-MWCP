@@ -92,7 +92,7 @@ def schema(id=None) -> dict:
     """
     if id is None:
         id = (
-            f"https://raw.githubusercontent.com/Defense-Cyber-Crime-Center/DC3-MWCP/"
+            f"https://raw.githubusercontent.com/dod-cyber-crime-center/DC3-MWCP/"
             f"{mwcp.__version__}/mwcp/config/schema.json"
         )
     schema = {

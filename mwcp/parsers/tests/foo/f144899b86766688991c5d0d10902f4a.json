@@ -1,7 +1,7 @@
 {
     "type": "report",
     "tags": [],
-    "mwcp_version": "3.10.1",
+    "mwcp_version": "3.11.0",
     "input_file": {
         "type": "file",
         "tags": [],

@@ -2,7 +2,7 @@
 All notable changes to this project will be documented in this file.
 
 
-## [Unreleased]
+## [3.11.0] - 2023-02-21
 
 ### Added
 - Added ability to provide external knowledge_base information. (see [documentation](docs/ParserComponents.md#external-knowledge))
@@ -194,10 +194,10 @@ command that would be run given the other options provided in the command line.
 - The "Tags" column in the generated report won't be shown if there are no tags in the table.
 
 ### Fixed
-- Fixed UnicodeDecodeError that can occur when printing a report with nested metadata elements. ([\#31](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/31))
+- Fixed UnicodeDecodeError that can occur when printing a report with nested metadata elements. ([\#31](https://github.com/dod-cyber-crime-center/DC3-MWCP/issues/31))
 - Include missing "Mode" column from EncryptionKey report tables.
 - Fixed rendering for values with line breaks in the HTML report output.
-- Removed obfuscated powershell examples from poshdeob causing a VT hit. ([\#32](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/32))
+- Removed obfuscated powershell examples from poshdeob causing a VT hit. ([\#32](https://github.com/dod-cyber-crime-center/DC3-MWCP/issues/32))
 
 
 ## [3.4.0] - 2021-10-06
@@ -507,7 +507,7 @@ It is assumed if you are not updating/adding tests.
     - `disableautosubfieldparsing`
     
 ### Fixed
-- Add ability to set decoder directory from the `run_kordesii_decoder()` function by @ddash-ct ([\#8](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/8))
+- Add ability to set decoder directory from the `run_kordesii_decoder()` function by @ddash-ct ([\#8](https://github.com/dod-cyber-crime-center/DC3-MWCP/issues/8))
 
 
 ## [1.4.1] - 2018-10-15
@@ -517,7 +517,7 @@ It is assumed if you are not updating/adding tests.
 - Refactored testing utility and force a failed test if a test case or parser is missing.
 
 ### Fixed
-- Fixed bug where new parsers in the default directory were not getting registered. ([\#6](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/issues/6))
+- Fixed bug where new parsers in the default directory were not getting registered. ([\#6](https://github.com/dod-cyber-crime-center/DC3-MWCP/issues/6))
 
 
 ## [1.4.0] - 2018-08-07
@@ -562,7 +562,7 @@ It is assumed if you are not updating/adding tests.
 ## [1.2.0] - 2018-04-17
 ### Added
 - Support for multiprocessing in tester.
-- Helper function for running [kordesii](https://github.com/Defense-Cyber-Crime-Center/kordesii) decoders in FileObject class.
+- Helper function for running [kordesii](https://github.com/dod-cyber-crime-center/kordesii) decoders in FileObject class.
 - Enhancements to Dispatcher.
     - Added option to not output unidentified files.
     - Added option to force overwriting descriptions.
@@ -603,33 +603,34 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.10.1...HEAD
-[3.10.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.10.0...3.10.1
-[3.10.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.9.0...3.10.0
-[3.9.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.8.0...3.9.0
-[3.8.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.7.0...3.8.0
-[3.7.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.2...3.7.0
-[3.6.2]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.1...3.6.2
-[3.6.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.6.0...3.6.1
-[3.6.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.5.0...3.6.0
-[3.5.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.4.0...3.5.0
-[3.4.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.2...3.4.0
-[3.3.2]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.1...3.3.2
-[3.3.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.3.0...3.3.1
-[3.3.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.2.1...3.3.0
-[3.2.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.2.0...3.2.1
-[3.2.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.1.0...3.2.0
-[3.1.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.0.1...3.1.0
-[3.0.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/3.0.0...3.0.1
-[3.0.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.2.0...3.0.0
-[2.2.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.2.0...2.2.0
-[2.1.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.3...2.1.0
-[2.0.3]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.2...2.0.3
-[2.0.2]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.1...2.0.2
-[2.0.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/2.0.0...2.0.1
-[2.0.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.4.1...2.0.0
-[1.4.1]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.4.0...1.4.1
-[1.4.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.3.0...1.4.0
-[1.3.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.2.0...1.3.0
-[1.2.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.1.0...1.2.0
-[1.1.0]: https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/compare/1.0.0...1.1.0
+[Unreleased]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.11.0...HEAD
+[3.11.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.10.1...3.11.0
+[3.10.1]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.10.0...3.10.1
+[3.10.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.9.0...3.10.0
+[3.9.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.8.0...3.9.0
+[3.8.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.7.0...3.8.0
+[3.7.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.6.2...3.7.0
+[3.6.2]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.6.1...3.6.2
+[3.6.1]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.6.0...3.6.1
+[3.6.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.5.0...3.6.0
+[3.5.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.4.0...3.5.0
+[3.4.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.3.2...3.4.0
+[3.3.2]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.3.1...3.3.2
+[3.3.1]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.3.0...3.3.1
+[3.3.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.2.1...3.3.0
+[3.2.1]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.2.0...3.2.1
+[3.2.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.1.0...3.2.0
+[3.1.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.0.1...3.1.0
+[3.0.1]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.0.0...3.0.1
+[3.0.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/2.2.0...3.0.0
+[2.2.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/2.2.0...2.2.0
+[2.1.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/2.0.3...2.1.0
+[2.0.3]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/2.0.2...2.0.3
+[2.0.2]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/2.0.1...2.0.2
+[2.0.1]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/2.0.0...2.0.1
+[2.0.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/1.4.1...2.0.0
+[1.4.1]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/1.4.0...1.4.1
+[1.4.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/1.3.0...1.4.0
+[1.3.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/1.2.0...1.3.0
+[1.2.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/1.1.0...1.2.0
+[1.1.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/1.0.0...1.1.0
