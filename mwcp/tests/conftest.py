@@ -19,7 +19,7 @@ def pytest_configure(config):
 
 def pytest_addoption(parser):
     """
-    Creates CLI options for setting testcase_dir and malware_repo.
+    Creates CLI options for setting MWCP configuration.
     """
     parser.addoption(
         "--testcase-dir", action="store",
@@ -28,6 +28,10 @@ def pytest_addoption(parser):
     parser.addoption(
         "--malware-repo", action="store",
         help="Directory containing malware samples for parser tests."
+    )
+    parser.addoption(
+        "--yara-repo", action="store",
+        help="Directory containing YARA rules used for recursive matching."
     )
     parser.addoption(
         "--full-diff", action="store_true",

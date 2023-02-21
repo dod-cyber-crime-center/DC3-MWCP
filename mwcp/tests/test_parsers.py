@@ -23,10 +23,15 @@ def _setup(config):
     # Set any configuration passed in through command line of pytest.
     testcase_dir = config.option.testcase_dir if "testcase_dir" in config.option else None
     malware_repo = config.option.malware_repo if "malware_repo" in config.option else None
+    yara_repo = config.option.yara_repo if "yara_repo" in config.option else None
     if testcase_dir:
         mwcp.config["TESTCASE_DIR"] = testcase_dir
     if malware_repo:
         mwcp.config["MALWARE_REPO"] = malware_repo
+    if yara_repo:
+        mwcp.config["YARA_REPO"] = yara_repo
+
+    mwcp.config.validate()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -218,10 +223,29 @@ def _test_parser(pytestconfig, input_file_path, results_path):
     else:
         recursive = expected_results["recursive"]
 
+    # Fail if recursive is set but user hasn't setup a yara repo.
+    if recursive and not mwcp.config.get("YARA_REPO"):
+        pytest.fail(
+            f"Recursion is enabled for testcase, but YARA_REPO isn't setup. "
+            f"Run `mwcp config` to add a YARA_REPO field or set the --yara-repo CLI flag."
+            f"\n\tparser = {parser_name}\n\tmd5 = {md5}\n\ttest_case = {results_path}"
+        )
+
+    # Older versions (<=3.10.1) of MWCP don't have the "external_knowledge" field.
+    if "external_knowledge" not in expected_results:
+        knowledge_base = expected_results["external_knowledge"] = {}
+    else:
+        knowledge_base = expected_results["external_knowledge"]
+
     # NOTE: Reading bytes of input file instead of passing in file path to ensure everything gets run in-memory
     #   and no residual artifacts (like idbs) are created in the malware repo.
-    report = mwcp.run(parser_name, data=input_file_path.read_bytes(), include_logs=False, recursive=recursive)
-
+    report = mwcp.run(
+        parser_name,
+        data=input_file_path.read_bytes(),
+        include_logs=False,
+        recursive=recursive,
+        knowledge_base=knowledge_base,
+    )
     actual_results = report.as_json_dict()
 
     _fixup_test_cases(expected_results, actual_results)

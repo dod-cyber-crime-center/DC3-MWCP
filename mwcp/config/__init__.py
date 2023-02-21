@@ -5,9 +5,11 @@ import os
 import pathlib
 import pkg_resources
 
-
 import appdirs
 from ruamel.yaml import YAML
+from ruamel.yaml.scanner import ScannerError
+
+from mwcp.exceptions import ConfigError
 
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,7 @@ class Config(dict):
 
     # Fields which contain a file or directory path.
     PATH_FIELDS = ["LOG_CONFIG_PATH", "TESTCASE_DIR", "MALWARE_REPO", "PARSER_DIR", "PARSER_CONFIG_PATH", "YARA_REPO"]
+    TESTING_FIELDS = ["TESTCASE_DIR", "MALWARE_REPO"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -68,8 +71,14 @@ class Config(dict):
     def pytest_cache_dir(self) -> pathlib.Path:
         return self.user_config_dir / ".pytest_cache"
 
-    def load(self, file_path=None):
-        """Loads configuration file."""
+    def load(self, file_path=None, production=False):
+        """
+        Loads configuration file.
+
+        :param file_path: Path to configuration file. (defaults to `config.yml` in user config directory)
+        :param production: Whether we are loading configuration for a production server.
+            In this mode, the fields for testing (MALWARE_REPO, TESTCASE_DIR) are ignored.
+        """
         if not file_path:
             file_path = self.user_path
 
@@ -78,7 +87,16 @@ class Config(dict):
             file_path = pathlib.Path(file_path)
 
         with open(file_path, "r") as fp:
-            config = dict(yaml.load(fp))
+            try:
+                config = dict(yaml.load(fp))
+            except ScannerError as e:
+                raise ConfigError(f"Error parsing config: {e}")
+
+        # Remove testing fields if in production.
+        # This lets us continue using the same configuration as in development without exposing testing parameters.
+        if production:
+            for key in self.TESTING_FIELDS:
+                config.pop(key, None)
 
         # Convert file path into absolute paths.
         directory = str(file_path.parent)
@@ -90,6 +108,18 @@ class Config(dict):
                 value = os.path.abspath(value)
                 config[key] = value
         self.update(config)
+        self.validate()
+
+    def validate(self):
+        """
+        Validates configuration.
+
+        :raises ConfigError: If there is an issue with the configuration.
+        """
+        for key, value in self.items():
+            if key in self.PATH_FIELDS:
+                if not pathlib.Path(value).exists():
+                    raise ConfigError(f"Invalid path for {key}: {value}")
 
 
 _config = Config()

@@ -364,6 +364,7 @@ report = {
     "mwcp_version": mwcp.__version__,
     "parser": "FooParser",
     "recursive": False,
+    "external_knowledge": {},
     "tags": ["tagging", "test"],
     "type": "report",
 }

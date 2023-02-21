@@ -36,6 +36,7 @@ import tabulate
 
 import mwcp
 from mwcp import testing
+from mwcp.exceptions import ConfigError
 from mwcp.stix.report_writer import STIXWriter
 from mwcp.tester import Tester
 from mwcp.utils.stringutils import convert_to_unicode
@@ -44,6 +45,7 @@ logger = logging.getLogger("mwcp")
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
+@click.pass_context
 @click.option("-d", "--debug", is_flag=True, help="Enables DEBUG level logs.")
 @click.option("-v", "--verbose", is_flag=True, help="Enables INFO level logs.")
 @click.option(
@@ -71,9 +73,19 @@ logger = logging.getLogger("mwcp")
     "--parser-source",
     help="Set a default parsers source to use. If not provided parsers from all sources will be available.",
 )
-def main(debug, verbose, config_path, parser_dir, parser_config, parser_source):
+def main(ctx, debug, verbose, config_path, parser_dir, parser_config, parser_source):
+    # Skip setup if running 'config' command.
+    if ctx.invoked_subcommand == "config":
+        return
+
     # Setup configuration
-    mwcp.config.load(config_path)
+    try:
+        mwcp.config.load(config_path)
+    except ConfigError as e:
+        click.secho(str(e), err=True)
+        click.secho("Run 'mwcp config' to fix the issue.", err=True)
+        sys.exit(1)
+
     if parser_dir:
         mwcp.config["PARSER_DIR"] = parser_dir
     parser_dir = mwcp.config.get("PARSER_DIR")
@@ -244,6 +256,31 @@ def _write_csv(input_files, results, csv_path=None):
             csvfile.close()
 
 
+def _parse_parameters(params) -> dict:
+    """
+    Parses the results from the --parameter option in the `parse` and `test` command.
+    Returns a knowledge_base dictionary.
+    """
+    knowledge_base = {}
+    for entry in params:
+        key, found, value = entry.partition(":")
+        if not found:
+            raise click.UsageError(f"Missing ':' in parameter: '{entry}'")
+        if value.casefold() == "true":
+            value = True
+        elif value.casefold() == "false":
+            value = False
+        else:
+            try:
+                value = int(value)
+            except ValueError:
+                pass
+        if key in knowledge_base:
+            raise click.UsageError(f"'{key}' parameter defined twice.")
+        knowledge_base[key] = value
+    return knowledge_base
+
+
 @main.command()
 @click.option(
     "--yara-repo",
@@ -311,9 +348,21 @@ def _write_csv(input_files, results, csv_path=None):
     help="Whether to present json output using legacy schema. "
          "(WARNING: This flag will eventually be removed in favor of only supporting the new schema.)"
 )
+@click.option(
+    "-p", "--param", "--parameter",
+    multiple=True,
+    help="External parameters that will get passed through to the parsers using the knowledge_base. "
+         "Should be a 'key:value' pair, where 'value' is a string, integer or boolean. "
+         "Binary data is not supported, we recommend base64 encoding if the need arises. "
+         "(e.g. --param aes_key:secret) "
+         "This flag can be provided multiple times for multiple parameters."
+)
 @click.argument("parser", required=True)
 @click.argument("input", nargs=-1, type=click.Path())
-def parse(parser, input, yara_repo, recursive, format, split, output_dir, output_files, prefix, string_report, include_filename, legacy):
+def parse(
+        parser, input, yara_repo, recursive, format, split, output_dir, output_files, prefix, string_report,
+        include_filename, legacy, param
+):
     """
     Parses given input with given parser.
 
@@ -324,12 +373,15 @@ def parse(parser, input, yara_repo, recursive, format, split, output_dir, output
     \b
     Common usages::
         mwcp parse foo ./malware.bin                          - Run foo parser on ./malware.bin
+        mwcp parse foo ./malware.bin --param key:secret       - Run foo parser on ./malware.bin with external knowledge of a secret key to be used by the parser.
         mwcp parse foo ./repo/*                               - Run foo parser on files found in repo directory.
         mwcp parse -f json foo ./malware.bin                  - Run foo parser and display results as json.
         mwcp parse -f csv foo ./repo/* > ./results.csv        - Run foo parser on a directory and output results as a csv file.
         mwcp parse - ./malware.bin --yara-repo=./rules        - Run a parser on ./malware.bin where the parser is detected by YARA.
         mwcp parse - ./malware.bin                            - yara_repo can be omitted if included in configuration.
     """
+    knowledge_base = _parse_parameters(param)
+
     if yara_repo:
         mwcp.config["YARA_REPO"] = yara_repo
 
@@ -355,6 +407,7 @@ def parse(parser, input, yara_repo, recursive, format, split, output_dir, output
                 prefix_output_files=prefix,
                 external_strings_report=string_report,
                 recursive=recursive,
+                knowledge_base=knowledge_base,
             )
             if parser == "-":
                 parser = None
@@ -397,11 +450,9 @@ def parse(parser, input, yara_repo, recursive, format, split, output_dir, output
 
         elif format == "stix":
             writer = STIXWriter()
-
             # aggregate the report details
             for report in reports:
-                report.as_stix(writer)
-                
+                report.write_stix(writer)
             print(writer.serialize())
 
     except Exception as e:
@@ -629,7 +680,7 @@ def _run_tests(tester, silent=False, show_passed=False):
 )
 @click.option(
     "--yara-repo",
-    type=click.Path(file_okay=False),
+    type=click.Path(exists=True, file_okay=False),
     help="Directory containing YARA signatures used for auto detection.",
 )
 @click.option(
@@ -641,11 +692,20 @@ def _run_tests(tester, silent=False, show_passed=False):
          "Do not set if you would like to use what is currently set in the test case. "
          "(Only works if a YARA repo has been provided through command line or configuration). "
 )
+@click.option(
+    "-p", "--param", "--parameter",
+    multiple=True,
+    help="External parameters that will get passed through to the parsers using the knowledge_base. "
+         "Should be a 'key:value' pair, where 'value' is a string, integer or boolean. "
+         "Binary data is not supported, we recommend base64 encoding if the need arises. "
+         "(e.g. --param aes_key:secret) "
+         "This flag can be provided multiple times for multiple parameters."
+)
 # Parser to process.
 @click.argument("parser", nargs=-1, required=False)
 def test(
     testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete, yes, force, last_failed, show_passed,
-    silent, legacy, exit_on_first, command, full_diff, yara_repo, recursive, parser,
+    silent, legacy, exit_on_first, command, full_diff, yara_repo, recursive, param, parser,
 ):
     """
     Testing utility to create and execute parser test cases.
@@ -659,16 +719,20 @@ def test(
         mwcp test foo                                         - Run test cases for foo parser.
         mwcp test foo -u                                      - Update existing test cases for foo parser.
         mwcp test foo -u --recursive                          - Update existing test cases for foo parser with recursive YARA matching for unidentified files.
+        mwcp test foo -u --param key:secret                   - Update existing test cases for foo parser with external knowledge of a secret key to be used by the parser.
         mwcp test -u                                          - Update existing test cases for all parsers.
         mwcp test --lf                                        - Rerun previously failed test cases.
         mwcp test --lf -u                                     - Update test cases that previously failed.
         mwcp test foo --add=./malware.bin                     - Add test case for malware.bin sample for foo parser.
         mwcp test foo --add=./malware.bin --recursive         - Add test case for malware.bin sample for foo parser with recursive YARA matching for unidentified files.
+        mwcp test foo --add=./malware.bin --param key:secret  - Add test case for malware.bin sample for foo parser with external knowledge of a secret key to be used by the parser.
         mwcp test foo -u --add=./malware.bin                  - Add test case for malware.bin sample.
                                                                 Allow updating if a test case for this file already exists.
         mwcp test foo --add-filelist=./paths.txt              - Add tests cases for foo parser using text file of paths.
         mwcp test foo --delete=./malware.bin                  - Delete test case for malware.bin sample for foo parser.
     """
+    knowledge_base = _parse_parameters(param)
+
     # Overwrite configuration with command line flags.
     if testcase_dir:
         mwcp.config["TESTCASE_DIR"] = testcase_dir
@@ -706,7 +770,14 @@ def test(
                 tester.remove_test(file_path)
         else:
             for file_path in add:
-                testing.add_tests(file_path, parsers=parser, force=force, update=update, recursive=recursive or False)
+                testing.add_tests(
+                    file_path,
+                    parsers=parser,
+                    force=force,
+                    update=update,
+                    recursive=recursive or False,
+                    knowledge_base=knowledge_base,
+                )
 
             for file_path in delete:
                 testing.remove_tests(file_path, parsers=parser)
@@ -728,7 +799,7 @@ def test(
                 test_cases = testing.iter_test_cases(parsers=parser)
             for test_case in test_cases:
                 click.secho(f"Updating {test_case.name}-{test_case.md5}...", fg="green")
-                test_case.update(force=force, recursive=recursive)
+                test_case.update(force=force, recursive=recursive, knowledge_base=knowledge_base)
 
     # Run tests
     else:
@@ -761,6 +832,8 @@ def test(
                 testcase_dir = str(pathlib.Path(testcase_dir).resolve())
             if malware_repo:
                 malware_repo = str(pathlib.Path(malware_repo).resolve())
+            if yara_repo:
+                yara_repo = str(pathlib.Path(yara_repo).resolve())
 
             from mwcp.tests import test_parsers
 
@@ -796,6 +869,8 @@ def test(
                 pytest_args += ["--testcase-dir", testcase_dir]
             if malware_repo:
                 pytest_args += ["--malware-repo", malware_repo]
+            if yara_repo:
+                pytest_args += ["--yara-repo", yara_repo]
             if exit_on_first:
                 pytest_args += ["-x"]
 

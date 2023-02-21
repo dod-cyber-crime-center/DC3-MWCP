@@ -25,13 +25,14 @@ class TestCase:
     md5: str
     results_path: pathlib.Path
 
-    def update(self, force: bool = False, recursive: bool = None) -> bool:
+    def update(self, force: bool = False, recursive: bool = None, knowledge_base: dict = None) -> bool:
         """
         Updates test case based on currently generated results.
 
         :param force: Whether to force adding the test case even if errors are encountered
         :param recursive: Whether to recursive parse unidentified files using YARA matching.
             (Set to None to use whatever is set in the test case.)
+        :param knowledge_base: Initial knowledge_base to provide to the report.
 
         :returns: Whether update was successful.
         """
@@ -58,7 +59,13 @@ class TestCase:
             )
             return False
 
-        report = mwcp.run(parser_name, data=file_path.read_bytes(), log_level=logging.INFO, recursive=recursive)
+        report = mwcp.run(
+            parser_name,
+            data=file_path.read_bytes(),
+            log_level=logging.INFO,
+            recursive=recursive,
+            knowledge_base=knowledge_base,
+        )
         if report.errors and not force:
             logger.warning(f"Results for {self.name} has the following errors, not updating:")
             logger.warning("\n".join(report.errors))
@@ -285,7 +292,8 @@ def download(md5: str, output_dir: pathlib.Path = None):
 
 
 def add_tests(
-        file_path: Union[str, pathlib.Path], parsers: List[str] = None, force=False, update=True, recursive=False
+        file_path: Union[str, pathlib.Path], parsers: List[str] = None, force=False, update=True, recursive=False,
+        knowledge_base: dict = None,
 ) -> bool:
     """
     Adds a test case for the given parser and md5 for malware sample.
@@ -296,6 +304,7 @@ def add_tests(
     :param force: Whether to force adding the test case even if errors are encountered
     :param update: Whether to allow updating the test case if a test for this file already exists.
     :param recursive: Whether to recursive parse unidentified files using YARA matching.
+    :param knowledge_base: Initial knowledge_base to provide to the report.
 
     :returns: Whether we were able successfully add all test cases.
     """
@@ -323,7 +332,13 @@ def add_tests(
                 )
                 continue
 
-            report = mwcp.run(full_parser_name, data=file_data, log_level=logging.INFO, recursive=recursive)
+            report = mwcp.run(
+                full_parser_name,
+                data=file_data,
+                log_level=logging.INFO,
+                recursive=recursive,
+                knowledge_base=knowledge_base,
+            )
 
             if report.errors and not force:
                 logger.warning(

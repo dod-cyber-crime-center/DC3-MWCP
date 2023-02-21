@@ -6,6 +6,12 @@ class MWCPError(Exception):
     """
 
 
+class ConfigError(MWCPError):
+    """
+    This exception is thrown if there is an issue with the configuration file.
+    """
+
+
 class UnableToParse(MWCPError):
     """
     This exception can be thrown if a parser that has been correctly identified has failed to parse

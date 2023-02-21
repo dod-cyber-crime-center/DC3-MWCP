@@ -82,6 +82,13 @@ class Parser(metaclass=ParserMeta):
         )
         return self.report
 
+    @property
+    def knowledge_base(self) -> dict:
+        """
+        Convenience function for getting knowledge_base.
+        """
+        return self.report.knowledge_base
+
     @classmethod
     def get_logger(cls):
         return logging.getLogger(".".join([cls.__module__, cls.__name__]))

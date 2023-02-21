@@ -2,11 +2,10 @@
 Tests STIX Reports.
 """
 import logging
+import json
 
 import pytest
 
-import json
-from mwcp.stix.report_writer import STIXWriter
 import mwcp
 
 
@@ -54,9 +53,9 @@ def test_report_stix(datadir, filled_report, mocker):
 
     # Writer must be initialized with a fixed time so we can easily compare results
     # TODO: Look into using freezegun library.
-    writer = STIXWriter(fixed_timestamp="2022-01-01T07:32:00.000Z")
-    filled_report.as_stix(writer)
-    actual = json.loads(writer.serialize())
+    actual = filled_report.as_stix(fixed_timestamp="2022-01-01T07:32:00.000Z")
+    print(actual)
+    actual = json.loads(actual)
     with open(datadir / "report.json", "rt") as input_file:
         expected = json.load(input_file)
 
@@ -66,5 +65,4 @@ def test_report_stix(datadir, filled_report, mocker):
         if obj["type"] == "malware-analysis":
             obj["version"] = mwcp.__version__
 
-    print(json.dumps(actual, indent=4))
     assert actual == expected

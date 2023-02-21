@@ -1,6 +1,25 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+## [Unreleased]
+
+### Added
+- Added ability to provide external knowledge_base information. (see [documentation](docs/ParserComponents.md#external-knowledge))
+
+### Changed
+- Configuration will now be validated on startup.
+- Added better failure message when running a recursive test case without a YARA repo setup.
+- `Dispatcher.knowledge_base` has been moved to `Report.knowledge_base`. The original location is deprecated and will eventually be removed.
+- `Report.as_stix()` no longer requires a writer and will now return serialized JSON results. 
+  - Please use `Report.write_stix()` for original functionality. 
+
+### Fixed
+- `mwcp config` CLI command will now still work even if the config file is invalid.
+- `--yara-repo` flag will now properly be read when running a test.
+- Fixed memory leak issues due to lingering report references.
+
+
 ## [3.10.1] - 2023-02-03
 
 ### Added

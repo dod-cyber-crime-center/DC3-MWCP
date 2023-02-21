@@ -3,13 +3,15 @@
 Parsers are created by inheriting from the `mwcp.Parser` class. An instance of this class comes with 4 major
 components to assist in parsing a file:
 
-- [self.file_object](#fileobject) - The file currently being parsed.
-- [self.report](#report) - Used to report on parsed configuration data.
-- [self.dispatcher](#dispatcher) - Used to add new embedded files to the processing queue.
-- [self.logger](#logger) - Used to log debugging, informational, and error messages.
-
+- [FileObject](#fileobject) - The file currently being parsed.
+- [Report](#report) - Used to report on parsed configuration data.
+- [Dispatcher](#dispatcher) - Used to add new embedded files to the processing queue.
+- [Logger](#logger) - Used to log debugging, informational, and error messages.
+- [Tagging](#tagging) - Used to provide contextual tags to elements.
+- [Knowledge Base](#knowledge-base)
 
 ### Guides
+
 - [Parser Development](ParserDevelopment.md)
 - [Parser Components](ParserComponents.md)
 - [Parser Installation](ParserInstallation.md)
@@ -17,10 +19,12 @@ components to assist in parsing a file:
 - [Python Style Guide](PythonStyleGuide.md)
 
 ## FileObject
+
 The file being processed by a parser is accessible via `self.file_object`, which is an instance of the 
 `mwcp.FileObject` class. This class contains a variety of useful attributes describing the file.
 
 It contains the following attributes:
+
 - `data` - The raw data of the file.
 - `name` - Name of the file (or an auto-generated stub)
 - `description` - Description of the file.
@@ -38,7 +42,8 @@ It contains the following attributes:
 - `parent` - The `mwcp.FileObject` object that this file was extracted from or None if this is the original input file.
 - `children` - The `mwcp.FileObject` objects that have been generated or dispatched by this file.
 - `siblings` - The `mwcp.FileObject` objects that share the same parent of this file.
-
+- `ancestors` - The `mwcp.FileObject` objects for the full parental hierarchy.
+- `descendants` - The `mwcp.FileObject` objects that came from the current file.
 
 A file-like object can be generated in a context manager using `.open()`.
 This can be helpful if a file stream is needed.
@@ -56,8 +61,8 @@ with self.file_object.temp_path() as file_path:
     _some_library_that_needs_a_path(file_path)
 ```
 
-
 ## Report
+
 You can report configuration data into `self.report`, which is an instance of a `mwcp.Report` class.
 
 You can add metadata via the `add()` function, which takes a metadata element defined in `mwcp.metadata`.
@@ -86,56 +91,9 @@ if config_display_name:
     self.report.add(metadata.Other("config_display_name", config_display_name))
 ```
 
-### Tagging
-Tags can be added to any produced metadata element, file object, or the report itself.
-To add a tag, simply call `add_tag()` with a provided sequence of tags.
-These tags provide an easy way to add context to the results based on your own
-defined standard such as actor set, technique, artifact location, etc.
-
-The `add_tag()` function will return the instance of the element it is
-being added to, allowing for easy addition of tags within existing code.
-
-```python
-from mwcp import metadata
-
-# Report key and provide context that is was use for the implant.
-key = self._extract_rc4_key(self.file_object.data)
-if key:
-    self.report.add(metadata.EncryptionKey(key=key, algorithm="rc4").add_tag("implant"))
-
-# Add embedded implant and add tag that it came from overlay.
-self.dispatcher.add(FileObject(implant_data).add_tag("overlay"))
-
-# Add a global tag to the report itself.
-self.report.add_tag("acme_triage", "ransomware")
-
-
-# Attach a tag for known actor set after positive identification.
-@classmethod
-def identify(cls, file_object):
-    if "MAGIC" in file_object.data:
-        file_object.add_tag("SuperActor")
-        return True
-    return False
-```
-
-
-Tags can also be included as an attribute on a `Parser` class to automatically attach on all identified files.
-
-```python
-from mwcp import Parser
-
-
-class Implant(Parser):
-    DESCRIPTION = "SuperMalware Implant"
-    TAGS = ("implant", "SuperMalware")
-
-    ...
-```
-
-
 ## Dispatcher
-You can access the underlining `mwcp.Dispatcher` object used to control the parsers from `self.dispatcher`.
+
+You can access the underlying `mwcp.Dispatcher` object used to control the parsers from `self.dispatcher`.
 
 The Dispatcher works by running a queue of input files on a specific list of parsers. Each parser identifies if it can parse the given file. If it identifies the file, the dispatcher
 will initialize and run the parser. The parser can then report any metadata as well as extract and place any
@@ -167,45 +125,13 @@ def run(self):
 *NOTE: Setting the description for the extracted file is not usually necessary since it will automatically
 be set with the description of the parser that identifies the file.*
 
-
-### Sharing information across parsers
-If you would like to share information that can be used by another parser. (eg. encryption keys)
-You can store this information in the `knowledge_base` contained in the dispatcher object.
-Since all parsers will have access to the dispatcher, a parser can pull data stored in here from another parser.
-
-However, the receiving parser should not assume that the other parser ran and should handle the situation
-where it cannot get the information.
-
-*NOTE: If you are trying to decrypt an embedded file. It's better to perform the decryption within
-the first parser that contains the embedded file and then dispatch the decrypted file. 
-You should not dispatch the encrypted file and pass the key through the knowledge base if you can prevent it.*
-
-```python
-# First parser
-def run(self):
-    # ...
-    self.dispatcher.knowledge_base['rc4_key'] = rc4_key
-    # ...
-
-# Second parser
-def run(self):
-    # ...
-    rc4_key = self.dispatcher.knowledge_base.get('rc4_key', None)
-    if not rc4_key:
-        self.logger.warning('Unable to retrieve rc4 key.')
-        return
-    # ..
-```
-
-
-
-
 ## Logger
+
 The `self.logger` object is a logger object from the `logging` library.
 Using this logger will ensure the component's name is added to the log message.
 
 It is a good idea to use logging to help inform the user on the progress of the parser and if the parser may
-need to be updated due to new variant of the sample.
+need to be updated due to a new variant of the sample.
 
 ```python
     def run(self):
@@ -240,8 +166,115 @@ def some_module_level_function():
 
 class BarImplant(Parser):
     # ...
-
 ```
 
-
 Please see the [README](../README.md#logging) for more information.
+
+## Tagging
+
+Tags can be added to any produced metadata element, file object, or the report itself.
+To add a tag, simply call `add_tag()` with a provided sequence of tags.
+These tags provide an easy way to add context to the results based on your own
+defined standard such as actor set, technique, artifact location, etc.
+
+The `add_tag()` function will return the instance of the element it is
+being added to, allowing for easy addition of tags within existing code.
+
+```python
+from mwcp import metadata
+
+# Report key and provide context that is was use for the implant.
+key = self._extract_rc4_key(self.file_object.data)
+if key:
+    self.report.add(metadata.EncryptionKey(key=key, algorithm="rc4").add_tag("implant"))
+
+# Add embedded implant and add tag that it came from overlay.
+self.dispatcher.add(FileObject(implant_data).add_tag("overlay"))
+
+# Add a global tag to the report itself.
+self.report.add_tag("acme_triage", "ransomware")
+
+
+# Attach a tag for known actor set after positive identification.
+@classmethod
+def identify(cls, file_object):
+    if "MAGIC" in file_object.data:
+        file_object.add_tag("SuperActor")
+        return True
+    return False
+```
+
+Tags can also be included as an attribute on a `Parser` class to automatically attach on all identified files.
+
+```python
+from mwcp import Parser
+
+
+class Implant(Parser):
+    DESCRIPTION = "SuperMalware Implant"
+    TAGS = ("implant", "SuperMalware")
+
+    ...
+```
+
+## Knowledge Base
+
+If you would like to share information that can be used by another parser. (eg. encryption keys)
+You can store this information in the `knowledge_base` contained in the [Report](#report) object.
+Since all parsers will have access to the report, a parser can pull data stored in here from another parser.
+
+However, the receiving parser should not assume that the other parser ran and should handle the situation
+where it cannot get the information.
+
+*NOTE: If you are trying to decrypt an embedded file. It's better to perform the decryption within
+the first parser that contains the embedded file and then dispatch the decrypted file. 
+You should not dispatch the encrypted file and pass the key through the knowledge base if you can prevent it.*
+
+```python
+# First parser
+def run(self):
+    # ...
+    self.report.knowledge_base['rc4_key'] = b"\xde\xad\xbe\xef"
+    # ...
+
+# Second parser
+def run(self):
+    # ...
+    rc4_key = self.report.knowledge_base.get('rc4_key', None)
+    if not rc4_key:
+        self.logger.warning('Unable to retrieve rc4 key.')
+        return
+    # ..
+```
+
+*NOTE: The `knowledge_base` can also be directly accessed from the parser using `self.knowledge_base`*
+
+There is also a separate `knowledge_base` for each [FileObject](#fileobject) object, which can be used for storing specific information for that file, which other parsers can access by traversing the parental hierarchy.
+
+```python
+# First parser
+def run(self):
+    # ...
+    self.file_object.knowledge_base['rc4_key'] = b"\xde\xad\xbe\xef"
+    # ...
+
+
+# Second parser
+def run(self):
+    # ... 
+    if parent := self.file_object.parent:
+        if rc4_key := parent.knowledge_base.get('rc4_key', None):
+            self.logger.warning("Obtained parent's RC4 key.")
+```
+
+### External Knowledge
+
+The `knowledge_base` can be prepopulated with additional knowledge provided by the user through the following methods:
+
+- `--param` flag on the [CLI](../README.md#cli-tool).
+- `param` [REST](../README.md#arguments) request argument.
+- `knowledge_base` [keyword argument](../README.md#python-api) on `mwcp.run()`
+
+This can be used to provide information externally obtained by another source before parsing starts.
+
+A parser can also obtain this information explicitly through `Report.external_knowledge`.

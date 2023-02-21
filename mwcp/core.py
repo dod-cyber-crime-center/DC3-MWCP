@@ -21,6 +21,7 @@ def run(
         output_directory: Union[str, pathlib.Path] = None,
         yara_repo: Union[str, pathlib.Path] = None,
         recursive: bool = True,
+        knowledge_base: dict = None,
         include_file_data: bool = False,
         prefix_output_files: bool = True,
         external_strings_report: bool = False,
@@ -68,6 +69,7 @@ def run(
         include_logs=include_logs,
         log_level=log_level,
         log_filter=log_filter,
+        knowledge_base=knowledge_base,
     )
     if not yara_repo:
         yara_repo = config.get("YARA_REPO")

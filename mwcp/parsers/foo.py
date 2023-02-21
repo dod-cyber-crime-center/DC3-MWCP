@@ -20,6 +20,13 @@ class Foo(Parser):
         # retrieve input file
         input_file = self.file_object
 
+        # Pull external information from user or other parsers through knowledge_base
+        secret = self.knowledge_base.get("secret", None)
+        if secret:
+            self.report.add(metadata.Other("secret_using_external_knowledge", secret + "!"))
+        # Pass in our own information for other parsers.
+        self.knowledge_base["encryption_key"] = b"\xde\xad\xbe\xef"
+
         # standardized metadata
         self.report.add(metadata.URL("http://127.0.0.1"))
 

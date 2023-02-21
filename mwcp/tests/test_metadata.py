@@ -51,6 +51,9 @@ def test_serialization():
     """).strip()
     assert metadata.Path2.from_dict(p_dict) == p
     assert metadata.Metadata.from_dict(p_dict) == p
+    # It should also work without the "type" field if using Path2 directly.
+    p_dict.pop("type")
+    assert metadata.Path2.from_dict(p_dict) == p
 
     # Test nested metadata.
     u = metadata.URL("http://google.com")
@@ -96,6 +99,24 @@ def test_serialization():
     """).strip()
     assert metadata.URL.from_dict(u_dict) == u
     assert metadata.Metadata.from_dict(u_dict) == u
+
+
+def test_other_serialization_issue():
+    """
+    Tests issue from deserializing a metadata.Other component, due to the extra "value_format" field.
+    """
+    other = metadata.Other("test", b"hello")
+    other_dict = other.as_dict()
+    assert other_dict == {
+        "type": "other",
+        "tags": [],
+        "key": "test",
+        "value": b"hello",
+        "value_format": "bytes",
+    }
+    assert metadata.Other.from_dict(other_dict) == other
+    # Should also work if data is still encoded.
+    assert metadata.Other.from_dict({"key": "test", "value": "aGVsbG8=", "value_format": "bytes"}) == other
 
 
 def test_schema(tmp_path):

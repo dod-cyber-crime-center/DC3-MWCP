@@ -8,7 +8,6 @@ from stix2.v21 import _Observable
 
 import mwcp
 from mwcp import metadata
-from mwcp.file_object import FileObject
 from mwcp.report_writers import ReportWriter
 
 

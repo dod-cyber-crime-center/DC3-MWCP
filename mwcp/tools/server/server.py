@@ -10,7 +10,7 @@ import json
 import logging
 import os
 import zipfile
-from copy import copy
+from typing import Tuple, Union, Optional
 
 import flask
 import mwcp
@@ -18,14 +18,12 @@ import mwcp.parsers
 import pygments
 import pygments.formatter
 import pygments.lexer
-from mwcp.utils import logutil
 from pygments.formatters.html import HtmlFormatter
 from pygments.lexers.data import JsonLexer
 from pygments.lexers.special import TextLexer
 from werkzeug.utils import secure_filename
 
 from mwcp.report import Report
-from mwcp.stix.report_writer import STIXWriter
 
 bp = flask.Blueprint("mwcp", __name__)
 YARA_MATCH = "-- YARA Match --"
@@ -34,7 +32,7 @@ YARA_MATCH = "-- YARA Match --"
 def init_app(app):
     """Initialize the Flask application and MWCP"""
     # Initialize MWCP
-    mwcp.config.load(os.getenv("MWCP_CONFIG", None))
+    mwcp.config.load(os.getenv("MWCP_CONFIG", None), production=True)
     mwcp.register_entry_points()
 
 
@@ -91,7 +89,7 @@ def run_parsers(parsers):
         for parser in parsers.split("/"):
             if parser:
                 # TODO: Determine if it should be possible to specify the output format and have file data not be included
-                report = _run_parser(parser, data=data)
+                report = _run_parser(parser, data)
                 output[parser] = _format_report(report)
     else:
         output.setdefault("errors", []).append("No input file provided")
@@ -153,7 +151,7 @@ def schema():
     """
     Provides JSON schema for report output.
     """
-    return mwcp.schema()
+    return flask.jsonify(mwcp.schema())
 
 
 @bp.route("/logs")
@@ -216,24 +214,6 @@ def _get_option(name, default=False) -> bool:
 def _legacy():
     """Whether we are using legacy or new metadata schema."""
     return _get_option("legacy", True)
-
-
-def _include_logs():
-    """Whether to include logs in parse report."""
-    return _get_option("include_logs", True)
-
-
-def _external_strings():
-    """Whether to create external string reports for reported decoded strings."""
-    return _get_option("external_strings")
-
-
-def _recursive():
-    """
-    Whether to recursively process unidentified files with YARA matched parsers.
-    (Yara repo must be setup for this option to be active.)
-    """
-    return _get_option("recursive", True)
 
 
 def _highlight(data, is_json=True):
@@ -321,7 +301,7 @@ def _build_zip(parser_results):
     return zip_buf
 
 
-def _build_parser_response(parser=None, **kwargs):
+def _build_parser_response(parser=None) -> Union[flask.Response, Tuple[flask.Response, int]]:
     """
     Build the response object for a parser request.
     This function handles the form fields and/or URL parameters and
@@ -330,37 +310,32 @@ def _build_parser_response(parser=None, **kwargs):
 
     :param str parser: The name of the parser to run. Pulled from `parser`
         URL parameter or form field if not specified.
-    :return: Flask response object
+    :return: Flask response object with optional status code.
     """
-    output = kwargs.get("output", "") or flask.request.values.get("output", "json")
+    output = flask.request.values.get("output", "json")
     output = output.lower()
     if output not in ("json", "text", "zip", "stix"):
-        flask.current_app.logger.warning(
-            "Unknown output type received: '{}'".format(output)
-        )
+        flask.current_app.logger.warning(f"Unknown output type received: '{output}'")
         output = "json"
-    highlight = kwargs.get("highlight") or flask.request.values.get("highlight")
-    include_file_data = not (kwargs.get("no_file_data") or flask.request.values.get("no_file_data"))
+    highlight = flask.request.values.get("highlight")
 
     if not highlight:
         json_response = flask.jsonify
     else:
         json_response = _highlight
 
-    report, response_code = _run_parser_request(parser, include_file_data=include_file_data)
+    report, response_code = _run_parser_request(parser)
 
     if response_code != 200:
         parser_results = _format_report(report)
         return json_response(parser_results), response_code
 
     if output == "stix":
-        writer = STIXWriter()
-        report.as_stix(writer)
-
+        parser_results = report.as_stix()
         if highlight:
-            return json_response(writer.serialize())
+            return json_response(parser_results)
         else:
-            return writer.serialize()
+            return parser_results
     else:
         parser_results = _format_report(report)
 
@@ -369,7 +344,7 @@ def _build_parser_response(parser=None, **kwargs):
         filename = secure_filename(flask.request.files.get("data").filename)
         zip_buf = _build_zip(parser_results)
         return flask.send_file(
-            zip_buf, "application/zip", True, "{}_mwcp_output.zip".format(filename)
+            zip_buf, "application/zip", True, f"{filename}_mwcp_output.zip"
         )
 
     if highlight:
@@ -391,7 +366,33 @@ def _format_report(report: Report):
     return output
 
 
-def _run_parser_request(parser=None, upload_name="data", include_file_data=True) -> (Report, int):
+def _parse_parameters(params) -> dict:
+    """
+    Parses the results from the --parameter option in the `parse` and `test` command.
+    Returns a knowledge_base dictionary.
+    """
+    knowledge_base = {}
+    for entry in params:
+        key, found, value = entry.partition(":")
+        if not found:
+            # How we raise error?
+            raise ValueError(f"Missing ':' in parameter: '{entry}'")
+        if value.casefold() == "true":
+            value = True
+        elif value.casefold() == "false":
+            value = False
+        else:
+            try:
+                value = int(value)
+            except ValueError:
+                pass
+        if key in knowledge_base:
+            raise ValueError(f"'{key}' parameter defined twice.")
+        knowledge_base[key] = value
+    return knowledge_base
+
+
+def _run_parser_request(parser=None, upload_name="data") -> (Report, int):
     """
     Run a parser based on the data in the current request.
 
@@ -407,7 +408,6 @@ def _run_parser_request(parser=None, upload_name="data", include_file_data=True)
         URL parameter or form field if not specified.
         Can be blank to use YARA matching.
     :param str upload_name: The name of the field of the uploaded sample
-    :param boolean include_file_data: If the parser should include file data
     :return: The results from the parser run and/or errors and an appropriate status code
     :rtype: (Report, int)
     """
@@ -438,44 +438,43 @@ def _run_parser_request(parser=None, upload_name="data", include_file_data=True)
     )
     if parser == YARA_MATCH:
         parser = None
-    report = _run_parser(parser, data=data, include_file_data=include_file_data)
+    report = _run_parser(parser, data)
 
     return report, 200
 
 
-def _run_parser(name, data=b"", include_file_data=True) -> Report:
+def _run_parser(parser_name: Optional[str], data: bytes) -> Report:
     """
     Run an MWCP parser on given data.
 
     Logs to a list handler that is locked to the current request.
 
-    :param str name: Name of the parser to run (or None for YARA match)
+    :param str parser_name: Name of the parser to run (or None for YARA match)
     :param bytes data: Data to run parser on
-    :param boolean include_file_data: If the parser should include file data
     :return: Output from the reporter
     :rtype: Report
     """
     report = Report()
-    log_filter = None
     try:
-        include_logs = _include_logs()
-        if include_logs:
-            log_filter = RequestFilter(flask.request)
+        params = flask.request.values.getlist("param") + flask.request.values.getlist("parameter")
+        knowledge_base = _parse_parameters(params)
 
+        include_logs = _get_option("include_logs", True)
         report = mwcp.run(
-            name,
+            parser_name,
             data=data,
-            recursive=_recursive(),
-            include_file_data=include_file_data,
+            recursive=_get_option("recursive", True),
             include_logs=include_logs,
-            log_filter=log_filter,
-            external_strings_report=_external_strings(),
+            include_file_data=not _get_option("no_file_data", False),
+            log_filter=RequestFilter(flask.request) if include_logs else None,
+            external_strings_report=_get_option("external_strings", False),
+            knowledge_base=knowledge_base
         )
 
     except Exception as e:
         if flask.has_app_context():
             flask.current_app.logger.error(
-                "Error running parser '%s': %s", name, str(e)
+                "Error running parser '%s': %s", parser_name, str(e)
             )
     finally:
         return report

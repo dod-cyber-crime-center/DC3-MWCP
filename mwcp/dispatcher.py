@@ -103,10 +103,7 @@ class Dispatcher(object):
         self._output_unidentified = output_unidentified
         self._overwrite_descriptions = overwrite_descriptions
         self._embedded = embedded
-
-        # Dictionary that can be used by parsers to pass variables across parsers.
-        # E.g. an encryption key found in the loader to be used by the implant.
-        self.knowledge_base = {}
+        self._knowledge_base = {}
 
     def __repr__(self):
         return "{}({})".format(self.name, ", ".join(repr(parser) for parser in self.parsers))
@@ -115,6 +112,11 @@ class Dispatcher(object):
     def _cleanup(cls):
         # Clear identify cache to prevent memory leaking.
         cls._identify_cache = {}
+
+    @property
+    def knowledge_base(self) -> dict:
+        warnings.warn("knowledge_base has been moved to the report object.", DeprecationWarning)
+        return self._knowledge_base
 
     def identify(self, file_object):
         """
@@ -179,12 +181,11 @@ class Dispatcher(object):
             logger.debug(u"Identifying {} with {!r}.".format(file_object.name, parser))
 
             # First see if result has been cached.
-            key = (parser, file_object)
+            key = (parser, file_object.md5)
             if key in self._identify_cache:
                 ret = self._identify_cache[key]
             else:
                 ret = parser.identify(file_object)
-                self._identify_cache[key] = ret
 
             if isinstance(ret, tuple) and isinstance(ret[0], bool):
                 identified, *rest = ret
@@ -192,6 +193,10 @@ class Dispatcher(object):
             else:
                 identified = ret
                 rest = tuple()
+
+            # Cache if single boolean result or False. We don't know if the extra run args are deterministic.
+            if not rest or not identified:
+                self._identify_cache[key] = bool(identified)
 
             if identified:
                 yield parser, rest
@@ -204,6 +209,8 @@ class Dispatcher(object):
         """
         self._current_file_object = file_object
         self._current_parser = parser
+        # Pull knowledge_base from report for backwards compatibility.
+        self._knowledge_base = report.knowledge_base
 
         # If a description wasn't set for the file, use the parser's
         # (But ignore setting it for sub dispatchers)
@@ -229,7 +236,7 @@ class Dispatcher(object):
             file_object.parser = orig_parser
 
             # Mark identify cache as failure, so we don't need to go through this again.
-            self._identify_cache[(parser, file_object)] = False
+            self._identify_cache[(parser, file_object.md5)] = False
 
             # Log to user before reraising.
             if isinstance(parser, Dispatcher):
@@ -261,10 +268,6 @@ class Dispatcher(object):
         parent = dispatcher
         orig_file_object = file_object
         self.add(file_object)
-
-        # Pull knowledge_base from previous dispatcher.
-        if parent:
-            self.knowledge_base = parent.knowledge_base
 
         while self._fifo_buffer:
             file_object = self._fifo_buffer.pop()

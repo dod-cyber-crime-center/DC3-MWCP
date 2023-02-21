@@ -226,6 +226,12 @@ class MarkupWriter(ReportWriter):
 
             self.table(tabular_data, headers=["Field", "Value"])
 
+        # Write any initial external knowledge provided by the user.
+        if report.external_knowledge:
+            self.h2("External Knowledge")
+            tabular_data = sorted(map(list, report.external_knowledge.items()))
+            self.table(tabular_data, headers=["Field", "Value"])
+
         # Consolidate metadata elements by their type.
         metadata_dict = collections.defaultdict(list)
         for element in report.metadata:

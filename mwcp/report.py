@@ -11,6 +11,7 @@ import re
 import warnings
 from copy import deepcopy
 from typing import Union, Iterable, Optional, Type, Tuple, List, Callable, TypeVar
+import weakref
 
 import pandas
 from anytree import RenderTree
@@ -88,11 +89,12 @@ class ReportLogHandler(logging.Handler):
 
     def __init__(self, report: "Report"):
         super().__init__()
-        self._report = report
+        self._report_ref = weakref.ref(report)
 
     def emit(self, record):
-        message = self.format(record)
-        self._report._logs.append(LogRecord(self._report._current_file, record.levelno, message))
+        if report := self._report_ref():
+            message = self.format(record)
+            report._logs.append(LogRecord(report._current_file, record.levelno, message))
 
 
 T = TypeVar("T")
@@ -104,12 +106,14 @@ class Report:
 
     :param input_file: The original input file that started the parsing. (The root file)
     :param parser: The name of the parser used for parsing.
+    :param recursive: Whether to recursively process unidentified files using YARA matching.
+    :param knowledge_base: External information to provide to the parsers. (e.g. encryption keys)
+    :param include_logs: Whether to include error and debug logs in the generated report.
     :param include_file_data: Whether to include file data in the generated report.
         If disabled, only the file path, description, and md5 will be included.
     :param prefix_output_files: Whether to include a prefix of the first 5 characters
         of the md5 on output files. This is to help avoid overwriting multiple
         output files with the same name.
-    :param include_logs: Whether to include error and debug logs in the generated report.
     :param log_level: If including logs, the logging level to be collected.
         (Defaults to currently set effective log level)
     :param log_filter: If including logs, this can be used to pass in a custom filter for the logs.
@@ -122,7 +126,9 @@ class Report:
             self,
             input_file: mwcp.FileObject = None,
             parser: str = None,
+            *,
             recursive: bool = False,
+            knowledge_base: dict = None,
             include_logs: bool = True,
             include_file_data: bool = False,
             prefix_output_files: bool = True,
@@ -145,7 +151,12 @@ class Report:
         self.input_file = input_file
         self.parser = parser
         self.recursive = recursive
+        # Save a copy to prevent polluting the original.
+        self.knowledge_base = dict(knowledge_base or {})
+        # Save a copy as "external_knowledge" for saving into report.
+        self._external_knowledge = dict(self.knowledge_base)
         self.tags = set()
+
         # Holds logs per file. (This is used by the ReportLogHandler)
         self._logs: List[LogRecord] = []
         # Holds metadata per file.
@@ -205,6 +216,11 @@ class Report:
         )
         with open(config.get("FIELDS_PATH"), "rb") as f:
             return json.load(f)
+
+    @property
+    def external_knowledge(self) -> dict:
+        """Provides copy of the initial knowledge_base provided by the user."""
+        return dict(self._external_knowledge)  # copy to prevent parser from modifying.
 
     def get_logs(self, source: Optional[FileObject] = None, errors_only=False) -> List[str]:
         """
@@ -486,6 +502,7 @@ class Report:
             input_file=metadata.File.from_file_object(input_file) if input_file else None,
             parser=(input_file.parser and input_file.parser.name) if source else self.parser,
             recursive=self.recursive,
+            external_knowledge=self.external_knowledge,
             errors=self.get_logs(source, errors_only=True),
             logs=self.get_logs(source),
             metadata=deepcopy(metadata_entries),
@@ -590,9 +607,25 @@ class Report:
         """
         return json.dumps(self.as_dict_legacy(include_filename=include_filename), indent=4)
 
-    def as_stix(self, writer: STIXWriter):
+    def as_stix(self, writer=None, *, fixed_timestamp: str = None) -> str:
         """
-        Updates the reporter with STIX content
+        Returns JSON serialized STIX representation of the report.
+        """
+        if writer:
+            warnings.warn(
+                "Passing writer to .as_stix() is deprecated. Use write_stix() if writing multiple reports.",
+                DeprecationWarning
+            )
+            self.write_stix(writer)
+            return ""
+
+        writer = STIXWriter(fixed_timestamp=fixed_timestamp)
+        self.write_stix(writer)
+        return writer.serialize()
+
+    def write_stix(self, writer: STIXWriter):
+        """
+        Writes STIX representation of report to provided STIXWriter.
         """
         for report_model in self._report_models:
             writer.write(report_model)
@@ -869,6 +902,7 @@ class Report:
         # Remove log handler.
         if self._log_handler:
             logging.root.removeHandler(self._log_handler)
+            self._log_handler = None
 
         self.finalized = True
 

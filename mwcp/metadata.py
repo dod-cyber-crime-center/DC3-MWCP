@@ -17,7 +17,8 @@ import warnings
 import ntpath
 from enum import IntEnum
 import uuid
-from typing import Any, Union, List, Optional, TypeVar, Type, Iterable, Tuple
+import typing
+from typing import Any, Union, List, Optional, TypeVar, Type, Dict
 
 from stix2 import v21 as stix
 
@@ -73,11 +74,15 @@ def _cast(value: Any, type_: Type[T]) -> T:
     if type_ is bytes and isinstance(value, int):
         raise ValueError("Cannot convert int to bytes.")
 
+    if typing.get_origin(type_) is dict:
+        key_type, value_type = typing.get_args(type_)
+        return {_cast(key, key_type): _cast(value, value_type) for key, value in value.items()}
+
     # cattr doesn't handle Unions very nicely, so we'll recursively
     # handle the innards of Union types instead.
     # NOTE: Based on documentation, the cattr devs will eventually provide
     # better support for Unions in the future.
-    if hasattr(type_, "__origin__") and type_.__origin__ is Union:
+    if typing.get_origin(type_) is Union:
         # First see if value is already one of the types.
         if type(value) in type_.__args__:
             return value
@@ -177,6 +182,7 @@ class Element:
     tags: List[str] = attr.ib(init=False, factory=list)
 
     _registry = {}
+    _STIX_NAMESPACE = uuid.UUID("27b16a6a-0f3e-44e2-af1f-4b1c590278f4")
 
     def __init_subclass__(cls, **kwargs):
         """
@@ -201,10 +207,52 @@ class Element:
         ]
 
     @classmethod
+    def _get_subclass(cls, type_name: str) -> Optional[Type["Element"]]:
+        """
+        Obtains subclass from given type.
+        """
+        try:
+            subclass = cls._registry[type_name]
+            if issubclass(subclass, cls) and subclass != cls:
+                return subclass
+        except KeyError:
+            return
+
+    @classmethod
     def _type(cls):
         """This function is used to determine name identifier for the """
         # By default, type is determined by class name.
         return _camel_to_snake(cls.__name__)
+
+    @classmethod
+    def _structure(cls, value: dict) -> "Element":
+        """
+        cattr hook for structuring Element class.
+        """
+        # Determine class to use based on "type" field.
+        # Then call that class's _structure() function.
+        type_ = value.pop("type", None)
+        if type_ and type_ != cls._type():
+            klass = cls._get_subclass(type_)
+            if not klass:
+                raise ValueError(f"Invalid type name: {type_}")
+            return klass._structure(value)
+
+        # Remove None values from dictionary, since that seems to be causing
+        # cattr (or our autocasting) to convert them to the string "None"
+        # TODO: Remove when github.com/python-attrs/cattrs/issues/53 is solved.
+        value = _strip_null(value)
+
+        # cattrs doesn't support init=False values, so we need to remove tags and
+        # then re-add them.
+        tags = value.pop("tags", [])
+        ret = cattr.structure_attrs_fromdict(value, cls)
+        ret.tags = tags
+        return ret
+
+    def _unstructure(self) -> dict:
+        # Add "type" field to help with serialization.
+        return {"type": self._type(), **cattr.unstructure_attrs_asdict(self)}
 
     @classmethod
     def fields(cls):
@@ -288,12 +336,7 @@ class Element:
 
     @classmethod
     def from_dict(cls, obj: dict) -> "Element":
-        obj = obj.copy()
-        if "type" not in obj:
-            obj["type"] = cls._type()
-        if "tags" not in obj:
-            obj["tags"] = []
-        return cattr.structure(obj, cls)
+        return cattr.structure(obj.copy(), cls)
 
     def as_dict(self, flat=False) -> dict:
         ret = cattr.unstructure(self)
@@ -368,7 +411,7 @@ class Element:
         :param report: mwcp Report used to add metadata.
         """
 
-    def add_tag(self, *tags: Iterable[str]) -> "Element":
+    def add_tag(self, *tags: str) -> "Element":
         """
         Adds a tag for the given metadata.
 
@@ -382,44 +425,15 @@ class Element:
         self.tags = sorted(self.tags)
         return self
 
+# Value may be partially converted
+# github.com/python-attrs/cattrs/issues/78
+cattr.register_structure_hook(
+    Element,
+    lambda value, cls: value if hasattr(value, "__attrs_attrs__") else cls._structure(dict(value))
+)
 
-# Create a hook that uses the "type" field to determine the appropriate class to use for Element.
-def _structure_hook(value: dict, klass):
-    # Value may be partially converted
-    # github.com/python-attrs/cattrs/issues/78
-    if hasattr(value, "__attrs_attrs__"):
-        return value
-
-    value = dict(value)  # create copy
-
-    # Determine class to use based on "type" field.
-    klass = Element._registry[value.pop("type")]
-
-    # Remove None values from dictionary, since that seems to be causing
-    # cattr (or our autocasting) to convert them to the string "None"
-    # TODO: Remove when github.com/python-attrs/cattrs/issues/53 is solved.
-    value = _strip_null(value)
-
-    # cattrs doesn't support init=False values, so we need to remove tags and
-    # then re-add them.
-    tags = value.pop("tags")
-    ret = cattr.structure_attrs_fromdict(value, klass)
-    ret.tags = tags
-    return ret
-
-
-cattr.register_structure_hook(Element, _structure_hook)
-
-
-# Create hook to add a "type" field to help with serialization of Element types.
-def _unstructure_hook(obj):
-    # obj may be None because we don't use Optional in our typing.
-    if obj is None:
-        return obj
-    return {"type": obj._type(), **cattr.unstructure_attrs_asdict(obj)}
-
-
-cattr.register_unstructure_hook(Element, _unstructure_hook)
+# obj may be None because we don't use Optional in our Typing.
+cattr.register_unstructure_hook(Element, lambda obj: None if obj is None else obj._unstructure())
 
 
 class Metadata(Element):
@@ -646,7 +660,7 @@ class Alphabet(Metadata):
         content = f"Alphabet: {self.alphabet}\nAlphabet Base: {self.base}"
 
         if self.tags:
-            content += "\n    Alphabet Tags: " + ", ".join(self.tags)
+            content += f"\n    Alphabet Tags: {', '.join(self.tags)}"
 
         return STIXResult(content)
 
@@ -690,11 +704,10 @@ class Command(Metadata):
 
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
         # Process generally uses a UUIDv4 but we want to deduplicate when the same command is used so we will use a v5
-        namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
-        id = "process--" + str(uuid.uuid5(namespace, f"{self.value}"))
+        identifier = "process--" + str(uuid.uuid5(self._STIX_NAMESPACE, f"{self.value}"))
 
         result = STIXResult(fixed_timestamp=fixed_timestamp)
-        result.add_linked(stix.Process(command_line=self.value, id=id))
+        result.add_linked(stix.Process(command_line=self.value, id=identifier))
         result.create_tag_note(self, result.linked_stix[-1])
         return result
 
@@ -720,10 +733,10 @@ class Credential(Metadata):
         if self.password:
             params["credential"] = self.password
 
-            # the default UUIDv5 generation scheme for user-account does not factor in credentials so it is possible to overwrite the same username with separate creds
+            # the default UUIDv5 generation scheme for user-account does not factor in credentials so it is possible
+            # to overwrite the same username with separate creds
             # since we do not want this with MWCP if a password is present will generate the ID in our own deterministic manner
-            namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
-            params["id"] = "user-account--" + str(uuid.uuid5(namespace, f"{self.username}//{self.password}"))
+            params["id"] = "user-account--" + str(uuid.uuid5(self._STIX_NAMESPACE, f"{self.username}//{self.password}"))
 
         result.add_linked(stix.UserAccount(**params))
         result.create_tag_note(self, result.linked_stix[-1])
@@ -818,7 +831,7 @@ class Socket(Metadata):
         # we define a static namespace explicitly for MWCP network traffic objects to ensure we deduplicate within MWCP
         # in general it is bad practice to deduplicate Network Traffic but as this is static analysis we want
         # to find correlation in a live environment this would be highly discouraged
-        namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
+        namespace = self._STIX_NAMESPACE
 
         result = STIXResult(fixed_timestamp=fixed_timestamp)
         network_values = {
@@ -835,18 +848,18 @@ class Socket(Metadata):
         if self.address:
             address_type = self._guess_address_type(self.address)
             if address_type == "ipv6":
-                network_values["dst_ref"] = stix.IPv6Address(value = self.address)
+                network_values["dst_ref"] = stix.IPv6Address(value=self.address)
                 network_values["protocols"] = ["ipv6"]
             elif address_type == "ipv4":
-                network_values["dst_ref"] = stix.IPv4Address(value = self.address)
+                network_values["dst_ref"] = stix.IPv4Address(value=self.address)
                 network_values["protocols"] = ["ipv4"]
             else:
-                network_values["dst_ref"] = stix.DomainName(value = self.address)
-                # This is ultimately a guess but it is safer to assume a domain maps
-                # to ipv4 than ipv6 and we must pick one
+                network_values["dst_ref"] = stix.DomainName(value=self.address)
+                # This is ultimately a guess, but it is safer to assume a domain maps
+                # to ipv4 than ipv6, and we must pick one
                 network_values["protocols"] = ["ipv4"]
         else:
-            network_values["src_ref"] = stix.IPv4Address(value = "0.0.0.0")
+            network_values["src_ref"] = stix.IPv4Address(value="0.0.0.0")
             network_values["protocols"] = ["ipv4"]
 
         # if a value was provided it should sit after ipv4 or ipv6 respectively
@@ -885,7 +898,7 @@ class Socket(Metadata):
         parts = address.split(".")
         if len(parts) == 4:
             if parts[3].isnumeric():
-                if int(parts[3]) >= 0 and int(parts[3]) < 256:
+                if 0 <= int(parts[3]) < 256:
                     return "ipv4"
         
         return "domain"
@@ -1034,23 +1047,36 @@ class URL(Metadata):
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
         result = STIXResult(fixed_timestamp=fixed_timestamp)
 
-        # Some parsers can have a URL without a URL so we skip it in these cases
+        # Some parsers can have a URL without a URL, so we skip it in these cases
         if self.url is None:
             warnings.warn("Skipped creation of STIX URL since the parser provided no URL")
             return result
 
-        result.add_linked(stix.URL(value = self.url))
+        result.add_linked(stix.URL(value=self.url))
         result.create_tag_note(self, result.linked_stix[-1])
 
         if self.socket:
             result.merge(self.socket.as_stix(base_object))
-            result.add_unlinked(stix.Relationship(relationship_type="used", source_ref=result.linked_stix[-1].id, target_ref=result.linked_stix[0].id, created=fixed_timestamp, modified=fixed_timestamp))
+            result.add_unlinked(stix.Relationship(
+                relationship_type="used",
+                source_ref=result.linked_stix[-1].id,
+                target_ref=result.linked_stix[0].id,
+                created=fixed_timestamp,
+                modified=fixed_timestamp
+            ))
 
         if self.credential:
             result.merge(self.credential.as_stix(base_object))
-            result.add_unlinked(stix.Relationship(relationship_type="contained", source_ref=result.linked_stix[0].id, target_ref=result.linked_stix[-1].id, created=fixed_timestamp, modified=fixed_timestamp))
+            result.add_unlinked(stix.Relationship(
+                relationship_type="contained",
+                source_ref=result.linked_stix[0].id,
+                target_ref=result.linked_stix[-1].id,
+                created=fixed_timestamp,
+                modified=fixed_timestamp
+            ))
 
         return result
+
 
 def C2URL(
         url: str = None,
@@ -1185,6 +1211,7 @@ class EmailAddress(Metadata):
         result.create_tag_note(self, result.linked_stix[-1])
         return result
 
+
 @attr.s(**config)
 class Event(Metadata):
     """
@@ -1199,7 +1226,7 @@ class Event(Metadata):
         content = f"Event Name: {self.value}"
 
         if self.tags:
-            content += "\n    Event Name Tags: " + ", ".join(self.tags)
+            content += f"\n    Event Name Tags: {', '.join(self.tags)}"
         
         return STIXResult(content)
 
@@ -1264,6 +1291,7 @@ class UUIDLegacy(Metadata):
         result.create_tag_note(self, result.linked_stix[-1])
         return result
 
+
 @attr.s(**config)
 class InjectionProcess(Metadata):
     """
@@ -1280,10 +1308,9 @@ class InjectionProcess(Metadata):
         content = f"Injects Into: {self.value}"
 
         if self.tags:
-            content += "\n    Injects Into Tags: " + ", ".join(self.tags)
+            content += f"\n    Injects Into Tags: {', '.join(self.tags)}"
 
         return STIXResult(content)
-        
 
 
 @attr.s(**config)
@@ -1301,10 +1328,9 @@ class Interval(Metadata):
         content = f"Interval: {self.value}"
 
         if self.tags:
-            content += "\n    Interval Tags: " + ", ".join(self.tags)
+            content += f"\n    Interval Tags: {', '.join(self.tags)}"
         
         return STIXResult(content)
-
 
 
 @attr.s(**config)
@@ -1322,7 +1348,7 @@ class IntervalLegacy(Metadata):
         content = f"Interval: {self.value}"
 
         if self.tags:
-            content += "\n    Interval Tags: " + ", ".join(self.tags)
+            content += f"\n    Interval Tags: {', '.join(self.tags)}"
         
         return STIXResult(content)
 
@@ -1452,7 +1478,7 @@ class EncryptionKey(Metadata):
         }
 
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
-        params = { "key_hex": self.key.hex() }
+        params = {"key_hex": self.key.hex()}
 
         if self.algorithm:
             params["algorithm"] = self.algorithm
@@ -1498,7 +1524,7 @@ class DecodedString(Metadata):
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
         result = STIXResult(fixed_timestamp=fixed_timestamp)
 
-        # sometimes empty strings come up so we should just discard these
+        # sometimes empty strings come up, so we should just discard these
         if not self.value:
             return result
 
@@ -1509,7 +1535,14 @@ class DecodedString(Metadata):
         if self.encryption_key:
             sub = self.encryption_key.as_stix(base_object)
             result.merge(sub)
-            result.add_unlinked(stix.Relationship(relationship_type="outputs", source_ref=sub.linked_stix[0].id, target_ref=cur.id, allow_custom=True, created=fixed_timestamp, modified=fixed_timestamp))
+            result.add_unlinked(stix.Relationship(
+                relationship_type="outputs",
+                source_ref=sub.linked_stix[0].id,
+                target_ref=cur.id,
+                allow_custom=True,
+                created=fixed_timestamp,
+                modified=fixed_timestamp
+            ))
             
         return result
         
@@ -1583,6 +1616,16 @@ class Other(Metadata):
         else:
             raise ValidationError(f"Got unexpected data: {self.value}")
 
+    @classmethod
+    def _structure(cls, value_dict: dict) -> Element:
+        # Pull value_format to know how to decode value.
+        value_format = value_dict.pop("value_format")
+        value = value_dict["value"]
+        if value_format == "bytes" and not isinstance(value, bytes):
+            value = base64.b64decode(value)
+        value_dict["value"] = value
+        return super()._structure(value_dict)
+
     def as_formatted_dict(self, flat=False) -> dict:
         ret = super().as_formatted_dict()
         # Don't show value_format.
@@ -1595,7 +1638,7 @@ class Other(Metadata):
             content = f"{self.key}: {self.value}"
 
             if self.tags:
-                content += f"\n    {self.key} Tags: " + ", ".join(self.tags)
+                content += f"\n    {self.key} Tags: {', '.join(self.tags)}"
 
             result = STIXResult(content)
         else:
@@ -1785,18 +1828,17 @@ class Registry2(Metadata):
         if self.value:
             value["data"] = self.value
         
-        # this will be read as a string with the class name included so we need to strip out the class time
         if self.data_type:
-            value["data_type"] = str(self.data_type).split(".")[-1]
+            value["data_type"] = self.data_type.name
 
         if value:
             properties["values"] = [value]
 
-        
         result.add_linked(stix.WindowsRegistryKey(**properties))
         result.create_tag_note(self, result.linked_stix[-1])
 
         return result
+
 
 def Registry(path: str = None, key: str = None, value: str = None, data: Union[bytes, str, int] = None) -> Registry2:
     """
@@ -2030,8 +2072,9 @@ class RSAPrivateKey(Metadata):
 
         # x509 specifies hashes and serial for deterministic IDs in most cases, but we will never have that
         # As such we are using our own namespace to generate a deterministic ID instead of forcing it to be a UUIDv4
-        # We only use the properties for the public key to make this ID so that we can avoid duplicating the public + private key data when both are present
-        namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
+        # We only use the properties for the public key to make this ID so that we can avoid duplicating the
+        # public + private key data when both are present
+        namespace = self._STIX_NAMESPACE
         params = {
             "id": "x509-certificate--" + str(uuid.uuid5(namespace, f"{self.public_exponent}//{self.modulus}"))
         }
@@ -2042,7 +2085,9 @@ class RSAPrivateKey(Metadata):
         if self.modulus:
             params["subject_public_key_modulus"] = str(self.modulus)
 
-        extensions = stix_extensions.rsa_private_key_extension(self.private_exponent, self.p, self.q, self.d_mod_p1, self.d_mod_q1, self.q_inv_mod_p)
+        extensions = stix_extensions.rsa_private_key_extension(
+            self.private_exponent, self.p, self.q, self.d_mod_p1, self.d_mod_q1, self.q_inv_mod_p
+        )
 
         if extensions:
             params["extensions"] = extensions
@@ -2051,6 +2096,7 @@ class RSAPrivateKey(Metadata):
         result.create_tag_note(self, result.linked_stix[-1])
 
         return result        
+
 
 @attr.s(**config)
 class RSAPublicKey(Metadata):
@@ -2157,7 +2203,7 @@ class RSAPublicKey(Metadata):
 
         # x509 specifies hashes and serial for deterministic IDs in most cases, but we will never have that
         # As such we are using our own namespace to generate a deterministic ID instead of forcing it to be a UUIDv4
-        namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
+        namespace = self._STIX_NAMESPACE
         params = {
             "id": "x509-certificate--" + str(uuid.uuid5(namespace, f"{self.public_exponent}//{self.modulus}"))
         }
@@ -2172,6 +2218,7 @@ class RSAPublicKey(Metadata):
         result.create_tag_note(self, result.linked_stix[-1])
 
         return result
+
 
 @attr.s(**config)
 class Service(Metadata):
@@ -2213,11 +2260,13 @@ class Service(Metadata):
 
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
         # Process generally uses a UUIDv4 but we want to deduplicate when the same command is used so we will use a v5
-        namespace = uuid.UUID('27b16a6a-0f3e-44e2-af1f-4b1c590278f4')
+        namespace = self._STIX_NAMESPACE
         
         result = STIXResult(fixed_timestamp=fixed_timestamp)
         params = {
-            "id": "process--" + str(uuid.uuid5(namespace, f"{self.image}/{self.name}/{self.display_name}/{self.description}/{self.image}/{self.dll}"))
+            "id": "process--" + str(uuid.uuid5(
+                namespace, f"{self.image}/{self.name}/{self.display_name}/{self.description}/{self.image}/{self.dll}"
+            ))
         }
         extension = {}
 
@@ -2237,20 +2286,19 @@ class Service(Metadata):
             dir_path = str(pathlib.Path(self.dll).parent)
 
             if dir_path:
-                result.add_unlinked(stix.Directory(path = dir_path))
-                result.add_unlinked(stix.File(name = self.image, parent_directory_ref = result.unlinked_stix[-1].id))
+                result.add_unlinked(stix.Directory(path=dir_path))
+                result.add_unlinked(stix.File(name=self.image, parent_directory_ref=result.unlinked_stix[-1].id))
                 params["image_ref"] = result.unlinked_stix[-1].id
 
         if extension:
             params["extensions"] = {"windows-service-ext": extension}
 
-        
         result.add_linked(stix.Process(**params))
         result.create_tag_note(self, result.linked_stix[-1])
 
         return result
 
-# TODO: legacy helpers
+
 def ServiceName(name: str) -> Service:
     warnings.warn(
         "This is a temporary helper that may be removed in a future version. "
@@ -2313,7 +2361,7 @@ class SSLCertSHA1(Metadata):
 
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
         result = STIXResult(fixed_timestamp=fixed_timestamp)
-        result.add_linked(stix.x509Certificate(hashes={"SHA-1": self.value}))
+        result.add_linked(stix.X509Certificate(hashes={"SHA-1": self.value}))
         result.create_tag_note(self, result.linked_stix[-1])
         return result
 
@@ -2335,7 +2383,6 @@ class UserAgent(Metadata):
         return result
 
 
-
 @attr.s(**config)
 class Version(Metadata):
     """
@@ -2352,7 +2399,7 @@ class Version(Metadata):
         content = f"Version: {self.value}"
 
         if self.tags:
-            content += "\n    Version: " + ", ".join(self.tags)
+            content += f"\n    Version: {', '.join(self.tags)}"
         
         return STIXResult(content)
 
@@ -2492,6 +2539,8 @@ class Report(Element):
     :var mwcp_version: The version of MWCP used.
     :var input_file: The initial file processed.
     :var parser: The initial parser used to process the file.
+    :var recursive: Whether parser recursively handled unidentified files using YARA matching.
+    :var external_knowledge: External information provided by the user to assist the parser.
     :var errors: List of error messages that have occurred.
     :var logs: List of all log messages that have occurred.
     :var metadata: List of extracted metadata elements.
@@ -2500,6 +2549,13 @@ class Report(Element):
     input_file: File = None
     parser: str = None
     recursive: bool = False
+    external_knowledge: Dict[str, Union[int, bool, str]] = attr.ib(
+        factory=dict,
+        metadata={"jsonschema": {
+            "type": "object",
+            "additionalProperties": {"type": ["integer", "boolean", "string"]},
+        }}
+    )
     errors: List[str] = attr.ib(factory=list)
     logs: List[str] = attr.ib(factory=list)
     metadata: List[Metadata] = attr.ib(factory=list)

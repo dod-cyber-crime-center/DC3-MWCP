@@ -6,6 +6,7 @@ import contextlib
 import logging
 import pathlib
 import re
+import weakref
 from typing import TYPE_CHECKING, Union, Type, Tuple, Iterable
 
 import yara
@@ -105,7 +106,7 @@ class Runner:
         # We also have to include the report in the input_file incase the parser tries to dereference
         # reporter.
         # TODO: Remove this on a major release.
-        input_file._report = report
+        input_file._report_ref = weakref.ref(report)
 
         with report, OutputLogger():
             try:
@@ -257,7 +258,7 @@ class YaraRunner(Runner):
         # We also have to include the report in the input_file incase the parser tries to dereference
         # reporter.
         # TODO: Remove this on a major release.
-        input_file._report = report
+        input_file._report_ref = weakref.ref(report)
 
         with report, OutputLogger():
             try:

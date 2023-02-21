@@ -1,7 +1,7 @@
 {
     "type": "report",
     "tags": [],
-    "mwcp_version": "3.3.3",
+    "mwcp_version": "3.10.1",
     "input_file": {
         "type": "file",
         "tags": [],
@@ -13,9 +13,14 @@
         "architecture": null,
         "compile_time": null,
         "file_path": null,
-        "data": null
+        "data": null,
+        "derivation": null
     },
     "parser": "dc3:foo",
+    "recursive": false,
+    "external_knowledge": {
+        "secret": "hello"
+    },
     "errors": [],
     "logs": [
         "[+] File f144899b86766688991c5d0d10902f4a.bin identified as Foo.",
@@ -25,6 +30,13 @@
         "[+] operating on inputfile f144899b86766688991c5d0d10902f4a.bin"
     ],
     "metadata": [
+        {
+            "type": "other",
+            "tags": [],
+            "key": "secret_using_external_knowledge",
+            "value": "hello!",
+            "value_format": "string"
+        },
         {
             "type": "url",
             "tags": [],
@@ -63,7 +75,8 @@
             "architecture": null,
             "compile_time": null,
             "file_path": null,
-            "data": null
+            "data": null,
+            "derivation": "extracted and decompressed"
         }
     ]
 }

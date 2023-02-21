@@ -10,6 +10,8 @@ import logging
 import os
 import pathlib
 import shutil
+import weakref
+
 import sys
 import tempfile
 import warnings
@@ -118,7 +120,7 @@ class FileObject(object):
         self._use_arch = use_arch
         self._ext = ext
         self._def_stub = def_stub
-        self._report = reporter  # DEPRECATED
+        self._report_ref = weakref.ref(reporter) if reporter else None  # DEPRECATED
         self.description = description
         self.derivation = derivation
         self.knowledge_base = {}
@@ -197,6 +199,7 @@ class FileObject(object):
         """
         for file_object in cls._instances:
             file_object._clear_temp_path_ctx()
+            file_object._report_ref = None
         cls._instances = []
 
     def add_tag(self, *tags: Iterable[str]) -> FileObject:
@@ -216,7 +219,7 @@ class FileObject(object):
             "FileObject.reporter has been deprecated and should not be accessed from FileObject.",
             DeprecationWarning
         )
-        return self._report
+        return self._report_ref and self._report_ref()
 
     @property
     def siblings(self) -> List[FileObject]:
@@ -477,7 +480,7 @@ class FileObject(object):
             DeprecationWarning
         )
         if self.output_file:
-            self._report.add(metadata.File.from_file_object(self))
+            self.reporter.add(metadata.File.from_file_object(self))
 
     @contextlib.contextmanager
     def disassembly(self, disassembler: str = None, report: Report = None, **config) -> ContextManager["dragodis.Disassembler"]:

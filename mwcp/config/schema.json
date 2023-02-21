@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$id": "https://raw.githubusercontent.com/Defense-Cyber-Crime-Center/DC3-MWCP/3.10.0/mwcp/config/schema.json",
+    "$id": "https://raw.githubusercontent.com/Defense-Cyber-Crime-Center/DC3-MWCP/3.10.1/mwcp/config/schema.json",
     "title": "Report",
     "description": "Defines the report of all metadata elements.",
     "type": "object",
@@ -123,6 +123,16 @@
         },
         "recursive": {
             "type": "boolean"
+        },
+        "external_knowledge": {
+            "type": "object",
+            "additionalProperties": {
+                "type": [
+                    "integer",
+                    "boolean",
+                    "string"
+                ]
+            }
         },
         "errors": {
             "type": "array",
@@ -1388,6 +1398,7 @@
         "tags",
         "mwcp_version",
         "recursive",
+        "external_knowledge",
         "errors",
         "logs",
         "metadata"

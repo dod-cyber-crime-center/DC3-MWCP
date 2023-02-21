@@ -93,6 +93,7 @@ def _get_expected_results(legacy: bool):
             },
             "parser": "foo",
             "recursive": True,
+            "external_knowledge": {},
             "metadata": [
                 {
                     'application_protocol': 'http',
@@ -230,8 +231,8 @@ def test_external_strings_report(datadir, client, make_test_buffer):
 
     options = {
         "data": (make_test_buffer(), "test.file"),
-        "external_strings": "True",
-        "legacy": "False",
+        "external_strings": True,
+        "legacy": False,
     }
     rv = client.post("/run_parser/DecodedStringTestParser.Implant", data=options)
     results = rv.json
@@ -286,13 +287,12 @@ def test_highlight_results(client, make_test_buffer, legacy):
 
     options = {
         "parser": "foo",
-        "highlight": "True",
+        "highlight": True,
         "output": "text",
         "data": (make_test_buffer(), "test.file"),
-        "include_logs": "False",
+        "include_logs": False,
+        "legacy": legacy,
     }
-    if not legacy:
-        options["legacy"] = "False"
     rv = client.post("/run_parser", data=options)
 
     assert rv.status_code == 200
@@ -301,6 +301,17 @@ def test_highlight_results(client, make_test_buffer, legacy):
     expected_results = _get_expected_results(legacy)
     plain_text_html = pygments.highlight(expected_results['output_text'], TextLexer(), fmt).encode()
     assert plain_text_html in rv.data
+
+
+def test_params(client, make_test_buffer):
+    rv = client.post("/run_parser", data={
+        "parser": "foo",
+        "param": ["key:secret", "hello:4"],
+        "data": (make_test_buffer(), "test.file"),
+        "legacy": False,
+    })
+    assert rv.status_code == 200
+    assert rv.json["external_knowledge"] == {"key": "secret", "hello": 4}
 
 
 @pytest.mark.parametrize("legacy", [True, False])
@@ -315,10 +326,9 @@ def test_zip_download(client, make_test_buffer, legacy):
         "parser": "foo",
         "output": "zip",
         "data": (make_test_buffer(), "test.file"),
-        "include_logs": "False",
+        "include_logs": False,
+        "legacy": legacy,
     }
-    if not legacy:
-        options["legacy"] = "False"
     rv = client.post("/run_parser", data=options)
 
     assert (

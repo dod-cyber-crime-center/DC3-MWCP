@@ -19,6 +19,7 @@
         },
         "parser": "foo",
         "recursive": true,
+        "external_knowledge": {},
         "errors": [],
         "logs": [
             "[+] File test.txt identified as Foo.",

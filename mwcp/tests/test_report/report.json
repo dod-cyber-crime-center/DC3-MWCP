@@ -21,6 +21,7 @@
     },
     "parser": "FooParser",
     "recursive": false,
+    "external_knowledge": {},
     "errors": [
         "[!] Test error log"
     ],
