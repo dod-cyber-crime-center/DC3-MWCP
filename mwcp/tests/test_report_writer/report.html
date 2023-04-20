@@ -41,13 +41,15 @@
 <h2>Credential</h2>
 <table>
 <thead>
-<tr><th>Username  </th><th>Password  </th></tr>
+<tr><th>Username  </th><th>Password           </th></tr>
 </thead>
 <tbody>
-<tr><td>admin     </td><td>123456    </td></tr>
-<tr><td>mruser    </td><td>          </td></tr>
-<tr><td>          </td><td>secrets   </td></tr>
-<tr><td>admin     </td><td>pass      </td></tr>
+<tr><td>admin     </td><td>123456             </td></tr>
+<tr><td>mruser    </td><td>                   </td></tr>
+<tr><td>          </td><td>secrets            </td></tr>
+<tr><td>You       </td><td>Tube               </td></tr>
+<tr><td>Malware   </td><td>ConfigurationParser</td></tr>
+<tr><td>admin     </td><td>pass               </td></tr>
 </tbody>
 </table>
 
@@ -144,6 +146,23 @@
 </tbody>
 </table>
 
+<h2>Network</h2>
+<table>
+<thead>
+<tr><th>Tags  </th><th>Url                                         </th><th>Path             </th><th>Query         </th><th>Protocol  </th><th style="text-align: right;">  Port</th><th>Username  </th><th>Password           </th><th>Address                 </th><th>Network Protocol  </th></tr>
+</thead>
+<tbody>
+<tr><td>      </td><td>https://www.youtube.com/watch?v=dQw4w9WgXcQ </td><td>/watch           </td><td>?v=dQw4w9WgXcQ</td><td>https     </td><td style="text-align: right;">  8080</td><td>You       </td><td>Tube               </td><td>                        </td><td>                  </td></tr>
+<tr><td>      </td><td>https://www.github.com                      </td><td>                 </td><td>              </td><td>https     </td><td style="text-align: right;">      </td><td>Malware   </td><td>ConfigurationParser</td><td>www.github.com          </td><td>                  </td></tr>
+<tr><td>      </td><td>https://www.gitlab.com                      </td><td>                 </td><td>              </td><td>https     </td><td style="text-align: right;">  8080</td><td>          </td><td>                   </td><td>1.2.3.4                 </td><td>udp               </td></tr>
+<tr><td>      </td><td>url.url.url                                 </td><td>                 </td><td>              </td><td>          </td><td style="text-align: right;">      </td><td>          </td><td>                   </td><td>url.url.url             </td><td>                  </td></tr>
+<tr><td>      </td><td>https://10.11.10.13:443/images/baner.jpg    </td><td>/images/baner.jpg</td><td>              </td><td>https     </td><td style="text-align: right;">   443</td><td>          </td><td>                   </td><td>10.11.10.13             </td><td>                  </td></tr>
+<tr><td>c2    </td><td>http://[fe80::20c:1234:5678:9abc]:80/badness</td><td>/badness         </td><td>              </td><td>http      </td><td style="text-align: right;">    80</td><td>          </td><td>                   </td><td>fe80::20c:1234:5678:9abc</td><td>                  </td></tr>
+<tr><td>proxy </td><td>                                            </td><td>                 </td><td>              </td><td>          </td><td style="text-align: right;">    80</td><td>admin     </td><td>pass               </td><td>192.168.1.1             </td><td>tcp               </td></tr>
+<tr><td>      </td><td>ftp://badhost.com:21                        </td><td>                 </td><td>              </td><td>ftp       </td><td style="text-align: right;">    21</td><td>admin     </td><td>pass               </td><td>badhost.com             </td><td>                  </td></tr>
+</tbody>
+</table>
+
 <h2>Path</h2>
 <table>
 <thead>
@@ -233,27 +252,41 @@ Public Exponent (e):
 <h2>Socket</h2>
 <table>
 <thead>
-<tr><th>Address    </th><th style="text-align: right;">  Port</th><th>Network Protocol  </th><th>Listen  </th></tr>
+<tr><th>Tags  </th><th>Address                 </th><th style="text-align: right;">  Port</th><th>Network Protocol  </th><th>Listen  </th></tr>
 </thead>
 <tbody>
-<tr><td>bad.com    </td><td style="text-align: right;">    21</td><td>tcp               </td><td>        </td></tr>
-<tr><td>           </td><td style="text-align: right;">  1635</td><td>udp               </td><td>        </td></tr>
-<tr><td>           </td><td style="text-align: right;">  4568</td><td>tcp               </td><td>True    </td></tr>
-<tr><td>10.11.10.13</td><td style="text-align: right;">   443</td><td>                  </td><td>        </td></tr>
-<tr><td>192.168.1.1</td><td style="text-align: right;">    80</td><td>tcp               </td><td>        </td></tr>
-<tr><td>badhost.com</td><td style="text-align: right;">    21</td><td>                  </td><td>        </td></tr>
+<tr><td>      </td><td>bad.com                 </td><td style="text-align: right;">    21</td><td>tcp               </td><td>        </td></tr>
+<tr><td>c2    </td><td>website.com             </td><td style="text-align: right;">   123</td><td>                  </td><td>        </td></tr>
+<tr><td>      </td><td>                        </td><td style="text-align: right;">  1635</td><td>udp               </td><td>        </td></tr>
+<tr><td>      </td><td>                        </td><td style="text-align: right;">  4568</td><td>tcp               </td><td>True    </td></tr>
+<tr><td>      </td><td>                        </td><td style="text-align: right;">  8080</td><td>                  </td><td>        </td></tr>
+<tr><td>      </td><td>www.github.com          </td><td style="text-align: right;">      </td><td>                  </td><td>        </td></tr>
+<tr><td>      </td><td>1.2.3.4                 </td><td style="text-align: right;">  8080</td><td>udp               </td><td>        </td></tr>
+<tr><td>      </td><td>url.url.url             </td><td style="text-align: right;">      </td><td>                  </td><td>        </td></tr>
+<tr><td>      </td><td>10.11.10.13             </td><td style="text-align: right;">   443</td><td>                  </td><td>        </td></tr>
+<tr><td>c2    </td><td>fe80::20c:1234:5678:9abc</td><td style="text-align: right;">    80</td><td>                  </td><td>        </td></tr>
+<tr><td>proxy </td><td>192.168.1.1             </td><td style="text-align: right;">    80</td><td>tcp               </td><td>        </td></tr>
+<tr><td>proxy </td><td>12.34.56.78             </td><td style="text-align: right;">    90</td><td>tcp               </td><td>        </td></tr>
+<tr><td>proxy </td><td>255.255.255.255         </td><td style="text-align: right;">      </td><td>                  </td><td>        </td></tr>
+<tr><td>      </td><td>badhost.com             </td><td style="text-align: right;">    21</td><td>                  </td><td>        </td></tr>
 </tbody>
 </table>
 
 <h2>URL</h2>
 <table>
 <thead>
-<tr><th>Tags  </th><th>Url                                     </th><th>Address    </th><th style="text-align: right;">  Port</th><th>Path             </th><th>Application Protocol  </th><th>Network Protocol  </th><th>Username  </th><th>Password  </th></tr>
+<tr><th>Tags  </th><th>Url                                         </th><th>Path             </th><th>Query          </th><th>Protocol  </th></tr>
 </thead>
 <tbody>
-<tr><td>      </td><td>https://10.11.10.13:443/images/baner.jpg</td><td>10.11.10.13</td><td style="text-align: right;">   443</td><td>/images/baner.jpg</td><td>https                 </td><td>                  </td><td>          </td><td>          </td></tr>
-<tr><td>proxy </td><td>                                        </td><td>192.168.1.1</td><td style="text-align: right;">    80</td><td>                 </td><td>                      </td><td>tcp               </td><td>admin     </td><td>pass      </td></tr>
-<tr><td>      </td><td>ftp://badhost.com:21                    </td><td>badhost.com</td><td style="text-align: right;">    21</td><td>                 </td><td>ftp                   </td><td>                  </td><td>admin     </td><td>pass      </td></tr>
+<tr><td>      </td><td>https://www.youtube.com/watch?v=dQw4w9WgXcQ </td><td>/watch           </td><td>?v=dQw4w9WgXcQ </td><td>https     </td></tr>
+<tr><td>      </td><td>https://www.github.com                      </td><td>                 </td><td>               </td><td>https     </td></tr>
+<tr><td>      </td><td>https://www.gitlab.com                      </td><td>                 </td><td>               </td><td>https     </td></tr>
+<tr><td>      </td><td>url.url.url                                 </td><td>                 </td><td>               </td><td>          </td></tr>
+<tr><td>      </td><td>https://10.11.10.13:443/images/baner.jpg    </td><td>/images/baner.jpg</td><td>               </td><td>https     </td></tr>
+<tr><td>c2    </td><td>http://[fe80::20c:1234:5678:9abc]:80/badness</td><td>/badness         </td><td>               </td><td>http      </td></tr>
+<tr><td>      </td><td>                                            </td><td>url/path.jpg     </td><td>               </td><td>          </td></tr>
+<tr><td>      </td><td>                                            </td><td>                 </td><td>query?answer=42</td><td>          </td></tr>
+<tr><td>      </td><td>ftp://badhost.com:21                        </td><td>                 </td><td>               </td><td>ftp       </td></tr>
 </tbody>
 </table>
 

@@ -1,6 +1,20 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Updated schema:
+  - `URL2` and `Socket2` objects replace `URL` and `Socket` objects.
+  - New `Network` object contains `URL2`, `Socket2` and `Credential`.
+  - `URL2` objects no longer contain `socket` or `credential` fields. This behavior is deprecated and is meant for the `Network` object.
+  - `Socket2` objects no longer contain a `c2` field. Instead, `c2` must be added as a tag to the `Socket2` or `URL2`. `C2SocketAddress`, `C2Address`, and `C2URL` automatically add the `c2` tag to the relevant `Socket2` or `URL2`.
+- Improved STIX output for modified objects.
+
+#### Fixed
+- Fixed issue with web server not providing a proper json response when STIX output is enabled.
+- Fixed report display when a nested element contains a tag.
+
 
 ## [3.11.0] - 2023-02-21
 

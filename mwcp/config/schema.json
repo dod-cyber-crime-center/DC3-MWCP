@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$id": "https://raw.githubusercontent.com/dod-cyber-crime-center/DC3-MWCP/3.11.0/mwcp/config/schema.json",
+    "$id": "https://raw.githubusercontent.com/dod-cyber-crime-center/DC3-MWCP/3.12.0/mwcp/config/schema.json",
     "title": "Report",
     "description": "Defines the report of all metadata elements.",
     "type": "object",
@@ -666,6 +666,185 @@
                         ]
                     },
                     {
+                        "title": "Network",
+                        "description": "A collection of URL, Socket and Credential to relate them together",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "network"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "url": {
+                                "anyOf": [
+                                    {
+                                        "title": "URL",
+                                        "description": "RFC 3986 URL",
+                                        "type": "object",
+                                        "properties": {
+                                            "type": {
+                                                "const": "url"
+                                            },
+                                            "tags": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "url": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "path": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "query": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "protocol": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "required": [
+                                            "type",
+                                            "tags"
+                                        ]
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "socket": {
+                                "anyOf": [
+                                    {
+                                        "title": "Socket",
+                                        "description": "A collection of address, port, and protocol used together to make a socket connection.",
+                                        "type": "object",
+                                        "properties": {
+                                            "type": {
+                                                "const": "socket"
+                                            },
+                                            "tags": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "address": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "port": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "integer",
+                                                        "minimum": 0,
+                                                        "maximum": 65535
+                                                    },
+                                                    {
+                                                        "type": "null"
+                                                    }
+                                                ]
+                                            },
+                                            "network_protocol": {
+                                                "anyOf": [
+                                                    {
+                                                        "enum": [
+                                                            "icmp",
+                                                            "tcp",
+                                                            "udp"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "type": "null"
+                                                    }
+                                                ]
+                                            },
+                                            "listen": {
+                                                "type": [
+                                                    "boolean",
+                                                    "null"
+                                                ]
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "required": [
+                                            "type",
+                                            "tags"
+                                        ]
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "credential": {
+                                "anyOf": [
+                                    {
+                                        "title": "Credential",
+                                        "description": "Collection of username and password used as credentials.",
+                                        "type": "object",
+                                        "properties": {
+                                            "type": {
+                                                "const": "credential"
+                                            },
+                                            "tags": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "username": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "password": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "required": [
+                                            "type",
+                                            "tags"
+                                        ]
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
                         "title": "Other",
                         "description": "All other items that don't fit within the existing declared schema. Value type is determined by the \"value_format\" property.",
                         "type": "object",
@@ -1081,12 +1260,6 @@
                                     }
                                 ]
                             },
-                            "c2": {
-                                "type": [
-                                    "boolean",
-                                    "null"
-                                ]
-                            },
                             "listen": {
                                 "type": [
                                     "boolean",
@@ -1146,78 +1319,6 @@
                                     "null"
                                 ]
                             },
-                            "socket": {
-                                "anyOf": [
-                                    {
-                                        "title": "Socket",
-                                        "description": "A collection of address, port, and protocol used together to make a socket connection.",
-                                        "type": "object",
-                                        "properties": {
-                                            "type": {
-                                                "const": "socket"
-                                            },
-                                            "tags": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "address": {
-                                                "type": [
-                                                    "string",
-                                                    "null"
-                                                ]
-                                            },
-                                            "port": {
-                                                "anyOf": [
-                                                    {
-                                                        "type": "integer",
-                                                        "minimum": 0,
-                                                        "maximum": 65535
-                                                    },
-                                                    {
-                                                        "type": "null"
-                                                    }
-                                                ]
-                                            },
-                                            "network_protocol": {
-                                                "anyOf": [
-                                                    {
-                                                        "enum": [
-                                                            "icmp",
-                                                            "tcp",
-                                                            "udp"
-                                                        ]
-                                                    },
-                                                    {
-                                                        "type": "null"
-                                                    }
-                                                ]
-                                            },
-                                            "c2": {
-                                                "type": [
-                                                    "boolean",
-                                                    "null"
-                                                ]
-                                            },
-                                            "listen": {
-                                                "type": [
-                                                    "boolean",
-                                                    "null"
-                                                ]
-                                            }
-                                        },
-                                        "additionalProperties": false,
-                                        "required": [
-                                            "type",
-                                            "tags"
-                                        ]
-                                    },
-                                    {
-                                        "type": "null"
-                                    }
-                                ]
-                            },
                             "path": {
                                 "type": [
                                     "string",
@@ -1230,50 +1331,10 @@
                                     "null"
                                 ]
                             },
-                            "application_protocol": {
+                            "protocol": {
                                 "type": [
                                     "string",
                                     "null"
-                                ]
-                            },
-                            "credential": {
-                                "anyOf": [
-                                    {
-                                        "title": "Credential",
-                                        "description": "Collection of username and password used as credentials.",
-                                        "type": "object",
-                                        "properties": {
-                                            "type": {
-                                                "const": "credential"
-                                            },
-                                            "tags": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "username": {
-                                                "type": [
-                                                    "string",
-                                                    "null"
-                                                ]
-                                            },
-                                            "password": {
-                                                "type": [
-                                                    "string",
-                                                    "null"
-                                                ]
-                                            }
-                                        },
-                                        "additionalProperties": false,
-                                        "required": [
-                                            "type",
-                                            "tags"
-                                        ]
-                                    },
-                                    {
-                                        "type": "null"
-                                    }
                                 ]
                             }
                         },

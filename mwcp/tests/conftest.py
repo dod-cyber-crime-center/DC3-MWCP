@@ -174,15 +174,41 @@ def metadata_items() -> List[Metadata]:
         metadata.Password("secrets"),
         metadata.CryptoAddress("14qViLJfdGaP4EeHnDyJbEGQysnCpwk3gd", "BTC"),
         metadata.Socket(address="bad.com", port=21, network_protocol="tcp"),
+        metadata.C2SocketAddress(address="website.com", port=123),
         metadata.Port(1635, protocol="udp"),
         metadata.ListenPort(4568, protocol="tcp"),
+        metadata.Network(
+            url=metadata.URL2(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+            socket=metadata.Socket(port=8080),
+            credential=metadata.Credential(username="You", password="Tube")
+        ),
+        metadata.Network(
+            url=metadata.URL2(url="https://www.github.com"),
+            credential=metadata.Credential(username="Malware", password="ConfigurationParser")
+        ),
+        metadata.Network(
+            url=metadata.URL2(url="https://www.gitlab.com"),
+            socket=metadata.Socket(address="1.2.3.4", port=8080, network_protocol="udp")
+        ),
+        metadata.URL2(url="url.url.url"),
         metadata.URL("https://10.11.10.13:443/images/baner.jpg"),
+        metadata.C2URL(url="http://[fe80::20c:1234:5678:9abc]:80/badness"),
+        metadata.URLPath("url/path.jpg"),
+        metadata.URLQuery("query?answer=42"),
         metadata.Proxy(
             username="admin",
             password="pass",
             address="192.168.1.1",
             port=80,
             protocol="tcp",
+        ),
+        metadata.ProxySocketAddress(
+            address="12.34.56.78",
+            port=90,
+            protocol="tcp"
+        ),
+        metadata.ProxyAddress(
+            address="255.255.255.255"
         ),
         metadata.FTP(
             username="admin",

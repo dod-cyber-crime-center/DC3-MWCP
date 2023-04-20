@@ -335,7 +335,7 @@ def _build_parser_response(parser=None) -> Union[flask.Response, Tuple[flask.Res
         if highlight:
             return json_response(parser_results)
         else:
-            return parser_results
+            return json_response(json.loads(parser_results))
     else:
         parser_results = _format_report(report)
 

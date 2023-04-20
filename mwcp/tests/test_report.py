@@ -114,7 +114,7 @@ def test_deduplication(report):
         report.add(metadata.URL("example.com"))
         report.add(metadata.Socket(address="example.com"))
         report.add(metadata.Socket(address="example.com"))  # equivalent more verbose version.
-        report.add(metadata.Socket(address="example.com", c2=True))
+        report.add(metadata.C2Address(address="example.com"))
 
         # Set new file source to ensure we dedup across sources (if not split)
         res_file = mwcp.FileObject(b"residual data", file_name="res.exe")
@@ -125,6 +125,7 @@ def test_deduplication(report):
     items = report.get()
     assert items == [
         metadata.URL("example.com"),
+        metadata.Network(url=metadata.URL2(url='example.com'), socket=metadata.Socket(address='example.com')),
         metadata.Socket(address="example.com"),
-        metadata.Socket(address="example.com", c2=True),
+        metadata.C2Address(address="example.com"),
     ]

@@ -36,15 +36,20 @@ def _get_expected_results(legacy: bool):
         SHA256        cc4fafa4c90b4e4c08ade61acfa63add6a3fc31aa58d3f217eb199f557512e2a
         Compile Time
 
+        ---- Network ----
+        Url               Protocol    Address
+        ----------------  ----------  ---------
+        http://127.0.0.1  http        127.0.0.1
+
         ---- Socket ----
         Address
         ---------
         127.0.0.1
 
         ---- URL ----
-        Url               Address    Application Protocol
-        ----------------  ---------  ----------------------
-        http://127.0.0.1  127.0.0.1  http
+        Url               Protocol
+        ----------------  ----------
+        http://127.0.0.1  http
 
         ---- Residual Files ----
         Filename           Description          Derivation                  MD5                               Arch    Compile Time
@@ -96,13 +101,16 @@ def _get_expected_results(legacy: bool):
             "external_knowledge": {},
             "metadata": [
                 {
-                    'application_protocol': 'http',
-                    'credential': None,
                     'path': None,
-                    'query': '',
+                    'protocol': 'http',
+                    'query': None,
+                    'tags': [],
+                    'type': 'url',
+                    'url': 'http://127.0.0.1'},
+                {
+                    'credential': None,
                     'socket': {
                         'address': '127.0.0.1',
-                        'c2': None,
                         'listen': None,
                         'network_protocol': None,
                         'port': None,
@@ -110,12 +118,17 @@ def _get_expected_results(legacy: bool):
                         'type': 'socket'
                     },
                     'tags': [],
-                    'type': 'url',
-                    'url': 'http://127.0.0.1'
+                    'type': 'network',
+                    'url': {
+                        'path': None,
+                        'protocol': 'http',
+                        'query': None,
+                        'tags': [],
+                        'type': 'url',
+                        'url': 'http://127.0.0.1'},
                 },
                 {
                     'address': '127.0.0.1',
-                    'c2': None,
                     'listen': None,
                     'network_protocol': None,
                     'port': None,

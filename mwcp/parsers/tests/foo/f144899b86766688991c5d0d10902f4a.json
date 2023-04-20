@@ -1,7 +1,7 @@
 {
     "type": "report",
     "tags": [],
-    "mwcp_version": "3.11.0",
+    "mwcp_version": "3.12.0",
     "input_file": {
         "type": "file",
         "tags": [],
@@ -41,19 +41,30 @@
             "type": "url",
             "tags": [],
             "url": "http://127.0.0.1",
+            "path": null,
+            "query": null,
+            "protocol": "http"
+        },
+        {
+            "credential": null,
             "socket": {
                 "type": "socket",
                 "tags": [],
                 "address": "127.0.0.1",
                 "port": null,
                 "network_protocol": null,
-                "c2": null,
                 "listen": null
             },
-            "path": null,
-            "query": "",
-            "application_protocol": "http",
-            "credential": null
+            "tags": [],
+            "type": "network",
+            "url": {
+                "type": "url",
+                "tags": [],
+                "url": "http://127.0.0.1",
+                "path": null,
+                "query": null,
+                "protocol": "http"
+            }
         },
         {
             "type": "socket",
@@ -61,7 +72,6 @@
             "address": "127.0.0.1",
             "port": null,
             "network_protocol": null,
-            "c2": null,
             "listen": null
         },
         {

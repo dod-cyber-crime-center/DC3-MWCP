@@ -3,15 +3,15 @@ Username    Password
 ----------  ----------
 admin       pass
 
----- Socket ----
-Address        Port  Network Protocol
------------  ------  ------------------
-192.168.1.1      80  tcp
-
----- URL ----
+---- Network ----
 Tags    Address        Port  Network Protocol    Username    Password
 ------  -----------  ------  ------------------  ----------  ----------
 proxy   192.168.1.1      80  tcp                 admin       pass
+
+---- Socket ----
+Tags    Address        Port  Network Protocol
+------  -----------  ------  ------------------
+proxy   192.168.1.1      80  tcp
 
 ---- Miscellaneous ----
 Key    Value

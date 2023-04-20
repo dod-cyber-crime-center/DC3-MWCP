@@ -3,6 +3,8 @@ import json
 import pytest
 from packaging import version
 
+from mwcp.exceptions import ValidationError
+
 try:
     import dragodis
 except ImportError:
@@ -101,7 +103,7 @@ def _fixup_test_cases(expected_results, actual_results):
             if item["type"] == "socket" and item["network_protocol"] == "tcp":
                 item["network_protocol"] = None
 
-            elif item["type"] == "url" and item["socket"] and item["socket"]["network_protocol"] == "tcp":
+            elif item["type"] in ["network", "url"] and item.get("socket") and item["socket"]["network_protocol"] == "tcp":
                 item["socket"]["network_protocol"] = None
 
         # Deduplicate both lists of metadata dictionary items since changing "tcp" to None will likely
@@ -200,6 +202,90 @@ def _fixup_test_cases(expected_results, actual_results):
         )
         expected_results["metadata"] = [item for item in expected_results["metadata"] if not is_supplemental(item)]
         actual_results["metadata"] = [item for item in actual_results["metadata"] if not is_supplemental(item)]
+
+    # Changes to schema in 3.12.0 include adding Network object with URL, Socket and Credential fields,
+    # URL no longer has Socket or Credential fields, changing Socket c2 from being a boolean to a tag,
+    # URL object socket and credential fields will be transferred to Network object
+    if expected_results_version < version.parse("3.12.0"):
+        to_add = []
+        to_remove = []
+
+        # First recreate url objects with the new logic. Ensure residual socket objects get replaced too.
+        for item in expected_results["metadata"]:
+            # URL -> Network
+            if item["type"] == "url":
+                new_socket = None
+                new_credential = None
+                if socket := item["socket"]:
+                    new_socket = mwcp.metadata.Socket(
+                        socket["address"], socket["port"], socket["network_protocol"]
+                    ).add_tag(*socket["tags"])
+                    if socket["c2"]:
+                        new_socket.add_tag("c2")
+                    if "proxy" in item["tags"]:  # Proxy tag was moved from URL to Socket object.
+                        new_socket.add_tag("proxy")
+                    to_remove.append(socket)
+                if credential := item["credential"]:
+                    new_credential = mwcp.metadata.Credential(
+                        credential["username"], credential["password"]
+                    ).add_tag(*credential["tags"])
+                    to_remove.append(credential)
+
+                if any([item["url"], item["path"], item["application_protocol"], item["query"]]):
+                    new_item = mwcp.metadata.URL(
+                        url=item["url"],
+                        socket=new_socket,
+                        path=item["path"],
+                        query=item["query"],
+                        application_protocol=item["application_protocol"],
+                        credential=new_credential
+                    ).add_tag(*item["tags"])
+                    if item["socket"] and item["socket"]["c2"]:  # "c2" tag is included on both URL and Socket object.
+                        new_item.add_tag("c2")
+                    if "proxy" in new_item.tags:  # "proxy" tag moved from URL to Socket object only.
+                        new_item.tags.remove("proxy")
+
+                    # Hack: Allow post_processing to add Network object.
+                    class MockReport(list):
+                        add = list.append
+                    report = MockReport()
+                    new_item.post_processing(report)
+                    for _item in report:
+                        to_add.append(_item.as_json_dict())
+                    to_add.append(new_item.as_json_dict())
+
+                elif new_socket:
+                    # If we had a url that should now just be a socket/credential add it as a network object.
+                    new_socket.add_tag(*item["tags"])
+                    if new_credential:
+                        to_add.append(mwcp.metadata.Network(socket=new_socket, credential=new_credential).as_json_dict())
+
+                if new_socket:
+                    to_add.append(new_socket.as_json_dict())
+                if new_credential:
+                    to_add.append(new_credential.as_json_dict())
+
+                to_remove.append(item)
+
+        # Next, fixup the c2 fields for any remaining socket objects not planned to be removed.
+        for item in expected_results["metadata"]:
+            if item["type"] == "socket" and item not in to_remove:
+                if item["c2"]:
+                    item["tags"].append("c2")
+                    item["tags"] = sorted(set(item["tags"]))
+                del item["c2"]
+
+        expected_results["metadata"] = [item for item in expected_results["metadata"] if item not in to_remove] + to_add
+
+        # Deduplicate expected list of metadata dictionary items since changes will likely create some.
+        for item in list(expected_results["metadata"]):
+            while expected_results["metadata"].count(item) > 1:
+                expected_results["metadata"].remove(item)
+
+        # Empty URLs may be produced, these should be removed
+        empty_url = {"path": None, "protocol": None, "query": None, "tags": [], "type": "url", "url": None}
+        while empty_url in expected_results["metadata"]:
+            expected_results["metadata"].remove(empty_url)
 
     # The order the metadata comes in doesn't matter and shouldn't fail the test.
     # (Using custom repr to ensure dictionary keys are sorted before repr is applied.)

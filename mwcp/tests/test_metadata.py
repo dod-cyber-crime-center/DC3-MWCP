@@ -62,19 +62,9 @@ def test_serialization():
         'type': 'url',
         'tags': [],
         'url': 'http://google.com',
-        'application_protocol': 'http',
-        'credential': None,
+        'protocol': 'http',
         'path': None,
-        'query': '',
-        'socket': {
-            'type': 'socket',
-            'tags': [],
-            'address': 'google.com',
-            'c2': None,
-            'listen': None,
-            'network_protocol': None,
-            'port': None
-        },
+        'query': None,
       }
     # language=json
     assert u.as_json() == textwrap.dedent(r"""
@@ -82,22 +72,12 @@ def test_serialization():
             "type": "url",
             "tags": [],
             "url": "http://google.com",
-            "socket": {
-                "type": "socket",
-                "tags": [],
-                "address": "google.com",
-                "port": null,
-                "network_protocol": null,
-                "c2": null,
-                "listen": null
-            },
             "path": null,
-            "query": "",
-            "application_protocol": "http",
-            "credential": null
+            "query": null,
+            "protocol": "http"
         }
     """).strip()
-    assert metadata.URL.from_dict(u_dict) == u
+    assert metadata.URL2.from_dict(u_dict) == u
     assert metadata.Metadata.from_dict(u_dict) == u
 
 

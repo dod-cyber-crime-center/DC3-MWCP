@@ -158,7 +158,7 @@ def _flatten_dict(dict_: dict) -> dict:
             # Consolidate tags into main dictionary.
             if tags:
                 try:
-                    new_dict["tags"].append(tags)
+                    new_dict["tags"].extend(tags)
                 except KeyError:
                     new_dict["tags"] = tags
         else:
@@ -782,7 +782,7 @@ class CryptoAddress(Metadata):
 
 
 @attr.s(**config)
-class Socket(Metadata):
+class Socket2(Metadata):
     """
     A collection of address, port, and protocol used together to make a socket
     connection.
@@ -808,10 +808,11 @@ class Socket(Metadata):
             "enum": sorted(_VALID_PROTOCOLS),
         }}
     )
-    # Determines if socket is for a C2 server.
-    #   True == known C2, False == known not a C2, None == unknown
-    c2: bool = None
     listen: bool = None
+
+    @classmethod
+    def _type(cls):
+        return "socket"
 
     def __attrs_post_init__(self):
         # Add the _from_port attribute, used internally for backwards compatibility support.
@@ -838,7 +839,7 @@ class Socket(Metadata):
             "is_active": False,
             "id": "network-traffic--" + str(uuid.uuid5(
                 namespace,
-                f"{self.address}//{self.port}//{self.network_protocol}//{self.c2}//{self.listen}"
+                f"{self.address}//{self.port}//{self.network_protocol}//{self.listen}"
             ))
         }
 
@@ -884,7 +885,7 @@ class Socket(Metadata):
         result.add_linked(traffic)
 
         return result
-    
+
     @staticmethod
     def _guess_address_type(address) -> str:
         """
@@ -900,11 +901,18 @@ class Socket(Metadata):
             if parts[3].isnumeric():
                 if 0 <= int(parts[3]) < 256:
                     return "ipv4"
-        
+
         return "domain"
 
 
-def SocketAddress(*args, **kwargs) -> Socket:
+def Socket(address=None, port=None, network_protocol=None, listen=None, c2=None) -> Socket2:
+    socket = Socket2(address=address, port=port, network_protocol=network_protocol, listen=listen)
+    if c2:
+        socket.add_tag("c2")
+    return socket
+
+
+def SocketAddress(*args, **kwargs) -> Socket2:
     warnings.warn(
         "This function is a temporary helper. This may be removed in a future version. "
         "Please use Socket() instead.",
@@ -913,15 +921,17 @@ def SocketAddress(*args, **kwargs) -> Socket:
     return Socket(*args, **kwargs)
 
 
-def C2SocketAddress(address: str, port: int = None, protocol: str = None) -> Socket:
+def C2SocketAddress(address: str, port: int = None, protocol: str = None) -> Socket2:
     warnings.warn(
         "This function is a temporary helper. This may be removed in a future version",
         DeprecationWarning
     )
-    return Socket(address=address, port=port, network_protocol=protocol, c2=True)
+    socket = Socket(address=address, port=port, network_protocol=protocol)
+    socket.add_tag("c2")
+    return socket
 
 
-def Port(port: int, protocol: str = None) -> Socket:
+def Port(port: int, protocol: str = None) -> Socket2:
     """
     TCP or UDP port.
     This generally refers to outbound connections where the malware is the client.
@@ -933,37 +943,38 @@ def Port(port: int, protocol: str = None) -> Socket:
     return socket
 
 
-def ListenPort(port: int, protocol: str = None) -> Socket:
+def ListenPort(port: int, protocol: str = None) -> Socket2:
     socket = Socket(port=port, network_protocol=protocol, listen=True)
     socket._from_port = True
     return socket
 
 
-def Address(address: str) -> Socket:
+def Address(address: str) -> Socket2:
     return Socket(address=address)
 
 
-def C2Address(address: str) -> Socket:
-    return Socket(address=address, c2=True)
+def C2Address(address: str) -> Socket2:
+    socket = Socket(address=address)
+    socket.add_tag("c2")
+    return socket
 
 
 @attr.s(**config)
-class URL(Metadata):
+class URL2(Metadata):
     """
     RFC 3986 URL
 
     e.g.
         URL("https://10.11.10.13:443/images/baner.jpg")
-
-        creds = Credential(username="user", password="pass")
-        URL(socket=Socket("mail.badhost.com"), application_protocol="smtp", credential=creds))
     """
     url: str = None
-    socket: Socket = None
     path: str = None
     query: str = None
-    application_protocol: str = None
-    credential: Credential = None
+    protocol: str = None
+
+    @classmethod
+    def _type(cls):
+        return "url"
 
     _URL_RE = re.compile(
         r"((?P<app_protocol>[a-z\.\-+]{1,40})://)?(?P<address>\[?[^/]+\]?)"
@@ -972,23 +983,22 @@ class URL(Metadata):
     )
 
     def __attrs_post_init__(self):
-        if self.url is not None:
-            self._parse_url(self.url)
+        self._processed = False  # prevent infinite loop.
+        # Hidden fields for reporting later.
+        self._socket = None
+        self._credential = None
 
-    def _parse_url(self, url: str):
-        """
-        Parses provided url in order to set individual components.
-        """
-        match = self._URL_RE.match(url)
+        if self.url:
+            self._parse_url()
+
+    def _parse_url(self):
+        match = self._URL_RE.match(self.url)
         if not match:
-            # TODO: To keeps backwards compatibility we still must allow the url
-            #   to be set.
-            logger.error(f"Error parsing as url: {url}")
-            return
+            raise ValidationError(f"Error parsing as url: {self.url}")
 
-        app_protocol = match.group("app_protocol")
-        path = match.group("path")
-        query = match.group("query")
+        app_protocol = match.group("app_protocol") or None
+        path = match.group("path") or None
+        query = match.group("query") or None
         port = None
 
         address = match.group("address")
@@ -1001,111 +1011,251 @@ class URL(Metadata):
             else:
                 address, found, port = address.partition(":")
             if found and not port:
-                raise ValidationError(f"Invalid URL {url}, found ':' at end without a port.")
+                raise ValidationError(f"Invalid URL {self.url}, found ':' at end without a port.")
             elif not port:
                 port = None
 
-        if not self.socket:
-            self.socket = Socket(address=address, port=port)
+        if address or port:
+            self._socket = Socket(address=address, port=port)
+        # TODO: determine how to parse username, password from URL
+        #if username or password:
+        #    self._credential = Credential(username=username, password=password)
+
         if not self.path:
             self.path = path
         if not self.query:
             self.query = query
-        if not self.application_protocol:
-            self.application_protocol = app_protocol
+        if not self.protocol:
+            self.protocol = app_protocol
+
+    @property
+    def socket(self) -> Optional[Socket2]:
+        warnings.warn(
+            "This function is a temporary getter. This may be removed in a future version. "
+            "Please get from Network object instead.",
+            DeprecationWarning
+        )
+        return self._socket or None
+
+    @socket.setter
+    def socket(self, value: Socket2):
+        warnings.warn(
+            "This function is a temporary setter. This may be removed in a future version. "
+            "Please set with Network() instead.",
+            DeprecationWarning
+        )
+        self._socket = value
+
+    @property
+    def credential(self) -> Optional[Credential]:
+        warnings.warn(
+            "This function is a temporary getter. This may be removed in a future version. "
+            "Please get from Network object instead.",
+            DeprecationWarning
+        )
+        return self._credential or None
+
+    @credential.setter
+    def credential(self, value: Credential):
+        warnings.warn(
+            "This function is a temporary setter. This may be removed in a future version. "
+            "Please set with Network() instead.",
+            DeprecationWarning
+        )
+        self._credential = value
 
     @property
     def c2(self) -> Optional[bool]:
-        return self.socket and self.socket.c2
+        warnings.warn(
+            "This function is a temporary getter. This may be removed in a future version. "
+            "Please get from Socket2 object instead.",
+            DeprecationWarning
+        )
+        return "c2" in self._socket.tags or "c2" in self.tags or None
 
     @c2.setter
     def c2(self, value: bool):
-        """
-        Convenience for setting url as a c2.
-        """
-        if not isinstance(value, bool):
-            raise ValidationError(f"C2 {repr(value)} is not a boolean.")
-        if not self.socket:
-            self.socket = Socket()
-        self.socket.c2 = value
+        warnings.warn(
+            "This function is a temporary setter. This may be removed in a future version. "
+            "Please set with Socket2() instead.",
+            DeprecationWarning
+        )
+        # Add tag(s) if c2 == True
+        if value:
+            self.tags.append("c2")
+            if self._socket:
+                self._socket.tags.append("c2")
 
-    @property
-    def listen(self) -> Optional[bool]:
-        return self.socket and self.socket.listen
-
-    @listen.setter
-    def listen(self, value: bool):
+    def post_processing(self, report):
         """
-        Convenience for setting url as a listen.
+        Creates a Network object if URL contains parsed out socket or credential information.
         """
-        if not isinstance(value, bool):
-            raise ValidationError("Listen {repr(value)} is not a boolean.")
-        if not self.socket:
-            self.socket = Socket()
-        self.socket.listen = value
+        if not self._processed:
+            self._processed = True
+            if self._socket or self._credential:
+                network = Network(url=self, socket=self._socket, credential=self._credential)
+                # Move "c2" tag to network object if it exists.
+                if "c2" in self.tags:
+                    network.add_tag("c2")
+                    if self._socket:
+                        self._socket.add_tag("c2")
+                report.add(network)
 
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
         result = STIXResult(fixed_timestamp=fixed_timestamp)
 
-        # Some parsers can have a URL without a URL, so we skip it in these cases
-        if self.url is None:
-            warnings.warn("Skipped creation of STIX URL since the parser provided no URL")
-            return result
-
-        result.add_linked(stix.URL(value=self.url))
+        if not self.url:
+            if self.path:   # TODO: determine if observedstring or url
+                result.add_linked(stix_extensions.ObservedString(purpose="url-path", value=self.path))
+            elif self.query:
+                result.add_linked(stix_extensions.ObservedString(purpose="url-query", value=self.query))
+            else:
+                warnings.warn("Skipped creation of STIX string since the parser provided no URL data")
+                return result
+        else:
+            result.add_linked(stix.URL(value=self.url))
+        if self.protocol:
+            protocol = self.protocol.upper()
+            if protocol != "HTTP" and protocol != "HTTPS":
+                result.add_unlinked(stix.Note(
+                    labels=protocol,
+                    content=protocol,
+                    object_refs=[result.linked_stix[0].id],
+                    created=fixed_timestamp,
+                    modified=fixed_timestamp,
+                    allow_custom=True
+                ))
         result.create_tag_note(self, result.linked_stix[-1])
+        return result
+
+
+@attr.s(**config)
+class Network(Metadata):
+    """
+    A collection of URL, Socket and Credential to relate them together
+
+    e.g. Network(
+            url=metadata.URL2(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+            socket=metadata.Socket(port=8080),
+            credential=metadata.Credential(username="You", password="Tube")
+        )
+    """
+    url: URL2 = None
+    socket: Socket2 = None
+    credential: Credential = None
+
+    def __attrs_post_init__(self):
+        if self.url and not self.url._processed:
+            if not self.socket:
+                self.socket = self.url._socket
+            if not self.credential:
+                self.credential = self.url._credential
+            self.url._processed = True  # prevent URL2 from creating another Network object during postprocessing.
+        if sum(map(bool, [self.url, self.socket, self.credential])) < 2:
+            raise ValidationError(f"Network object must have at least 2 fields provided: {self!r}")
+
+    def as_formatted_dict(self, flat=False) -> dict:
+        sup = super().as_formatted_dict(flat=flat)
+        # Fixup double "Url / Url" field.
+        return {key.replace("url.url", "url"): value for (key, value) in sup.items()}
+
+    def post_processing(self, report):
+        if self.socket and "c2" in self.socket.tags:
+            self.add_tag("c2")
+            if self.url:
+                self.url.add_tag("c2")
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+
+        if self.url:
+            result.merge(self.url.as_stix(base_object, fixed_timestamp))
 
         if self.socket:
-            result.merge(self.socket.as_stix(base_object))
-            result.add_unlinked(stix.Relationship(
-                relationship_type="used",
-                source_ref=result.linked_stix[-1].id,
-                target_ref=result.linked_stix[0].id,
-                created=fixed_timestamp,
-                modified=fixed_timestamp
-            ))
+            result.merge(self.socket.as_stix(base_object, fixed_timestamp))
+            if self.url:
+                result.add_unlinked(stix.Relationship(
+                    relationship_type="used",
+                    source_ref=result.linked_stix[-1].id,
+                    target_ref=result.linked_stix[0].id,
+                    created=fixed_timestamp,
+                    modified=fixed_timestamp
+                ))
 
         if self.credential:
             result.merge(self.credential.as_stix(base_object))
-            result.add_unlinked(stix.Relationship(
-                relationship_type="contained",
-                source_ref=result.linked_stix[0].id,
-                target_ref=result.linked_stix[-1].id,
-                created=fixed_timestamp,
-                modified=fixed_timestamp
-            ))
+            if self.url or self.socket:
+                result.add_unlinked(stix.Relationship(
+                    relationship_type="contained",
+                    source_ref=result.linked_stix[0].id,
+                    target_ref=result.linked_stix[-1].id,
+                    created=fixed_timestamp,
+                    modified=fixed_timestamp
+                ))
 
         return result
 
 
+def URL(
+    url: str = None,
+    socket: Socket2 = None,
+    path: str = None,
+    query: str = None,
+    application_protocol: str = None,
+    credential: Credential = None
+) -> URL2:
+    warnings.warn(
+        "This function is a temporary helper. This may be removed in a future version. "
+        "Please use URL2() instead.",
+        DeprecationWarning
+    )
+    url_obj = URL2(url=url, path=path, query=query, protocol=application_protocol)
+    if socket:
+        url_obj._socket = socket
+    if credential:
+        url_obj._credential = credential
+    return url_obj
+
+
 def C2URL(
         url: str = None,
-        socket: Socket = None,
+        socket: Socket2 = None,
         path: str = None,
         query: str = None,
         application_protocol: str = None,
         credential: Credential = None
-) -> URL:
-    url = URL(
+) -> URL2:
+    url_obj = URL(
         url=url,
-        socket=socket,
         path=path,
         query=query,
         application_protocol=application_protocol,
+        socket=socket,
         credential=credential
     )
-    url.c2 = True
-    return url
+    url_obj.c2 = True
+    return url_obj
 
 
-def URLPath(path: str) -> URL:
+
+def URLPath(path: str) -> URL2:
     """Path portion of URL"""
+    warnings.warn(
+        "This function is a temporary helper. This may be removed in a future version. "
+        "Please use URL2() instead.",
+        DeprecationWarning
+    )
+    return URL2(path=path)
+
+
+def URLQuery(query: str) -> URL2:
+    """Query portion of URL"""
     warnings.warn(
         "This function is a temporary helper. This may be removed in a future version. "
         "Please use URL() instead.",
         DeprecationWarning
     )
-    return URL(path=path)
+    return URL2(query=query)
 
 
 def Proxy(
@@ -1114,7 +1264,7 @@ def Proxy(
         address: str = None,
         port: int = None,
         protocol: str = None
-) -> URL:
+) -> Union[Network, Socket, Credential]:
     """
     Generates URL object from given proxy connection information.
 
@@ -1127,16 +1277,26 @@ def Proxy(
             protocol="tcp",
         )
     """
-    url = URL()
+    warnings.warn(
+        "This function is a temporary helper. This may be removed in a future version. "
+        "Please use URL2() instead.",
+        DeprecationWarning
+    )
+    socket: Socket2 = None
+    credential: Credential = None
     if address or port or protocol:
-        url.socket = Socket(address=address, port=port, network_protocol=protocol)
+        socket = Socket(address=address, port=port, network_protocol=protocol)
     if username or password:
-        url.credential = Credential(username=username, password=password)
-    url.add_tag("proxy")
-    return url
+        credential = Credential(username=username, password=password)
+    if not socket:
+        raise ValidationError("Proxy should have at least one of: [address, port, protocol], none provided")
+    socket.add_tag("proxy")
+    if credential:
+        return Network(socket=socket, credential=credential)
+    return socket
 
 
-def ProxySocketAddress(address: str, port: int = None, protocol: str = None) -> URL:
+def ProxySocketAddress(address: str, port: int = None, protocol: str = None) -> Socket2:
     warnings.warn(
         "This function is a temporary helper. This may be removed in a future version. "
         "Please use Proxy() instead.",
@@ -1145,7 +1305,7 @@ def ProxySocketAddress(address: str, port: int = None, protocol: str = None) -> 
     return Proxy(address=address, port=port, protocol=protocol)
 
 
-def ProxyAddress(address: str) -> URL:
+def ProxyAddress(address: str) -> Socket2:
     warnings.warn(
         "This function is a temporary helper. This may be removed in a future version. "
         "Please use Proxy() instead.",
@@ -1160,7 +1320,7 @@ def FTP(
         url: str = None,
         address: str = None,
         port: Port = None,
-) -> URL:
+) -> Union[URL2, Network, Socket]:
     """
     Generates URL object from given FTP credentials and URL or address information.
 
@@ -1175,17 +1335,19 @@ def FTP(
         "This function is a temporary helper. This may be removed in a future version",
         DeprecationWarning
     )
+    if not url and not address:
+        raise ValidationError("Must provide either url or address. Neither provided.")
     if url and address:
         raise ValidationError("Must provide either url or address. Both provided.")
+    url_object = None
+    socket = None
     if url:
-        url_object = URL(url)
+        url_object = URL2(url=url, protocol="ftp")
     else:
-        url_object = URL(socket=Socket(address=address, port=port))
+        socket = Socket(address=address, port=port)
     if username or password:
-        url_object.credential = Credential(username=username, password=password)
-    url_object.application_protocol = "ftp"
-    return url_object
-
+        return Network(credential=Credential(username=username, password=password), url=url_object, socket=socket)
+    return Network(url=url_object, socket=socket)
 
 @attr.s(**config)
 class EmailAddress(Metadata):
@@ -1227,7 +1389,7 @@ class Event(Metadata):
 
         if self.tags:
             content += f"\n    Event Name Tags: {', '.join(self.tags)}"
-        
+
         return STIXResult(content)
 
 
@@ -1329,7 +1491,7 @@ class Interval(Metadata):
 
         if self.tags:
             content += f"\n    Interval Tags: {', '.join(self.tags)}"
-        
+
         return STIXResult(content)
 
 
@@ -1349,7 +1511,7 @@ class IntervalLegacy(Metadata):
 
         if self.tags:
             content += f"\n    Interval Tags: {', '.join(self.tags)}"
-        
+
         return STIXResult(content)
 
 
@@ -1399,11 +1561,11 @@ class EncryptionKey(Metadata):
             metadata.EncryptionKey(b"hello").with_encoding(None)  # won't display ascii representation in report.
 
         (If not provided, MWCP will do its best to guess the right encoding.)
-        
+
         :param encoding: Encoding to use or None to not decode key in report.
         :param raise_error: Whether to raise a ValidationError if the given encoding would fail to decode the key.
             Defaults to ignoring the encoding otherwise.
-        
+
         :raises ValidationError: If given encoding fails to decode key. (if raise_error is True)
         """
         if not (isinstance(encoding, str) or encoding is None):
@@ -1543,9 +1705,9 @@ class DecodedString(Metadata):
                 created=fixed_timestamp,
                 modified=fixed_timestamp
             ))
-            
+
         return result
-        
+
 
 @attr.s(**config)
 class MissionID(Metadata):
@@ -1558,7 +1720,7 @@ class MissionID(Metadata):
         MissionID("201412")
     """
     value: str
-    
+
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
         result = STIXResult(fixed_timestamp=fixed_timestamp)
         result.add_linked(stix_extensions.ObservedString(purpose="mission-id", value=self.value))
@@ -1827,7 +1989,7 @@ class Registry2(Metadata):
 
         if self.value:
             value["data"] = self.value
-        
+
         if self.data_type:
             value["data_type"] = self.data_type.name
 
@@ -2095,7 +2257,7 @@ class RSAPrivateKey(Metadata):
         result.add_linked(stix.X509Certificate(**params))
         result.create_tag_note(self, result.linked_stix[-1])
 
-        return result        
+        return result
 
 
 @attr.s(**config)
@@ -2261,7 +2423,7 @@ class Service(Metadata):
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
         # Process generally uses a UUIDv4 but we want to deduplicate when the same command is used so we will use a v5
         namespace = self._STIX_NAMESPACE
-        
+
         result = STIXResult(fixed_timestamp=fixed_timestamp)
         params = {
             "id": "process--" + str(uuid.uuid5(
@@ -2281,7 +2443,7 @@ class Service(Metadata):
 
         if self.image:
             params["command_line"] = self.image
-        
+
         if self.dll and self.dll != self.image:
             dir_path = str(pathlib.Path(self.dll).parent)
 
@@ -2400,7 +2562,7 @@ class Version(Metadata):
 
         if self.tags:
             content += f"\n    Version: {', '.join(self.tags)}"
-        
+
         return STIXResult(content)
 
 
@@ -2457,10 +2619,10 @@ class File(Metadata):
             hashes["SHA-1"] = self.sha1
         if self.sha1:
             hashes["SHA-256"] = self.sha256
-        
+
         params = {
-            "name": self.name
-            , "hashes": hashes
+            "name": self.name,
+            "hashes": hashes
         }
 
         if self.data:
@@ -2474,9 +2636,9 @@ class File(Metadata):
 
         if self.compile_time or self.architecture:
             result.note_content = f"Compiled on: {self.compile_time}\nFor architecture: {self.architecture}"
-        
+
         result.note_labels = self.tags
-        
+
         return result
 
     @classmethod
@@ -2568,3 +2730,4 @@ class StringReport(Element):
     """
     file: File
     strings: List[DecodedString] = attr.ib(factory=list)
+

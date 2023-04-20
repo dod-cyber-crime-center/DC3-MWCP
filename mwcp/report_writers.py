@@ -178,6 +178,8 @@ class MarkupWriter(ReportWriter):
 
             if entry["tags"]:
                 includes_tags = True
+                # deduplicate tags list if child objects share same tag with parent object or each other
+                entry["tags"] = sorted(set(entry["tags"]))
 
             # Convert key names into more friendly titles.
             for key in list(entry.keys()):

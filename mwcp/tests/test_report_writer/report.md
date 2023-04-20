@@ -24,12 +24,14 @@
 | cmd.exe /c notepad.exe |
 
 ## Credential
-| Username   | Password   |
-|:-----------|:-----------|
-| admin      | 123456     |
-| mruser     |            |
-|            | secrets    |
-| admin      | pass       |
+| Username   | Password            |
+|:-----------|:--------------------|
+| admin      | 123456              |
+| mruser     |                     |
+|            | secrets             |
+| You        | Tube                |
+| Malware    | ConfigurationParser |
+| admin      | pass                |
 
 ## Crypto Address
 | Address                            | Symbol   |
@@ -79,6 +81,18 @@
 |:-----------------|
 | ithinkimalonenow |
 
+## Network
+| Tags   | Url                                          | Path              | Query          | Protocol   |   Port | Username   | Password            | Address                  | Network Protocol   |
+|:-------|:---------------------------------------------|:------------------|:---------------|:-----------|-------:|:-----------|:--------------------|:-------------------------|:-------------------|
+|        | https://www.youtube.com/watch?v=dQw4w9WgXcQ  | /watch            | ?v=dQw4w9WgXcQ | https      |   8080 | You        | Tube                |                          |                    |
+|        | https://www.github.com                       |                   |                | https      |        | Malware    | ConfigurationParser | www.github.com           |                    |
+|        | https://www.gitlab.com                       |                   |                | https      |   8080 |            |                     | 1.2.3.4                  | udp                |
+|        | url.url.url                                  |                   |                |            |        |            |                     | url.url.url              |                    |
+|        | https://10.11.10.13:443/images/baner.jpg     | /images/baner.jpg |                | https      |    443 |            |                     | 10.11.10.13              |                    |
+| c2     | http://[fe80::20c:1234:5678:9abc]:80/badness | /badness          |                | http       |     80 |            |                     | fe80::20c:1234:5678:9abc |                    |
+| proxy  |                                              |                   |                |            |     80 | admin      | pass                | 192.168.1.1              | tcp                |
+|        | ftp://badhost.com:21                         |                   |                | ftp        |     21 | admin      | pass                | badhost.com              |                    |
+
 ## Path
 | Path                            | Is Dir   | Posix   |
 |:--------------------------------|:---------|:--------|
@@ -116,21 +130,35 @@
 | WindowsUserManagement | Windows User Management | Provides a common management to access information about windows user. | %System%\svohost.exe |
 
 ## Socket
-| Address     |   Port | Network Protocol   | Listen   |
-|:------------|-------:|:-------------------|:---------|
-| bad.com     |     21 | tcp                |          |
-|             |   1635 | udp                |          |
-|             |   4568 | tcp                | True     |
-| 10.11.10.13 |    443 |                    |          |
-| 192.168.1.1 |     80 | tcp                |          |
-| badhost.com |     21 |                    |          |
+| Tags   | Address                  |   Port | Network Protocol   | Listen   |
+|:-------|:-------------------------|-------:|:-------------------|:---------|
+|        | bad.com                  |     21 | tcp                |          |
+| c2     | website.com              |    123 |                    |          |
+|        |                          |   1635 | udp                |          |
+|        |                          |   4568 | tcp                | True     |
+|        |                          |   8080 |                    |          |
+|        | www.github.com           |        |                    |          |
+|        | 1.2.3.4                  |   8080 | udp                |          |
+|        | url.url.url              |        |                    |          |
+|        | 10.11.10.13              |    443 |                    |          |
+| c2     | fe80::20c:1234:5678:9abc |     80 |                    |          |
+| proxy  | 192.168.1.1              |     80 | tcp                |          |
+| proxy  | 12.34.56.78              |     90 | tcp                |          |
+| proxy  | 255.255.255.255          |        |                    |          |
+|        | badhost.com              |     21 |                    |          |
 
 ## URL
-| Tags   | Url                                      | Address     |   Port | Path              | Application Protocol   | Network Protocol   | Username   | Password   |
-|:-------|:-----------------------------------------|:------------|-------:|:------------------|:-----------------------|:-------------------|:-----------|:-----------|
-|        | https://10.11.10.13:443/images/baner.jpg | 10.11.10.13 |    443 | /images/baner.jpg | https                  |                    |            |            |
-| proxy  |                                          | 192.168.1.1 |     80 |                   |                        | tcp                | admin      | pass       |
-|        | ftp://badhost.com:21                     | badhost.com |     21 |                   | ftp                    |                    | admin      | pass       |
+| Tags   | Url                                          | Path              | Query           | Protocol   |
+|:-------|:---------------------------------------------|:------------------|:----------------|:-----------|
+|        | https://www.youtube.com/watch?v=dQw4w9WgXcQ  | /watch            | ?v=dQw4w9WgXcQ  | https      |
+|        | https://www.github.com                       |                   |                 | https      |
+|        | https://www.gitlab.com                       |                   |                 | https      |
+|        | url.url.url                                  |                   |                 |            |
+|        | https://10.11.10.13:443/images/baner.jpg     | /images/baner.jpg |                 | https      |
+| c2     | http://[fe80::20c:1234:5678:9abc]:80/badness | /badness          |                 | http       |
+|        |                                              | url/path.jpg      |                 |            |
+|        |                                              |                   | query?answer=42 |            |
+|        | ftp://badhost.com:21                         |                   |                 | ftp        |
 
 ## UUID
 | Value                                |

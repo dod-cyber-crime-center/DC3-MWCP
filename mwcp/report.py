@@ -281,10 +281,10 @@ class Report:
                     if element.directory_path:
                         results["directory"].append(element.directory_path)
 
-            elif isinstance(element, metadata.Socket):
+            elif isinstance(element, metadata.Socket2):
                 if element.address:
                     results["address"].append(element.address)
-                    if element.c2:
+                    if "c2" in element.tags:
                         results["c2_address"].append(element.address)
 
                 socket_address = [
@@ -296,7 +296,7 @@ class Report:
                     # noinspection PyDataclass
                     if not element._from_port:  # user explicitly specified a Socket
                         results["socketaddress"].append(socket_address)
-                        if element.c2:
+                        if "c2" in element.tags:
                             results["c2_socketaddress"].append(socket_address)
 
                     port = socket_address[1:]
@@ -320,37 +320,39 @@ class Report:
                 symbol = (element.symbol or "crypto").lower()
                 self._insert_into_other(results, f"{symbol}_address", element.address)
 
-            elif isinstance(element, metadata.URL):
+            elif isinstance(element, metadata.URL2):
                 if element.url:
                     results["url"].append(element.url)
-                    if element.socket and element.socket.c2:
-                        results["c2_url"].append(element.url)
                 if element.path:
                     results["urlpath"].append(element.path)
-                if element.application_protocol == "ftp":
+                if element.protocol == "ftp":
                     credential = element.credential
                     # If the credential wasn't included, they probably didn't mean for the url to
                     # be reported as "ftp" under the legacy schema.
                     if credential:
                         ftp = [credential.username, credential.password, element.url]
                         results["ftp"].append(ftp)
-                if "proxy" in element.tags:
-                    if element.credential and element.socket:
+
+            elif isinstance(element, metadata.Network):
+                if element.socket and "c2" in element.socket.tags:
+                    if element.url and element.url.url:
+                        results["c2_url"].append(element.url.url)
+                if element.socket and "proxy" in element.socket.tags:
+                    if element.credential:
                         results["proxy"].append([
                             element.credential.username,
                             element.credential.password,
                             element.socket.address or "",
                             str(element.socket.port),
-                            (element.socket and element.socket.network_protocol) or "",
+                            element.socket.network_protocol or ""
                         ])
-                    if element.socket:
-                        if element.socket.address:
-                            results["proxy_address"].append(element.socket.address)
-                        if element.socket.port is not None:
+                    if element.socket.address:
+                        results["proxy_address"].append(element.socket.address)
+                        if element.socket.port:
                             results["proxy_socketaddress"].append([
                                 element.socket.address,
                                 str(element.socket.port),
-                                element.socket.network_protocol,
+                                element.socket.network_protocol
                             ])
 
             elif isinstance(element, metadata.Credential):

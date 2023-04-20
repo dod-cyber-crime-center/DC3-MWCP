@@ -32,18 +32,29 @@
             "type": "url",
             "tags": [],
             "url": "http://127.0.0.1",
+            "path": null,
+            "query": null,
+            "protocol": "http"
+        },
+        {
+            "type": "network",
+            "tags": [],
+            "url": {
+                "type": "url",
+                "tags": [],
+                "url": "http://127.0.0.1",
+                "path": null,
+                "query": null,
+                "protocol": "http"
+            },
             "socket": {
                 "type": "socket",
                 "tags": [],
                 "address": "127.0.0.1",
                 "port": null,
                 "network_protocol": null,
-                "c2": null,
                 "listen": null
             },
-            "path": null,
-            "query": "",
-            "application_protocol": "http",
             "credential": null
         },
         {
@@ -52,7 +63,6 @@
             "address": "127.0.0.1",
             "port": null,
             "network_protocol": null,
-            "c2": null,
             "listen": null
         },
         {

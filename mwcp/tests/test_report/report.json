@@ -116,7 +116,16 @@
             "address": "bad.com",
             "port": 21,
             "network_protocol": "tcp",
-            "c2": null,
+            "listen": null
+        },
+        {
+            "type": "socket",
+            "tags": [
+                "c2"
+            ],
+            "address": "website.com",
+            "port": 123,
+            "network_protocol": null,
             "listen": null
         },
         {
@@ -125,7 +134,6 @@
             "address": null,
             "port": 1635,
             "network_protocol": "udp",
-            "c2": null,
             "listen": null
         },
         {
@@ -134,25 +142,205 @@
             "address": null,
             "port": 4568,
             "network_protocol": "tcp",
-            "c2": null,
             "listen": true
+        },
+        {
+            "type": "network",
+            "tags": [],
+            "url": {
+                "type": "url",
+                "tags": [],
+                "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "path": "/watch",
+                "query": "?v=dQw4w9WgXcQ",
+                "protocol": "https"
+            },
+            "socket": {
+                "type": "socket",
+                "tags": [],
+                "address": null,
+                "port": 8080,
+                "network_protocol": null,
+                "listen": null
+            },
+            "credential": {
+                "type": "credential",
+                "tags": [],
+                "username": "You",
+                "password": "Tube"
+            }
+        },
+        {
+            "type": "url",
+            "tags": [],
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "path": "/watch",
+            "query": "?v=dQw4w9WgXcQ",
+            "protocol": "https"
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": null,
+            "port": 8080,
+            "network_protocol": null,
+            "listen": null
+        },
+        {
+            "type": "credential",
+            "tags": [],
+            "username": "You",
+            "password": "Tube"
+        },
+        {
+            "type": "network",
+            "tags": [],
+            "url": {
+                "type": "url",
+                "tags": [],
+                "url": "https://www.github.com",
+                "path": null,
+                "query": null,
+                "protocol": "https"
+            },
+            "socket": {
+                "type": "socket",
+                "tags": [],
+                "address": "www.github.com",
+                "port": null,
+                "network_protocol": null,
+                "listen": null
+            },
+            "credential": {
+                "type": "credential",
+                "tags": [],
+                "username": "Malware",
+                "password": "ConfigurationParser"
+            }
+        },
+        {
+            "type": "url",
+            "tags": [],
+            "url": "https://www.github.com",
+            "path": null,
+            "query": null,
+            "protocol": "https"
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": "www.github.com",
+            "port": null,
+            "network_protocol": null,
+            "listen": null
+        },
+        {
+            "type": "credential",
+            "tags": [],
+            "username": "Malware",
+            "password": "ConfigurationParser"
+        },
+        {
+            "type": "network",
+            "tags": [],
+            "url": {
+                "type": "url",
+                "tags": [],
+                "url": "https://www.gitlab.com",
+                "path": null,
+                "query": null,
+                "protocol": "https"
+            },
+            "socket": {
+                "type": "socket",
+                "tags": [],
+                "address": "1.2.3.4",
+                "port": 8080,
+                "network_protocol": "udp",
+                "listen": null
+            },
+            "credential": null
+        },
+        {
+            "type": "url",
+            "tags": [],
+            "url": "https://www.gitlab.com",
+            "path": null,
+            "query": null,
+            "protocol": "https"
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": "1.2.3.4",
+            "port": 8080,
+            "network_protocol": "udp",
+            "listen": null
+        },
+        {
+            "type": "url",
+            "tags": [],
+            "url": "url.url.url",
+            "path": null,
+            "query": null,
+            "protocol": null
+        },
+        {
+            "type": "network",
+            "tags": [],
+            "url": {
+                "type": "url",
+                "tags": [],
+                "url": "url.url.url",
+                "path": null,
+                "query": null,
+                "protocol": null
+            },
+            "socket": {
+                "type": "socket",
+                "tags": [],
+                "address": "url.url.url",
+                "port": null,
+                "network_protocol": null,
+                "listen": null
+            },
+            "credential": null
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": "url.url.url",
+            "port": null,
+            "network_protocol": null,
+            "listen": null
         },
         {
             "type": "url",
             "tags": [],
             "url": "https://10.11.10.13:443/images/baner.jpg",
+            "path": "/images/baner.jpg",
+            "query": null,
+            "protocol": "https"
+        },
+        {
+            "type": "network",
+            "tags": [],
+            "url": {
+                "type": "url",
+                "tags": [],
+                "url": "https://10.11.10.13:443/images/baner.jpg",
+                "path": "/images/baner.jpg",
+                "query": null,
+                "protocol": "https"
+            },
             "socket": {
                 "type": "socket",
                 "tags": [],
                 "address": "10.11.10.13",
                 "port": 443,
                 "network_protocol": null,
-                "c2": null,
                 "listen": null
             },
-            "path": "/images/baner.jpg",
-            "query": "",
-            "application_protocol": "https",
             "credential": null
         },
         {
@@ -161,27 +349,85 @@
             "address": "10.11.10.13",
             "port": 443,
             "network_protocol": null,
-            "c2": null,
             "listen": null
         },
         {
             "type": "url",
             "tags": [
-                "proxy"
+                "c2"
             ],
+            "url": "http://[fe80::20c:1234:5678:9abc]:80/badness",
+            "path": "/badness",
+            "query": null,
+            "protocol": "http"
+        },
+        {
+            "type": "network",
+            "tags": [
+                "c2"
+            ],
+            "url": {
+                "type": "url",
+                "tags": [
+                    "c2"
+                ],
+                "url": "http://[fe80::20c:1234:5678:9abc]:80/badness",
+                "path": "/badness",
+                "query": null,
+                "protocol": "http"
+            },
+            "socket": {
+                "type": "socket",
+                "tags": [
+                    "c2"
+                ],
+                "address": "fe80::20c:1234:5678:9abc",
+                "port": 80,
+                "network_protocol": null,
+                "listen": null
+            },
+            "credential": null
+        },
+        {
+            "type": "socket",
+            "tags": [
+                "c2"
+            ],
+            "address": "fe80::20c:1234:5678:9abc",
+            "port": 80,
+            "network_protocol": null,
+            "listen": null
+        },
+        {
+            "type": "url",
+            "tags": [],
+            "url": null,
+            "path": "url/path.jpg",
+            "query": null,
+            "protocol": null
+        },
+        {
+            "type": "url",
+            "tags": [],
+            "url": null,
+            "path": null,
+            "query": "query?answer=42",
+            "protocol": null
+        },
+        {
+            "type": "network",
+            "tags": [],
             "url": null,
             "socket": {
                 "type": "socket",
-                "tags": [],
+                "tags": [
+                    "proxy"
+                ],
                 "address": "192.168.1.1",
                 "port": 80,
                 "network_protocol": "tcp",
-                "c2": null,
                 "listen": null
             },
-            "path": null,
-            "query": null,
-            "application_protocol": null,
             "credential": {
                 "type": "credential",
                 "tags": [],
@@ -191,11 +437,12 @@
         },
         {
             "type": "socket",
-            "tags": [],
+            "tags": [
+                "proxy"
+            ],
             "address": "192.168.1.1",
             "port": 80,
             "network_protocol": "tcp",
-            "c2": null,
             "listen": null
         },
         {
@@ -205,21 +452,44 @@
             "password": "pass"
         },
         {
-            "type": "url",
+            "type": "socket",
+            "tags": [
+                "proxy"
+            ],
+            "address": "12.34.56.78",
+            "port": 90,
+            "network_protocol": "tcp",
+            "listen": null
+        },
+        {
+            "type": "socket",
+            "tags": [
+                "proxy"
+            ],
+            "address": "255.255.255.255",
+            "port": null,
+            "network_protocol": null,
+            "listen": null
+        },
+        {
+            "type": "network",
             "tags": [],
-            "url": "ftp://badhost.com:21",
+            "url": {
+                "type": "url",
+                "tags": [],
+                "url": "ftp://badhost.com:21",
+                "path": null,
+                "query": null,
+                "protocol": "ftp"
+            },
             "socket": {
                 "type": "socket",
                 "tags": [],
                 "address": "badhost.com",
                 "port": 21,
                 "network_protocol": null,
-                "c2": null,
                 "listen": null
             },
-            "path": null,
-            "query": "",
-            "application_protocol": "ftp",
             "credential": {
                 "type": "credential",
                 "tags": [],
@@ -228,12 +498,19 @@
             }
         },
         {
+            "type": "url",
+            "tags": [],
+            "url": "ftp://badhost.com:21",
+            "path": null,
+            "query": null,
+            "protocol": "ftp"
+        },
+        {
             "type": "socket",
             "tags": [],
             "address": "badhost.com",
             "port": 21,
             "network_protocol": null,
-            "c2": null,
             "listen": null
         },
         {
