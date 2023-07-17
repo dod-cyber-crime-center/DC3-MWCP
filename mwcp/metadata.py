@@ -344,6 +344,17 @@ class Element:
             ret = _flatten_dict(ret)
         return ret
 
+    def _format_value(self, value):
+        # Convert bytes to a string representation.
+        if isinstance(value, bytes):
+            value = str(value)
+        if isinstance(value, list):
+            value = list(map(self._format_value, value))
+        # Recursively handle nested elements.
+        if isinstance(value, Element):
+            value = value.as_formatted_dict()
+        return value
+
     def as_formatted_dict(self, flat=False) -> dict:
         """
         Converts metadata element into a well formatted dictionary usually
@@ -353,13 +364,7 @@ class Element:
         for field in self.fields():
             name = field.name
             value = getattr(self, name)
-            # Convert bytes to a string representation.
-            if isinstance(value, bytes):
-                value = str(value)
-            # Recursively handle nested elements.
-            if isinstance(value, Element):
-                value = value.as_formatted_dict()
-            ret[name] = value
+            ret[name] = self._format_value(value)
 
         if flat:
             ret = _flatten_dict(ret)
@@ -403,6 +408,10 @@ class Element:
             value = getattr(self, field.name)
             if isinstance(value, Element):
                 elements.extend(value.elements())
+            elif isinstance(value, list):
+                for sub_value in value:
+                    if isinstance(sub_value, Element):
+                        elements.extend(sub_value.elements())
         return elements
 
     def post_processing(self, report):
@@ -699,17 +708,32 @@ def Base64Alphabet(alphabet: str) -> Alphabet:
 class Command(Metadata):
     """
     Shell command
+
+    :var value: The shell command itself.
+    :var cwd: Working directory where the command would get run (if known).
+
+    e.g.
+        Command("calc.exe")
+        Command("calc.exe", cwd=r"C:\Windows\System32")
     """
     value: str
+    cwd: str = None
 
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
         # Process generally uses a UUIDv4 but we want to deduplicate when the same command is used so we will use a v5
-        identifier = "process--" + str(uuid.uuid5(self._STIX_NAMESPACE, f"{self.value}"))
+        identifier = "process--" + str(uuid.uuid5(self._STIX_NAMESPACE, f"{self.value}/{self.cwd}"))
 
         result = STIXResult(fixed_timestamp=fixed_timestamp)
-        result.add_linked(stix.Process(command_line=self.value, id=identifier))
+        result.add_linked(stix.Process(command_line=self.value, cwd=self.cwd, id=identifier))
         result.create_tag_note(self, result.linked_stix[-1])
         return result
+
+    def as_formatted_dict(self, flat=False) -> dict:
+        return {
+            "tags": self.tags,
+            "command": self.value,
+            "working_directory": self.cwd,
+        }
 
 
 @attr.s(**config)
@@ -778,6 +802,155 @@ class CryptoAddress(Metadata):
 
         result.add_linked(stix_extensions.CryptoCurrencyAddress(**params))
         result.create_tag_note(self, result.linked_stix[-1])
+        return result
+
+
+_ActionType = Union[Command, str]
+_ActionType = Union[List[_ActionType], _ActionType]
+
+def _action_converter(actions):
+    # Convenience to allow users to pass in strings or a single command not in a list.
+    if actions is not None:
+        if not isinstance(actions, list):
+            actions = [actions]
+        actions = [
+            Command(command) if isinstance(command, str) else command
+            for command in actions
+        ]
+    return actions
+
+
+@attr.s(**config)
+class ScheduledTask(Metadata):
+    """
+    A Windows Scheduled task
+
+    NOTE: This is currently only covers basic registration info and commands that get run.
+        Other information such as trigger information is currently not captured.
+        Please use 'Other' to store other information if desired.
+
+    e.g.
+        ScheduledTask("calc.exe", name="ActiveXServer")
+        ScheduleTask([Command("calc.exe", cwd=r"C:\Temp"), Command("notepad.exe")], name="LegitWindowsTask")
+    """
+    # TODO: for now we are only accounting for command (Exec) actions.
+    #   Add support for COM, email, and message types.
+    actions: _ActionType = attr.ib(
+        default=None,
+        converter=_action_converter,
+        metadata={"jsonschema": {
+            "type": "array",
+            "items": Command.schema(),
+        }}
+    )
+    name: str = None
+    description: str = None
+    author: str = None
+    credentials: Credential = None
+
+    @classmethod
+    def from_xml(cls, xml_data: str) -> "ScheduledTask":
+        """
+        Creates a ScheduledTask from exported xml file.
+
+        Based on https://learn.microsoft.com/en-us/windows/win32/taskschd/task-scheduler-schema
+        """
+        xml_data = xml_data.strip()
+        # Remove namespace because it makes parsing complex.
+        xml_data = re.sub(' xmlns="[^"]+"', '', xml_data, count=1)
+        try:
+            root = ElementTree.fromstring(xml_data)
+        except ElementTree.ParseError as e:
+            raise ValueError(f"Failed to parse XML data: {e}")
+        if root.tag != "Task":
+            raise ValueError(f"Expected root tag to be 'Task', got '{root.tag}'")
+
+        # Parse registration info
+        # NOTE: Must check with 'is None' because truthiness is still False with .find() for some reason.
+        description = None
+        author = None
+        if (registration := root.find("RegistrationInfo")) is not None:
+            if (description := registration.find("Description")) is not None:
+                description = description.text
+            if (author := registration.find("Author")) is not None:
+                author = author.text
+
+        # Parse commands.
+        actions_meta = []
+        if (actions := root.find("Actions")) is not None:
+            for action in actions.findall("Exec"):
+                command = action.find("Command")
+                if command is None:
+                    raise ValueError(f"Expected 'Command' tag.")
+                command = command.text
+                if (arguments := action.find("Arguments")) is not None:
+                    command += " " + arguments.text
+                if (cwd := action.find("WorkingDirectory")) is not None:
+                    cwd = cwd.text
+                actions_meta.append(Command(command, cwd=cwd))
+
+        return cls(actions_meta, description=description, author=author)
+
+    def as_formatted_dict(self, flat=False) -> dict:
+        """
+        Formatting in order to collapse the actions.
+
+        TODO: Look into doing this generically for list fields.
+        """
+        tags = list(self.tags)
+        if self.credentials:
+            tags.extend(self.credentials.tags)
+
+        actions = []
+        if self.actions is not None:
+            for action in self.actions:
+                tags.extend(action.tags)
+                if action.cwd:
+                    actions.append(f"{action.cwd}> {action.value}")
+                else:
+                    actions.append(action.value)
+
+        return {
+            "tags": sorted(set(tags)),
+            "actions": "\n".join(actions),
+            "name": self.name,
+            "description": self.description,
+            "author": self.author,
+            "username": self.credentials.username if self.credentials else None,
+            "password": self.credentials.password if self.credentials else None,
+        }
+
+    def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
+        result = STIXResult(fixed_timestamp=fixed_timestamp)
+
+        params = {}
+        if self.name:
+            params["name"] = self.name
+        if self.description:
+            params["description"] = self.description
+        if self.author:
+            params["author"] = self.author
+        if self.credentials:
+            credentials = self.credentials.as_stix(base_object)
+            result.merge_ref(credentials)
+            params["user_account_ref"] = credentials.linked_stix[-1].id
+
+        scheduled_task = stix_extensions.ScheduledTask(**params)
+        result.add_linked(scheduled_task)
+        result.create_tag_note(self, scheduled_task)
+
+        for action in self.actions:
+            action_obj = action.as_stix(base_object)
+            result.merge(action_obj)
+            result.add_unlinked(stix.Relationship(
+                relationship_type="contained",
+                source_ref=scheduled_task.id,
+                target_ref=action_obj.linked_stix[-1].id,
+                created=fixed_timestamp,
+                modified=fixed_timestamp,
+                allow_custom=True,
+            ))
+
         return result
 
 
@@ -867,7 +1040,7 @@ class Socket2(Metadata):
         if self.network_protocol:
             network_values["protocols"].append(self.network_protocol)
 
-        if self.port:
+        if self.port is not None:
             if self.listen:
                 network_values["src_port"] = self.port
             else:
@@ -1167,32 +1340,54 @@ class Network(Metadata):
 
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
         result = STIXResult(fixed_timestamp=fixed_timestamp)
+        rels = []
 
-        if self.url:
+        if self.url and any([self.url.url, self.url.path, self.url.query]):
             result.merge(self.url.as_stix(base_object, fixed_timestamp))
 
         if self.socket:
             result.merge(self.socket.as_stix(base_object, fixed_timestamp))
-            if self.url:
-                result.add_unlinked(stix.Relationship(
-                    relationship_type="used",
-                    source_ref=result.linked_stix[-1].id,
-                    target_ref=result.linked_stix[0].id,
+            if self.url and len(result.linked_stix) > 1:
+                # Only add this relationship if a NetworkTraffic and URL both already exist in the linked_stix.
+                # If the STIX URL object doesn't exist, no relationship needed
+                rels.append({
+                    "relationship_type" : "used",
+                    "source_ref" : result.linked_stix[-1].id,
+                    "target_ref": result.linked_stix[0].id,
+                    "created": fixed_timestamp,
+                    "modified": fixed_timestamp
+                })
+            elif self.url and self.url.protocol and not any([self.url.url, self.url.path, self.url.query]):
+                protocol = self.url.protocol.upper()
+                result.add_unlinked(stix.Note(
+                    labels=protocol,
+                    content=protocol,
+                    object_refs=[result.linked_stix[0].id],
                     created=fixed_timestamp,
-                    modified=fixed_timestamp
+                    modified=fixed_timestamp,
+                    allow_custom=True
                 ))
 
         if self.credential:
             result.merge(self.credential.as_stix(base_object))
             if self.url or self.socket:
-                result.add_unlinked(stix.Relationship(
-                    relationship_type="contained",
-                    source_ref=result.linked_stix[0].id,
-                    target_ref=result.linked_stix[-1].id,
-                    created=fixed_timestamp,
-                    modified=fixed_timestamp
-                ))
+                rels.append({
+                    "relationship_type": "contained",
+                    "source_ref": result.linked_stix[0].id,
+                    "target_ref": result.linked_stix[-1].id,
+                    "created": fixed_timestamp,
+                    "modified": fixed_timestamp
+                })
 
+        if len(rels) == 1:
+            result.add_unlinked(stix.Relationship(**rels[0]))
+        elif rels:
+            # Add a label to both relationships which contain the ID not contained in either the source or target refs
+            # i.e. with A -> B and B -> C, add C as a label to the first relationship and A as a label to the second
+            rels[0]["labels"] = [result.linked_stix[2].id]
+            rels[1]["labels"] = [result.linked_stix[1].id]
+            result.add_unlinked(stix.Relationship(**rels[0]))
+            result.add_unlinked(stix.Relationship(**rels[1]))
         return result
 
 
@@ -1345,6 +1540,7 @@ def FTP(
         url_object = URL2(url=url, protocol="ftp")
     else:
         socket = Socket(address=address, port=port)
+        url_object = URL2(protocol="ftp")
     if username or password:
         return Network(credential=Credential(username=username, password=password), url=url_object, socket=socket)
     return Network(url=url_object, socket=socket)

@@ -318,3 +318,11 @@ def test_parsers_descriptions(make_sample_parser):
         ('Sample.Downloader', source, '', 'TestParser Downloader'),
         ('Sample.Implant', source, '', 'TestParser Implant'),
     ]
+
+
+def test_iter_parser_classes(make_sample_parser):
+    registry.clear()
+    registry.register_entry_points()
+    from mwcp.parsers.foo import Foo
+
+    assert list(registry.iter_parser_classes("foo")) == [Foo]

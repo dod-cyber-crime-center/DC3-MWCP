@@ -173,6 +173,14 @@ def metadata_items() -> List[Metadata]:
         metadata.Username("mruser"),
         metadata.Password("secrets"),
         metadata.CryptoAddress("14qViLJfdGaP4EeHnDyJbEGQysnCpwk3gd", "BTC"),
+        metadata.ScheduledTask("calc.exe", name="CalcTask"),
+        metadata.ScheduledTask([
+            metadata.Command("notepad.exe", cwd=r"C:\Windows\Temp"),
+            'cmd.exe /c "echo hi"',
+        ],
+            name="Complex Task", description="Some task with multiple commands",
+            credentials=metadata.Credential("admin", "pass"),
+        ),
         metadata.Socket(address="bad.com", port=21, network_protocol="tcp"),
         metadata.C2SocketAddress(address="website.com", port=123),
         metadata.Port(1635, protocol="udp"),
@@ -214,6 +222,12 @@ def metadata_items() -> List[Metadata]:
             username="admin",
             password="pass",
             url="ftp://badhost.com:21",
+        ),
+        metadata.FTP(
+            username="password",
+            password="username",
+            address="123.45.67.89",
+            port=0
         ),
         metadata.EmailAddress("email@bad.com"),
         metadata.Event("MicrosoftExist"),

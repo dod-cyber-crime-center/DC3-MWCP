@@ -187,3 +187,61 @@ def test_encryption_key_with_encoding(key, encoding, display):
     """
     key = metadata.EncryptionKey(key).with_encoding(encoding)
     assert key.as_formatted_dict()["key"] == display
+
+
+def test_scheduled_task_from_xml():
+    """
+    Tests ScheduledTask.from_xml()
+    """
+    # language=xml
+    scheduled_task = metadata.ScheduledTask.from_xml(r"""
+        <?xml version="1.0" encoding="UTF-16"?>
+        <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+            <RegistrationInfo>
+                <Date>2005-10-11T13:21:17-08:00</Date>
+                <Author>AuthorName</Author>
+                <Version>1.0.0</Version>
+                <Description>Task starts after a specified time.</Description>
+            </RegistrationInfo>
+            <Triggers>
+                <TimeTrigger>
+                    <StartBoundary>2023-07-13T13:14:41.816836</StartBoundary>
+                    <Enabled>true</Enabled>
+                    <Repetition>
+                        <Interval>PT1M</Interval>
+                    </Repetition>
+                </TimeTrigger>
+            </Triggers>
+            <Actions Context="Author">
+                <Exec>
+                    <Command>C:\Windows\System32\replace.exe</Command>
+                    <Arguments>"C:\Users\bob\implant.exe" C:\Windows\Temp /A</Arguments>
+                </Exec>
+                <Exec>
+                    <Command>C:\Windows\Temp\implant.exe</Command>
+                </Exec>
+            </Actions>
+        </Task>
+    """)
+    assert scheduled_task.as_dict() == {
+        "type": "scheduled_task",
+        "tags": [],
+        "name": None,
+        "author": "AuthorName",
+        "description": "Task starts after a specified time.",
+        "credentials": None,
+        "actions": [
+            {
+                "type": "command",
+                "tags": [],
+                "value": 'C:\\Windows\\System32\\replace.exe "C:\\Users\\bob\\implant.exe" C:\\Windows\\Temp /A',
+                "cwd": None,
+            },
+            {
+                "type": "command",
+                "tags": [],
+                "value": 'C:\\Windows\\Temp\\implant.exe',
+                "cwd": None,
+            }
+        ]
+    }

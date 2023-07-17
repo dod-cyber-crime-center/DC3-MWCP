@@ -84,7 +84,8 @@
         {
             "type": "command",
             "tags": [],
-            "value": "cmd.exe /c notepad.exe"
+            "value": "cmd.exe /c notepad.exe",
+            "cwd": null
         },
         {
             "type": "credential",
@@ -109,6 +110,73 @@
             "tags": [],
             "address": "14qViLJfdGaP4EeHnDyJbEGQysnCpwk3gd",
             "symbol": "BTC"
+        },
+        {
+            "type": "scheduled_task",
+            "tags": [],
+            "actions": [
+                {
+                    "type": "command",
+                    "tags": [],
+                    "value": "calc.exe",
+                    "cwd": null
+                }
+            ],
+            "name": "CalcTask",
+            "description": null,
+            "author": null,
+            "credentials": null
+        },
+        {
+            "type": "command",
+            "tags": [],
+            "value": "calc.exe",
+            "cwd": null
+        },
+        {
+            "type": "scheduled_task",
+            "tags": [],
+            "actions": [
+                {
+                    "type": "command",
+                    "tags": [],
+                    "value": "notepad.exe",
+                    "cwd": "C:\\Windows\\Temp"
+                },
+                {
+                    "type": "command",
+                    "tags": [],
+                    "value": "cmd.exe /c \"echo hi\"",
+                    "cwd": null
+                }
+            ],
+            "name": "Complex Task",
+            "description": "Some task with multiple commands",
+            "author": null,
+            "credentials": {
+                "type": "credential",
+                "tags": [],
+                "username": "admin",
+                "password": "pass"
+            }
+        },
+        {
+            "type": "command",
+            "tags": [],
+            "value": "notepad.exe",
+            "cwd": "C:\\Windows\\Temp"
+        },
+        {
+            "type": "command",
+            "tags": [],
+            "value": "cmd.exe /c \"echo hi\"",
+            "cwd": null
+        },
+        {
+            "type": "credential",
+            "tags": [],
+            "username": "admin",
+            "password": "pass"
         },
         {
             "type": "socket",
@@ -446,12 +514,6 @@
             "listen": null
         },
         {
-            "type": "credential",
-            "tags": [],
-            "username": "admin",
-            "password": "pass"
-        },
-        {
             "type": "socket",
             "tags": [
                 "proxy"
@@ -512,6 +574,54 @@
             "port": 21,
             "network_protocol": null,
             "listen": null
+        },
+        {
+            "type": "network",
+            "tags": [],
+            "url": {
+                "type": "url",
+                "tags": [],
+                "url": null,
+                "path": null,
+                "query": null,
+                "protocol": "ftp"
+            },
+            "socket": {
+                "type": "socket",
+                "tags": [],
+                "address": "123.45.67.89",
+                "port": 0,
+                "network_protocol": null,
+                "listen": null
+            },
+            "credential": {
+                "type": "credential",
+                "tags": [],
+                "username": "password",
+                "password": "username"
+            }
+        },
+        {
+            "type": "url",
+            "tags": [],
+            "url": null,
+            "path": null,
+            "query": null,
+            "protocol": "ftp"
+        },
+        {
+            "type": "socket",
+            "tags": [],
+            "address": "123.45.67.89",
+            "port": 0,
+            "network_protocol": null,
+            "listen": null
+        },
+        {
+            "type": "credential",
+            "tags": [],
+            "username": "password",
+            "password": "username"
         },
         {
             "type": "email_address",

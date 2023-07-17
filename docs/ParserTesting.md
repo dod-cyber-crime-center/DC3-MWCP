@@ -152,6 +152,20 @@ This will not run any tests, but rather just output the `pytest` command.
 pytest 'C:\Python310\Lib\site-packages\mwcp\tests\test_parsers.py' --disable-pytest-warnings --durations 10 -vv -k foo -n auto
 ```
 
+## Code Coverage
+
+The `--cov` flag can be used to enable code coverage tracking through the use of the [pytest-cov](https://github.com/pytest-dev/pytest-cov) plugin. 
+Only the files which contain the `Parser` component classes for the requested parser(s) will be included in the code coverage.
+
+After testing, the [Coverage.py](https://coverage.readthedocs.io) tool can be used to generate reports.
+
+
+```console
+> mwcp test foo --cov
+> coverage html
+> open htmlcov/index.html
+```
+
 
 ## Downloading Test Samples
 

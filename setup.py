@@ -41,6 +41,7 @@ setup(
         'construct==2.9.45',  # pin because parsers are very dependent on this.
         'defusedxml',
         'future',
+        'isodate',
         'jinja2',  # For construct.html_hex()
         'jsonschema_extractor>=1.0',
         'packaging',
@@ -54,6 +55,7 @@ setup(
         'pytest-datadir',
         'pytest-xdist',
         'pytest-mock',
+        'pytest-cov',
         'pyyaml',
         'requests',
         'ruamel.yaml',
@@ -66,7 +68,7 @@ setup(
         'pygments',
 
         # Dependencies for builtin parsers.
-        'isoparser',
+        'pycdlib',
         'pycryptodome',
         'olefile',
     ],

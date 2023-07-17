@@ -10,7 +10,7 @@ import importlib.util
 import logging
 import os
 import pkgutil
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Type, Iterable
 
 import pkg_resources
 
@@ -453,3 +453,30 @@ def get_parser_descriptions(name=None, source=None, config_only=True):
     for _source, parser in iter_parsers(name=name, source=source, config_only=config_only, _recursive=False):
         descriptions.append(ParserInfo(parser.name, _source.name, parser.AUTHOR, parser.DESCRIPTION))
     return sorted(descriptions, key=lambda e: tuple(sub.lower() for sub in e))  # Case-insensitive sorting.
+
+
+def iter_parser_classes(*names) -> Iterable[Type[Parser]]:
+    """
+    Obtains the Parser component classes that would be used based on the requested parser(s).
+
+    :param names: Names of parsers to obtain Parser classes.
+    """
+    if not names:
+        return
+
+    seen = set()
+
+    def _iter_classes(parser):
+        if parser in seen:
+            return
+        if isinstance(parser, type) and issubclass(parser, Parser):
+            seen.add(parser)
+            yield parser
+        else:
+            assert isinstance(parser, Dispatcher)
+            for sub_parser in parser.parsers:
+                yield from _iter_classes(sub_parser)
+
+    for name in names:
+        for _, parser in iter_parsers(name):
+            yield from _iter_classes(parser)

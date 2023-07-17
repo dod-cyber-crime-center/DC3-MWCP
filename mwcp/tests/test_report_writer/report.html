@@ -31,10 +31,13 @@
 <h2>Command</h2>
 <table>
 <thead>
-<tr><th>Value                 </th></tr>
+<tr><th>Command                       </th><th>Working Directory  </th></tr>
 </thead>
 <tbody>
-<tr><td>cmd.exe /c notepad.exe</td></tr>
+<tr><td>cmd.exe /c notepad.exe        </td><td>                   </td></tr>
+<tr><td>calc.exe                      </td><td>                   </td></tr>
+<tr><td>notepad.exe                   </td><td>C:\Windows\Temp    </td></tr>
+<tr><td>cmd.exe /c &quot;echo hi&quot;</td><td>                   </td></tr>
 </tbody>
 </table>
 
@@ -47,9 +50,10 @@
 <tr><td>admin     </td><td>123456             </td></tr>
 <tr><td>mruser    </td><td>                   </td></tr>
 <tr><td>          </td><td>secrets            </td></tr>
+<tr><td>admin     </td><td>pass               </td></tr>
 <tr><td>You       </td><td>Tube               </td></tr>
 <tr><td>Malware   </td><td>ConfigurationParser</td></tr>
-<tr><td>admin     </td><td>pass               </td></tr>
+<tr><td>password  </td><td>username           </td></tr>
 </tbody>
 </table>
 
@@ -160,6 +164,7 @@
 <tr><td>c2    </td><td>http://[fe80::20c:1234:5678:9abc]:80/badness</td><td>/badness         </td><td>              </td><td>http      </td><td style="text-align: right;">    80</td><td>          </td><td>                   </td><td>fe80::20c:1234:5678:9abc</td><td>                  </td></tr>
 <tr><td>proxy </td><td>                                            </td><td>                 </td><td>              </td><td>          </td><td style="text-align: right;">    80</td><td>admin     </td><td>pass               </td><td>192.168.1.1             </td><td>tcp               </td></tr>
 <tr><td>      </td><td>ftp://badhost.com:21                        </td><td>                 </td><td>              </td><td>ftp       </td><td style="text-align: right;">    21</td><td>admin     </td><td>pass               </td><td>badhost.com             </td><td>                  </td></tr>
+<tr><td>      </td><td>                                            </td><td>                 </td><td>              </td><td>ftp       </td><td style="text-align: right;">     0</td><td>password  </td><td>username           </td><td>123.45.67.89            </td><td>                  </td></tr>
 </tbody>
 </table>
 
@@ -239,6 +244,18 @@ Public Exponent (e):
 </tbody>
 </table>
 
+<h2>Scheduled Task</h2>
+<table>
+<thead>
+<tr><th>Actions  </th><th>Name        </th><th>Description                     </th><th>Username  </th><th>Password  </th></tr>
+</thead>
+<tbody>
+<tr><td>calc.exe </td><td>CalcTask    </td><td>                                </td><td>          </td><td>          </td></tr>
+<tr><td><pre>C:\Windows\Temp&gt; notepad.exe
+cmd.exe /c &quot;echo hi&quot;</pre>          </td><td>Complex Task</td><td>Some task with multiple commands</td><td>admin     </td><td>pass      </td></tr>
+</tbody>
+</table>
+
 <h2>Service</h2>
 <table>
 <thead>
@@ -269,6 +286,7 @@ Public Exponent (e):
 <tr><td>proxy </td><td>12.34.56.78             </td><td style="text-align: right;">    90</td><td>tcp               </td><td>        </td></tr>
 <tr><td>proxy </td><td>255.255.255.255         </td><td style="text-align: right;">      </td><td>                  </td><td>        </td></tr>
 <tr><td>      </td><td>badhost.com             </td><td style="text-align: right;">    21</td><td>                  </td><td>        </td></tr>
+<tr><td>      </td><td>123.45.67.89            </td><td style="text-align: right;">     0</td><td>                  </td><td>        </td></tr>
 </tbody>
 </table>
 
@@ -287,6 +305,7 @@ Public Exponent (e):
 <tr><td>      </td><td>                                            </td><td>url/path.jpg     </td><td>               </td><td>          </td></tr>
 <tr><td>      </td><td>                                            </td><td>                 </td><td>query?answer=42</td><td>          </td></tr>
 <tr><td>      </td><td>ftp://badhost.com:21                        </td><td>                 </td><td>               </td><td>ftp       </td></tr>
+<tr><td>      </td><td>                                            </td><td>                 </td><td>               </td><td>ftp       </td></tr>
 </tbody>
 </table>
 

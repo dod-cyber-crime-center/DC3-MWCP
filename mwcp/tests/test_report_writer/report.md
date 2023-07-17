@@ -19,9 +19,12 @@
 | ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/= |     64 |
 
 ## Command
-| Value                  |
-|:-----------------------|
-| cmd.exe /c notepad.exe |
+| Command                | Working Directory   |
+|:-----------------------|:--------------------|
+| cmd.exe /c notepad.exe |                     |
+| calc.exe               |                     |
+| notepad.exe            | C:\Windows\Temp     |
+| cmd.exe /c "echo hi"   |                     |
 
 ## Credential
 | Username   | Password            |
@@ -29,9 +32,10 @@
 | admin      | 123456              |
 | mruser     |                     |
 |            | secrets             |
+| admin      | pass                |
 | You        | Tube                |
 | Malware    | ConfigurationParser |
-| admin      | pass                |
+| password   | username            |
 
 ## Crypto Address
 | Address                            | Symbol   |
@@ -92,6 +96,7 @@
 | c2     | http://[fe80::20c:1234:5678:9abc]:80/badness | /badness          |                | http       |     80 |            |                     | fe80::20c:1234:5678:9abc |                    |
 | proxy  |                                              |                   |                |            |     80 | admin      | pass                | 192.168.1.1              | tcp                |
 |        | ftp://badhost.com:21                         |                   |                | ftp        |     21 | admin      | pass                | badhost.com              |                    |
+|        |                                              |                   |                | ftp        |      0 | password   | username            | 123.45.67.89             |                    |
 
 ## Path
 | Path                            | Is Dir   | Posix   |
@@ -124,6 +129,12 @@
 |        | HKEY_LOCAL_MACHINE\Foo\Bar                                       |         |               |             |
 | tag2   |                                                                  | Baz     |               |             |
 
+## Scheduled Task
+| Actions                                              | Name         | Description                      | Username   | Password   |
+|:-----------------------------------------------------|:-------------|:---------------------------------|:-----------|:-----------|
+| calc.exe                                             | CalcTask     |                                  |            |            |
+| C:\Windows\Temp> notepad.exe<br>cmd.exe /c "echo hi" | Complex Task | Some task with multiple commands | admin      | pass       |
+
 ## Service
 | Name                  | Display Name            | Description                                                            | Image                |
 |:----------------------|:------------------------|:-----------------------------------------------------------------------|:---------------------|
@@ -146,6 +157,7 @@
 | proxy  | 12.34.56.78              |     90 | tcp                |          |
 | proxy  | 255.255.255.255          |        |                    |          |
 |        | badhost.com              |     21 |                    |          |
+|        | 123.45.67.89             |      0 |                    |          |
 
 ## URL
 | Tags   | Url                                          | Path              | Query           | Protocol   |
@@ -159,6 +171,7 @@
 |        |                                              | url/path.jpg      |                 |            |
 |        |                                              |                   | query?answer=42 |            |
 |        | ftp://badhost.com:21                         |                   |                 | ftp        |
+|        |                                              |                   |                 | ftp        |
 
 ## UUID
 | Value                                |

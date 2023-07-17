@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$id": "https://raw.githubusercontent.com/dod-cyber-crime-center/DC3-MWCP/3.12.0/mwcp/config/schema.json",
+    "$id": "https://raw.githubusercontent.com/dod-cyber-crime-center/DC3-MWCP/3.13.0/mwcp/config/schema.json",
     "title": "Report",
     "description": "Defines the report of all metadata elements.",
     "type": "object",
@@ -195,6 +195,12 @@
                             },
                             "value": {
                                 "type": "string"
+                            },
+                            "cwd": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
                             }
                         },
                         "additionalProperties": false,
@@ -1154,6 +1160,126 @@
                                 "type": [
                                     "integer",
                                     "null"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "tags"
+                        ]
+                    },
+                    {
+                        "title": "ScheduledTask",
+                        "description": "A Windows Scheduled task",
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "scheduled_task"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "actions": {
+                                "anyOf": [
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "title": "Command",
+                                            "description": "Shell command",
+                                            "type": "object",
+                                            "properties": {
+                                                "type": {
+                                                    "const": "command"
+                                                },
+                                                "tags": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "value": {
+                                                    "type": "string"
+                                                },
+                                                "cwd": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "additionalProperties": false,
+                                            "required": [
+                                                "type",
+                                                "tags",
+                                                "value"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "author": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "credentials": {
+                                "anyOf": [
+                                    {
+                                        "title": "Credential",
+                                        "description": "Collection of username and password used as credentials.",
+                                        "type": "object",
+                                        "properties": {
+                                            "type": {
+                                                "const": "credential"
+                                            },
+                                            "tags": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "username": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "password": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "required": [
+                                            "type",
+                                            "tags"
+                                        ]
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
                                 ]
                             }
                         },

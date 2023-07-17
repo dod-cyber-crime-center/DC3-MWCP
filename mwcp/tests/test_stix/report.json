@@ -1,6 +1,6 @@
 {
     "type": "bundle",
-    "id": "bundle--00000000-0000-4006-9000-000000000224",
+    "id": "bundle--00000000-0000-4006-9000-000000000253",
     "objects": [
         {
             "type": "file",
@@ -54,7 +54,7 @@
         {
             "type": "process",
             "spec_version": "2.1",
-            "id": "process--afbeadcf-8c4d-51af-a780-9ca51b0525d5",
+            "id": "process--967dc03f-f29e-5ea6-8ac4-a943b44d908c",
             "command_line": "cmd.exe /c notepad.exe"
         },
         {
@@ -87,6 +87,86 @@
                     "extension_type": "new-sco"
                 }
             }
+        },
+        {
+            "type": "scheduled-task",
+            "spec_version": "2.1",
+            "id": "scheduled-task--838714c2-7c33-5b62-9c83-dcf1bcb57200",
+            "name": "CalcTask",
+            "extensions": {
+                "extension-definition--936177d9-884c-48a9-9883-c768b4ea0fb0": {
+                    "extension_type": "new-sco"
+                }
+            }
+        },
+        {
+            "type": "process",
+            "spec_version": "2.1",
+            "id": "process--b1992bc5-6311-55b6-ac80-dab0d482ea73",
+            "command_line": "calc.exe"
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--00000000-0000-4006-9000-000000000025",
+            "created": "2022-01-01T07:32:00.000Z",
+            "modified": "2022-01-01T07:32:00.000Z",
+            "relationship_type": "contained",
+            "source_ref": "scheduled-task--838714c2-7c33-5b62-9c83-dcf1bcb57200",
+            "target_ref": "process--b1992bc5-6311-55b6-ac80-dab0d482ea73"
+        },
+        {
+            "type": "scheduled-task",
+            "spec_version": "2.1",
+            "id": "scheduled-task--84f6855c-1dc9-5151-869c-5739365269ee",
+            "name": "Complex Task",
+            "description": "Some task with multiple commands",
+            "user_account_ref": "user-account--fe211bbf-7bcb-57db-a908-3f92b8729256",
+            "extensions": {
+                "extension-definition--936177d9-884c-48a9-9883-c768b4ea0fb0": {
+                    "extension_type": "new-sco"
+                }
+            }
+        },
+        {
+            "type": "process",
+            "spec_version": "2.1",
+            "id": "process--4d442556-503e-5860-b658-c2408f6770d0",
+            "cwd": "C:\\Windows\\Temp",
+            "command_line": "notepad.exe"
+        },
+        {
+            "type": "process",
+            "spec_version": "2.1",
+            "id": "process--f8fc9682-7b8f-5928-8dc8-048d5a5ad3e2",
+            "command_line": "cmd.exe /c \"echo hi\""
+        },
+        {
+            "type": "user-account",
+            "spec_version": "2.1",
+            "id": "user-account--fe211bbf-7bcb-57db-a908-3f92b8729256",
+            "credential": "pass",
+            "account_login": "admin"
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--00000000-0000-4006-9000-000000000032",
+            "created": "2022-01-01T07:32:00.000Z",
+            "modified": "2022-01-01T07:32:00.000Z",
+            "relationship_type": "contained",
+            "source_ref": "scheduled-task--84f6855c-1dc9-5151-869c-5739365269ee",
+            "target_ref": "process--4d442556-503e-5860-b658-c2408f6770d0"
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--00000000-0000-4006-9000-000000000035",
+            "created": "2022-01-01T07:32:00.000Z",
+            "modified": "2022-01-01T07:32:00.000Z",
+            "relationship_type": "contained",
+            "source_ref": "scheduled-task--84f6855c-1dc9-5151-869c-5739365269ee",
+            "target_ref": "process--f8fc9682-7b8f-5928-8dc8-048d5a5ad3e2"
         },
         {
             "type": "network-traffic",
@@ -126,7 +206,7 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000028",
+            "id": "note--00000000-0000-4006-9000-000000000046",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "MWCP Tags: c2",
@@ -196,22 +276,28 @@
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000041",
+            "id": "relationship--00000000-0000-4006-9000-000000000060",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "used",
             "source_ref": "network-traffic--0e1af2a8-ca87-580a-8408-43736afaf891",
-            "target_ref": "url--c96b45dd-72e8-5c12-84b4-3e315f44a933"
+            "target_ref": "url--c96b45dd-72e8-5c12-84b4-3e315f44a933",
+            "labels": [
+                "user-account--60790776-3c42-5af0-87f3-410d53d4773d"
+            ]
         },
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000044",
+            "id": "relationship--00000000-0000-4006-9000-000000000062",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "contained",
             "source_ref": "url--c96b45dd-72e8-5c12-84b4-3e315f44a933",
-            "target_ref": "user-account--60790776-3c42-5af0-87f3-410d53d4773d"
+            "target_ref": "user-account--60790776-3c42-5af0-87f3-410d53d4773d",
+            "labels": [
+                "network-traffic--0e1af2a8-ca87-580a-8408-43736afaf891"
+            ]
         },
         {
             "type": "url",
@@ -245,22 +331,28 @@
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000057",
+            "id": "relationship--00000000-0000-4006-9000-000000000076",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "used",
             "source_ref": "network-traffic--e107283e-6e4e-5481-813a-eb46a74a66a1",
-            "target_ref": "url--967a2810-a1a7-5d17-95fa-9a1d91b21f91"
+            "target_ref": "url--967a2810-a1a7-5d17-95fa-9a1d91b21f91",
+            "labels": [
+                "user-account--5ab45405-dabc-5d27-bd2b-316d070c8f8a"
+            ]
         },
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000060",
+            "id": "relationship--00000000-0000-4006-9000-000000000078",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "contained",
             "source_ref": "url--967a2810-a1a7-5d17-95fa-9a1d91b21f91",
-            "target_ref": "user-account--5ab45405-dabc-5d27-bd2b-316d070c8f8a"
+            "target_ref": "user-account--5ab45405-dabc-5d27-bd2b-316d070c8f8a",
+            "labels": [
+                "network-traffic--e107283e-6e4e-5481-813a-eb46a74a66a1"
+            ]
         },
         {
             "type": "url",
@@ -289,7 +381,7 @@
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000073",
+            "id": "relationship--00000000-0000-4006-9000-000000000091",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "used",
@@ -321,7 +413,7 @@
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000087",
+            "id": "relationship--00000000-0000-4006-9000-000000000105",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "used",
@@ -354,7 +446,7 @@
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000099",
+            "id": "relationship--00000000-0000-4006-9000-000000000117",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "used",
@@ -387,7 +479,7 @@
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000117",
+            "id": "relationship--00000000-0000-4006-9000-000000000135",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "used",
@@ -431,13 +523,6 @@
             ]
         },
         {
-            "type": "user-account",
-            "spec_version": "2.1",
-            "id": "user-account--fe211bbf-7bcb-57db-a908-3f92b8729256",
-            "credential": "pass",
-            "account_login": "admin"
-        },
-        {
             "type": "ipv4-addr",
             "spec_version": "2.1",
             "id": "ipv4-addr--cd2ddd9b-6ae2-5d22-aec9-a9940505e5d5",
@@ -446,7 +531,7 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000131",
+            "id": "note--00000000-0000-4006-9000-000000000149",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "MWCP Tags: proxy",
@@ -462,7 +547,7 @@
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000134",
+            "id": "relationship--00000000-0000-4006-9000-000000000152",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "contained",
@@ -523,12 +608,13 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000154",
+            "id": "note--00000000-0000-4006-9000-000000000171",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "FTP",
             "object_refs": [
-                "url--0bdcaa6f-f4d8-5870-b34c-3499c52f6da8"
+                "url--0bdcaa6f-f4d8-5870-b34c-3499c52f6da8",
+                "network-traffic--a5c2b0ba-4ca4-5f92-9b7f-31ea4328c9f3"
             ],
             "labels": [
                 "FTP"
@@ -543,22 +629,62 @@
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000159",
+            "id": "relationship--00000000-0000-4006-9000-000000000177",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "used",
             "source_ref": "network-traffic--61c4dfb2-0590-52ab-8a89-182fdfac2c9f",
-            "target_ref": "url--0bdcaa6f-f4d8-5870-b34c-3499c52f6da8"
+            "target_ref": "url--0bdcaa6f-f4d8-5870-b34c-3499c52f6da8",
+            "labels": [
+                "user-account--fe211bbf-7bcb-57db-a908-3f92b8729256"
+            ]
         },
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000162",
+            "id": "relationship--00000000-0000-4006-9000-000000000179",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "contained",
             "source_ref": "url--0bdcaa6f-f4d8-5870-b34c-3499c52f6da8",
-            "target_ref": "user-account--fe211bbf-7bcb-57db-a908-3f92b8729256"
+            "target_ref": "user-account--fe211bbf-7bcb-57db-a908-3f92b8729256",
+            "labels": [
+                "network-traffic--61c4dfb2-0590-52ab-8a89-182fdfac2c9f"
+            ]
+        },
+        {
+            "type": "network-traffic",
+            "spec_version": "2.1",
+            "id": "network-traffic--a5c2b0ba-4ca4-5f92-9b7f-31ea4328c9f3",
+            "is_active": false,
+            "dst_ref": "ipv4-addr--825a9b1f-0e4b-5ae6-a6f3-deb785022479",
+            "dst_port": 0,
+            "protocols": [
+                "ipv4"
+            ]
+        },
+        {
+            "type": "user-account",
+            "spec_version": "2.1",
+            "id": "user-account--c4cf62fa-9291-5b00-98a3-da76a7e7014a",
+            "credential": "username",
+            "account_login": "password"
+        },
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--825a9b1f-0e4b-5ae6-a6f3-deb785022479",
+            "value": "123.45.67.89"
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--00000000-0000-4006-9000-000000000194",
+            "created": "2022-01-01T07:32:00.000Z",
+            "modified": "2022-01-01T07:32:00.000Z",
+            "relationship_type": "contained",
+            "source_ref": "network-traffic--a5c2b0ba-4ca4-5f92-9b7f-31ea4328c9f3",
+            "target_ref": "user-account--c4cf62fa-9291-5b00-98a3-da76a7e7014a"
         },
         {
             "type": "email-addr",
@@ -643,7 +769,7 @@
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000185",
+            "id": "relationship--00000000-0000-4006-9000-000000000214",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "outputs",
@@ -683,7 +809,7 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000195",
+            "id": "note--00000000-0000-4006-9000-000000000224",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "MWCP Tags: something",
@@ -749,7 +875,7 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000207",
+            "id": "note--00000000-0000-4006-9000-000000000236",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "MWCP Tags: tag2",
@@ -832,7 +958,7 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000220",
+            "id": "note--00000000-0000-4006-9000-000000000249",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "Description: SuperMalware Implant\nAlphabet: 0123456789ABCDEF\nAlphabet Base: 16\nAlphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567=\nAlphabet Base: 32\nAlphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\nAlphabet Base: 64\nEvent Name: MicrosoftExist\nInjects Into: svchost\nInterval: 3.0\nkeylogger: True\nmisc_integer: 432\n    misc_integer Tags: tag1\nVersion: 3.1\nVersion: 403.10",
@@ -843,7 +969,7 @@
         {
             "type": "malware-analysis",
             "spec_version": "2.1",
-            "id": "malware-analysis--00000000-0000-4006-9000-000000000222",
+            "id": "malware-analysis--00000000-0000-4006-9000-000000000251",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "product": "mwcp",
@@ -865,6 +991,7 @@
                 "network-traffic--61c4dfb2-0590-52ab-8a89-182fdfac2c9f",
                 "network-traffic--62cf4d13-9b4e-53b6-bb6b-7a76b84af80e",
                 "network-traffic--8343028c-1e60-592d-85a7-0923ff19dfef",
+                "network-traffic--a5c2b0ba-4ca4-5f92-9b7f-31ea4328c9f3",
                 "network-traffic--b8bbe726-692b-5ea4-884b-6b51d6b92d45",
                 "network-traffic--bb17faf8-923f-53e4-9414-d13ca5be64ad",
                 "network-traffic--d8fb20fc-2b25-5759-8248-51b2cfb33811",
@@ -882,8 +1009,13 @@
                 "observed-string--b864bf21-56c6-5463-8090-fbed73fe8c0a",
                 "observed-string--bc281294-f441-523b-9120-36904995dbea",
                 "observed-string--e9ed8909-9e65-5117-b69e-19bbfd27219f",
-                "process--afbeadcf-8c4d-51af-a780-9ca51b0525d5",
+                "process--4d442556-503e-5860-b658-c2408f6770d0",
+                "process--967dc03f-f29e-5ea6-8ac4-a943b44d908c",
+                "process--b1992bc5-6311-55b6-ac80-dab0d482ea73",
+                "process--f8fc9682-7b8f-5928-8dc8-048d5a5ad3e2",
                 "process--fcae5a42-bfd2-5484-8f83-e917a0ffbdc7",
+                "scheduled-task--838714c2-7c33-5b62-9c83-dcf1bcb57200",
+                "scheduled-task--84f6855c-1dc9-5151-869c-5739365269ee",
                 "symmetric-encryption--142febd3-2359-57f8-b864-179af8a65bc0",
                 "symmetric-encryption--89973fff-4119-5075-b47f-90b5de7e98c2",
                 "symmetric-encryption--e221dd6b-1b29-515a-b280-50b4e42f74aa",
@@ -898,6 +1030,7 @@
                 "user-account--60790776-3c42-5af0-87f3-410d53d4773d",
                 "user-account--7629d6cc-ddf1-5613-ac3f-a99412e97f7f",
                 "user-account--77b33f3a-e5cc-5dbf-9ca1-1909c939adff",
+                "user-account--c4cf62fa-9291-5b00-98a3-da76a7e7014a",
                 "user-account--fb2bd8be-01c4-5b2a-a3ee-f9de3d09571a",
                 "user-account--fe211bbf-7bcb-57db-a908-3f92b8729256",
                 "windows-registry-key--158cae83-e424-5b58-a7f9-2db9ff3bd31b",

@@ -37,6 +37,7 @@ import tabulate
 import mwcp
 from mwcp import testing
 from mwcp.exceptions import ConfigError
+from mwcp import registry
 from mwcp.stix.report_writer import STIXWriter
 from mwcp.tester import Tester
 from mwcp.utils.stringutils import convert_to_unicode
@@ -446,7 +447,10 @@ def parse(
                     df = reports[0].as_dataframe(split=split)
                 else:
                     df = pandas.concat([report.as_dataframe(split=split) for report in reports])
-                print(df.to_csv(line_terminator="\n"))
+                try:
+                    print(df.to_csv(lineterminator="\n"))
+                except TypeError:
+                    print(df.to_csv(line_terminator="\n"))  # pandas < 2.0
 
         elif format == "stix":
             writer = STIXWriter()
@@ -701,11 +705,17 @@ def _run_tests(tester, silent=False, show_passed=False):
          "(e.g. --param aes_key:secret) "
          "This flag can be provided multiple times for multiple parameters."
 )
+@click.option(
+    "--cov", "--coverage",
+    is_flag=True,
+    help="Whether to include code coverage information for parser files. "
+         "After tests are complete, reports can be generated using `coverage`. (e.g. `coverage html`)."
+)
 # Parser to process.
 @click.argument("parser", nargs=-1, required=False)
 def test(
     testcase_dir, malware_repo, nprocs, update, add, add_filelist, delete, yes, force, last_failed, show_passed,
-    silent, legacy, exit_on_first, command, full_diff, yara_repo, recursive, param, parser,
+    silent, legacy, exit_on_first, command, full_diff, yara_repo, recursive, param, cov, parser,
 ):
     """
     Testing utility to create and execute parser test cases.
@@ -859,6 +869,18 @@ def test(
             else:
                 # Reset cache for keeping track of previously failed tests.
                 pytest_args += ["--cache-clear"]
+
+            if cov:
+                # Determine what modules to give to pytest-cov based on the parsers requested.
+                if parser:
+                    modules = set(parser_klass.__module__ for parser_klass in registry.iter_parser_classes(*parser))
+                else:
+                    modules = set()
+                    for source in registry.get_sources():
+                        if package := source.package:
+                            modules.add(package.__name__)
+                for module in sorted(modules):
+                    pytest_args += ["--cov", module]
 
             if parser:
                 pytest_args += ["-k", " or ".join(parser)]

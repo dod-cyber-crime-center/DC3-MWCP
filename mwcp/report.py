@@ -286,6 +286,8 @@ class Report:
                     results["address"].append(element.address)
                     if "c2" in element.tags:
                         results["c2_address"].append(element.address)
+                    if "proxy" in element.tags:
+                        results["proxy_address"].append(element.address)
 
                 socket_address = [
                     element.address or "",
@@ -298,6 +300,8 @@ class Report:
                         results["socketaddress"].append(socket_address)
                         if "c2" in element.tags:
                             results["c2_socketaddress"].append(socket_address)
+                        if "proxy" in element.tags:
+                            results["proxy_socketaddress"].append(socket_address)
 
                     port = socket_address[1:]
                     if element.listen:
@@ -323,38 +327,34 @@ class Report:
             elif isinstance(element, metadata.URL2):
                 if element.url:
                     results["url"].append(element.url)
+                    if "c2" in element.tags:
+                        results["c2_url"].append(element.url)
                 if element.path:
                     results["urlpath"].append(element.path)
-                if element.protocol == "ftp":
-                    credential = element.credential
-                    # If the credential wasn't included, they probably didn't mean for the url to
-                    # be reported as "ftp" under the legacy schema.
-                    if credential:
-                        ftp = [credential.username, credential.password, element.url]
-                        results["ftp"].append(ftp)
+                    if "c2" in element.tags and not element.url:
+                        results["c2_url"].append(element.path)
 
             elif isinstance(element, metadata.Network):
-                if element.socket and "c2" in element.socket.tags:
-                    if element.url and element.url.url:
-                        results["c2_url"].append(element.url.url)
-                if element.socket and "proxy" in element.socket.tags:
-                    if element.credential:
-                        results["proxy"].append([
-                            element.credential.username,
-                            element.credential.password,
+                if element.socket and element.credential and "proxy" in element.socket.tags:
+                    results["proxy"].append([
+                        element.credential.username,
+                        element.credential.password,
+                        element.socket.address or "",
+                        str(element.socket.port),
+                        element.socket.network_protocol or ""
+                    ])
+                if element.url and element.url.protocol == "ftp":
+                    result = []
+                    if element.url.url:
+                        result.extend([element.url.url])
+                    if element.socket:
+                        result.extend([
                             element.socket.address or "",
                             str(element.socket.port),
                             element.socket.network_protocol or ""
                         ])
-                    if element.socket.address:
-                        results["proxy_address"].append(element.socket.address)
-                        if element.socket.port:
-                            results["proxy_socketaddress"].append([
-                                element.socket.address,
-                                str(element.socket.port),
-                                element.socket.network_protocol
-                            ])
-
+                    result.extend([element.credential.username, element.credential.password])
+                    results["ftp"].append(result)
             elif isinstance(element, metadata.Credential):
                 if element.username and element.password:
                     results["credential"].append([element.username, element.password])

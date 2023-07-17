@@ -1,6 +1,7 @@
 """
 This provides helper objects that can be used to generate STIX content
 """
+from __future__ import annotations
 
 
 class STIXResult:
@@ -35,8 +36,20 @@ class STIXResult:
         if note:
             self.unlinked_stix.append(note)
 
-    def merge(self, other):
+    def merge(self, other: STIXResult):
         self.linked_stix.extend(other.linked_stix)
+        self.unlinked_stix.extend(other.unlinked_stix)
+
+        if self.note_content == "":
+            self.note_content = other.note_content
+        elif other.note_content != "":
+            self.note_content += "\n" + other.note_content
+
+    def merge_ref(self, other: STIXResult):
+        """
+        A merge for when the target is a reference for the current object.
+        """
+        self.unlinked_stix.extend(other.linked_stix)
         self.unlinked_stix.extend(other.unlinked_stix)
 
         if self.note_content == "":

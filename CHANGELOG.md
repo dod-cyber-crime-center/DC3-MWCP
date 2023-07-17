@@ -1,6 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Added `cwd` to `Command` metadata object.
+- Added `ScheduledTask` metadata object. (#38)
+- Added `--cov` flag to `mwcp test` command for enabling code coverage for parsers. (see [documentation](docs/ParserTesting.md#code-coverage))
+
+### Changed
+- Improved handling of STIX results for `Network` objects.
+- The `dc3:ISO` parser has been updated to handle ISO 9660 `UDF`, `Joliet`, and `Rock Ridge` extensions.
+  - Consequently, the `isoparser` dependency has been replaced with `pycdlib`.
+
+
 ## [3.12.0] - 2023-04-20
 
 ### Changed
@@ -26,7 +39,7 @@ All notable changes to this project will be documented in this file.
 - Added better failure message when running a recursive test case without a YARA repo setup.
 - `Dispatcher.knowledge_base` has been moved to `Report.knowledge_base`. The original location is deprecated and will eventually be removed.
 - `Report.as_stix()` no longer requires a writer and will now return serialized JSON results. 
-  - Please use `Report.write_stix()` for original functionality. 
+  - Please use `Report.write_stix()` for original functionality.
 
 ### Fixed
 - `mwcp config` CLI command will now still work even if the config file is invalid.

@@ -287,6 +287,12 @@ def _fixup_test_cases(expected_results, actual_results):
         while empty_url in expected_results["metadata"]:
             expected_results["metadata"].remove(empty_url)
 
+    # Version 3.13 adds cwd to Command
+    if expected_results_version < version.parse("3.13.0"):
+        for item in expected_results["metadata"]:
+            if item["type"] == "command":
+                item["cwd"] = None
+
     # The order the metadata comes in doesn't matter and shouldn't fail the test.
     # (Using custom repr to ensure dictionary keys are sorted before repr is applied.)
     custom_repr = lambda d: repr(dict(sorted(d.items())) if isinstance(d, dict) else d)

@@ -65,7 +65,7 @@ report = {
             "tags": [],
             "type": "alphabet",
         },
-        {"tags": [], "type": "command", "value": "cmd.exe /c notepad.exe"},
+        {"cwd": None, "tags": [], "type": "command", "value": "cmd.exe /c notepad.exe"},
         {"password": "123456", "tags": [], "type": "credential", "username": "admin"},
         {"password": None, "tags": [], "type": "credential", "username": "mruser"},
         {"password": "secrets", "tags": [], "type": "credential", "username": None},
@@ -74,6 +74,63 @@ report = {
             "symbol": "BTC",
             "tags": [],
             "type": "crypto_address",
+        },
+        {
+            "actions": [
+                {"cwd": None, "tags": [], "type": "command", "value": "calc.exe"}
+            ],
+            "author": None,
+            "credentials": None,
+            "description": None,
+            "name": "CalcTask",
+            "tags": [],
+            "type": "scheduled_task",
+        },
+        {"cwd": None, "tags": [], "type": "command", "value": "calc.exe"},
+        {
+            "actions": [
+                {
+                    "cwd": "C:\\Windows\\Temp",
+                    "tags": [],
+                    "type": "command",
+                    "value": "notepad.exe",
+                },
+                {
+                    "cwd": None,
+                    "tags": [],
+                    "type": "command",
+                    "value": 'cmd.exe /c "echo hi"',
+                },
+            ],
+            "author": None,
+            "credentials": {
+                "password": "pass",
+                "tags": [],
+                "type": "credential",
+                "username": "admin",
+            },
+            "description": "Some task with multiple commands",
+            "name": "Complex Task",
+            "tags": [],
+            "type": "scheduled_task",
+        },
+        {
+            "cwd": "C:\\Windows\\Temp",
+            "tags": [],
+            "type": "command",
+            "value": "notepad.exe",
+        },
+        {
+            "cwd": None,
+            "tags": [],
+            "type": "command",
+            "value": 'cmd.exe /c "echo hi"'
+        },
+        {
+            "password": "pass",
+            "tags": [],
+            "type": "credential",
+            "username": "admin"
         },
         {
             "address": "bad.com",
@@ -399,12 +456,6 @@ report = {
             "type": "socket",
         },
         {
-            "password": "pass",
-            "tags": [],
-            "type": "credential",
-            "username": "admin",
-        },
-        {
             "address": "12.34.56.78",
             "listen": None,
             "network_protocol": "tcp",
@@ -461,6 +512,54 @@ report = {
             "port": 21,
             "tags": [],
             "type": "socket",
+        },
+        {
+            "credential": {
+                "password": "username",
+                "tags": [],
+                "type": "credential",
+                "username": "password"
+            },
+            "socket": {
+                "address": "123.45.67.89",
+                "listen": None,
+                "network_protocol": None,
+                "port": 0,
+                "tags": [],
+                "type": "socket"
+            },
+            "tags": [],
+            "type": "network",
+            "url": {
+                "path": None,
+                "protocol": "ftp",
+                "query": None,
+                "tags": [],
+                "type": "url",
+                "url": None
+            }
+        },
+        {
+            "path": None,
+            "protocol": "ftp",
+            "query": None,
+            "tags": [],
+            "type": "url",
+            "url": None
+        },
+        {
+            "address": "123.45.67.89",
+            "listen": None,
+            "network_protocol": None,
+            "port": 0,
+            "tags": [],
+            "type": "socket"
+        },
+        {
+            "password": "username",
+            "tags": [],
+            "type": "credential",
+            "username": "password"
         },
         {"tags": [], "type": "email_address", "value": "email@bad.com"},
         {"tags": [], "type": "event", "value": "MicrosoftExist"},
