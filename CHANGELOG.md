@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [3.13.0] - 2023-07-17
 
 ### Added
 - Added `cwd` to `Command` metadata object.
@@ -630,7 +630,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.12.0...HEAD
+[Unreleased]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.13.0...HEAD
+[3.13.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.12.0...3.13.0
 [3.12.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.11.0...3.12.0
 [3.11.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.10.1...3.11.0
 [3.10.1]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.10.0...3.10.1
