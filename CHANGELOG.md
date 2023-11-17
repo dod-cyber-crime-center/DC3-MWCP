@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+## [Unreleased]
+
+### Fixed
+- DateTime related structures can throw OSError, catch and raise as construct.ConstructError
+
+
 ## [3.10.0] - 2023-01-25
 
 ### Added
