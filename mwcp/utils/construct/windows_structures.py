@@ -321,10 +321,13 @@ class SystemTimeAdapter(construct.Adapter):
         self._tzinfo = tzinfo
 
     def _decode(self, obj, context, path):
-        return datetime.datetime(
-            obj.wYear, obj.wMonth, obj.wDay, obj.wHour, obj.wMinute, obj.wSecond, obj.wMilliseconds * 1000,
-            tzinfo=self._tzinfo
-        ).isoformat()
+        try:
+            return datetime.datetime(
+                obj.wYear, obj.wMonth, obj.wDay, obj.wHour, obj.wMinute, obj.wSecond, obj.wMilliseconds * 1000,
+                tzinfo=self._tzinfo
+            ).isoformat()
+        except OSError as e:
+            raise construct.ConstructError(e)
 
 
 # Add common helpers
@@ -356,9 +359,12 @@ class FileTimeAdapter(construct.Adapter):
         self._tz = tz
 
     def _decode(self, obj, context, path):
-        return datetime.datetime.fromtimestamp(
-            (obj - EPOCH_AS_FILETIME) / HUNDREDS_OF_NANOSECONDS, tz=self._tz
-        ).isoformat()
+        try:
+            return datetime.datetime.fromtimestamp(
+                (obj - EPOCH_AS_FILETIME) / HUNDREDS_OF_NANOSECONDS, tz=self._tz
+            ).isoformat()
+        except OSError as e:
+            raise construct.ConstructError(e)
 
 
 # Add common helpers
