@@ -53,7 +53,10 @@ class EpochTimeAdapter(Adapter):
         self._tz = tz
 
     def _decode(self, obj, context, path):
-        return datetime.datetime.fromtimestamp(obj, tz=self._tz).isoformat()
+        try:
+            return datetime.datetime.fromtimestamp(obj, tz=self._tz).isoformat()
+        except OSError as e:
+            raise construct.ConstructError(e)
 
 
 # Add common helpers

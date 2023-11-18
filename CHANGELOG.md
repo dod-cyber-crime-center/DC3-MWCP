@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+## [Unreleased]
+
+### Changed
+- Catch OSError from DateTime related constructs and raise as ConstructError
+
+
 ## [3.13.0] - 2023-07-17
 
 ### Added
