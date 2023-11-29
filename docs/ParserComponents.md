@@ -113,10 +113,10 @@ def run(self):
     Extract metadata and implant from Foo Dropper.
     """
     # Decrypt and report implant.
-    key = self._extract_rc4_key(self.file_object.file_data)
+    key = self._extract_rc4_key(self.file_object.data)
     if key:
         # Decrypt and dispatch implant.
-        implant_data = self._decrypt_implant(key, self.file_object.file_data)
+        implant_data = self._decrypt_implant(key, self.file_object.data)
         if implant_data:
             implant_file_object = FileObject(implant_data, description='Decrypted Implant')
             self.dispatcher.add(implant_file_object)
@@ -139,7 +139,7 @@ need to be updated due to a new variant of the sample.
         Extract metadata and implant from Foo Dropper.
         """
         # Decrypt and report implant.
-        key = self._extract_rc4_key(self.file_object.file_data)
+        key = self._extract_rc4_key(self.file_object.data)
         if key:
             # Report key.
             self.logger.info('Found the key!')

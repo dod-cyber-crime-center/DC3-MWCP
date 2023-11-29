@@ -56,7 +56,7 @@ class FileObject(object):
 
     def __init__(
         self,
-        file_data: bytes,
+        file_data: Union[bytes, bytearray],
         reporter=None,  # DEPRECATED
         pe: pefile.PE = None,
         file_name=None,
@@ -72,7 +72,7 @@ class FileObject(object):
         """
         Initializes the FileObject.
 
-        :param bytes file_data: Data for the file.
+        :param bytes/bytearray file_data: Data for the file.
         :param pefile.PE pe: PE object for the file.
         :param mwcp.Report reporter: MWCP Report.
         :param str file_name: File name to use if file is not a PE or use_supplied_fname was specified.
@@ -94,9 +94,12 @@ class FileObject(object):
                 DeprecationWarning
             )
 
-        # Ensure we are getting a bytes string. Libraries like pefile depend on this.
-        if not isinstance(file_data, bytes):
-            raise TypeError("file_data must be a bytes string.")
+        # Ensure we are getting a bytes string or bytearray.
+        # Convert bytearrays to bytes strings as libraries like pefile depend on this.
+        if isinstance(file_data, bytearray):
+            file_data = bytes(file_data)
+        elif not isinstance(file_data, bytes):
+            raise TypeError("file_data must be either a bytes string or bytearray.")
 
         self._file_path = file_path
         self._exists = bool(file_path)  # Indicates if the user provided the path and the file exists on the host file system.

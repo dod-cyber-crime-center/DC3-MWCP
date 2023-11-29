@@ -355,7 +355,7 @@ class Dropper(Parser):
         Extract metadata and implant from Foo Dropper.
         """
         # parse config
-        info = self.DECRYPT_CALL.parse(self.file_object.file_data, pe=self.file_object.pe)
+        info = self.DECRYPT_CALL.parse(self.file_object.data, pe=self.file_object.pe)
         config = info.config
 
         # report metadata

@@ -222,6 +222,20 @@ class Report:
         """Provides copy of the initial knowledge_base provided by the user."""
         return dict(self._external_knowledge)  # copy to prevent parser from modifying.
 
+    @property
+    def unidentified(self) -> List[FileObject]:
+        """The files that are unidentified."""
+        from mwcp.dispatcher import UnidentifiedFile
+        if not self.input_file:
+            return []
+        ret = []
+        if self.input_file.parser == UnidentifiedFile:
+            ret.append(self.input_file)
+        for file_object in self.input_file.descendants:
+            if file_object.parser == UnidentifiedFile:
+                ret.append(file_object)
+        return ret
+
     def get_logs(self, source: Optional[FileObject] = None, errors_only=False) -> List[str]:
         """
         Gets log messages.

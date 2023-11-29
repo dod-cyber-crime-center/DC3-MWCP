@@ -7,6 +7,7 @@ import logging
 import pathlib
 import re
 import weakref
+from collections import deque
 from typing import TYPE_CHECKING, Union, Type, Tuple, Iterable
 
 import yara
@@ -17,7 +18,6 @@ from mwcp.file_object import FileObject
 from mwcp.dispatcher import Dispatcher
 from mwcp.report import Report
 from mwcp.registry import iter_parsers
-from mwcp.dispatcher import UnidentifiedFile
 
 if TYPE_CHECKING:
     from mwcp import Parser
@@ -148,7 +148,12 @@ class YaraRunner(Runner):
         super().__init__(**report_config)
         self._rules = self.compile_rules(pathlib.Path(yara_repo))
         self._recursive = recursive
-        self._attempted = set()  # Keep track of files we have already attempted to parse.
+        self._queue = deque()
+        self._seen = set()
+
+    def reset(self):
+        self._queue = deque()
+        self._seen = set()
 
     def compile_rules(self, yara_repo: pathlib.Path) -> yara.Rules:
         if not yara_repo.exists():
@@ -203,28 +208,33 @@ class YaraRunner(Runner):
         if not matched:
             logger.info(f"Found no YARA matches for {file_object.name}")
 
+    def _collect_unidentified(self, report: Report) -> Iterable[FileObject]:
+        """Collects new unidentified files since the last time this function was run."""
+        for file_object in report.unidentified:
+            if file_object not in self._seen:
+                self._seen.add(file_object)
+                yield file_object
+
     def _parse(self, input_file: FileObject, parsers: Iterable[Parser], report: Report):
-        self._attempted.add(input_file)
         super()._parse(input_file, parsers, report)
-        # After parsing the file, recursively process any undefined dispatched files.
+
+        # After parsing the file, recursively add any new undefined dispatched files to the queue for processing.
         if self._recursive:
-            for child in input_file.descendants:
-                if child.parser == UnidentifiedFile and child not in self._attempted:
-                    parsers = list(self.iter_parsers(child))
-                    if not parsers:
-                        self._attempted.add(child)  # Avoid running yara multiple times.
-                        continue
+            for file_object in self._collect_unidentified(report):
+                parsers = list(self.iter_parsers(file_object))
+                if not parsers:
+                    continue
 
-                    # Clear identification markings and try again.
-                    child.parser = None
-                    child.description = None
+                # Clear identification markings and try again.
+                file_object.parser = None
+                file_object.description = None
 
-                    # Remove child from report. (It will get re-added when we parse.)
-                    for file in report.get(metadata.File, source=child.parent):
-                        if file.md5 == child.md5:
-                            report.remove(file)
+                # Remove child from report. (It will get re-added when we parse.)
+                for file in report.get(metadata.File, source=file_object.parent):
+                    if file.md5 == file_object.md5:
+                        report.remove(file)
 
-                    self._parse(child, parsers, report)
+                self._queue.appendleft((file_object, parsers))
 
     def run(
             self,
@@ -262,8 +272,12 @@ class YaraRunner(Runner):
 
         with report, OutputLogger():
             try:
-                parsers = self.iter_parsers(input_file, parser)
-                self._parse(input_file, parsers, report)
+                self.reset()
+                parsers = list(self.iter_parsers(input_file, parser))
+                self._queue.appendleft((input_file, parsers))
+                while self._queue:
+                    file_object, parsers = self._queue.pop()
+                    self._parse(file_object, parsers, report)
                 return report
             finally:
                 self._cleanup()

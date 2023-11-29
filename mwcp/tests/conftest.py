@@ -285,3 +285,11 @@ def metadata_items() -> List[Metadata]:
             derivation="embedded"
         ),
     ]
+
+
+def pytest_itemcollected(item):
+    """
+    Automatically mark tests as "framework" if not marked as "parsers"
+    """
+    if not any(marker.name == "parsers" for marker in item.iter_markers()):
+        item.add_marker("framework")

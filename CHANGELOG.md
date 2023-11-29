@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Catch OSError from DateTime related constructs and raise as ConstructError
+- `FileObject` objects now also accept bytearrays for the `file_data` field.
+
+### Fixed
+- Fixed bug causing files to be unprocessed when using yara recursion with a dispatched file with a modified parent. (#40)
 
 
 ## [3.13.0] - 2023-07-17

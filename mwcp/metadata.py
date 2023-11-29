@@ -902,13 +902,12 @@ class ScheduledTask(Metadata):
             tags.extend(self.credentials.tags)
 
         actions = []
-        if self.actions is not None:
-            for action in self.actions:
-                tags.extend(action.tags)
-                if action.cwd:
-                    actions.append(f"{action.cwd}> {action.value}")
-                else:
-                    actions.append(action.value)
+        for action in self.actions or []:
+            tags.extend(action.tags)
+            if action.cwd:
+                actions.append(f"{action.cwd}> {action.value}")
+            else:
+                actions.append(action.value)
 
         return {
             "tags": sorted(set(tags)),
@@ -939,7 +938,7 @@ class ScheduledTask(Metadata):
         result.add_linked(scheduled_task)
         result.create_tag_note(self, scheduled_task)
 
-        for action in self.actions:
+        for action in self.actions or []:
             action_obj = action.as_stix(base_object)
             result.merge(action_obj)
             result.add_unlinked(stix.Relationship(
