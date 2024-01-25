@@ -8,15 +8,16 @@ Usage:
 
 import nox
 
+SUPPORTED_PYTHON_VERSIONS = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
-@nox.session(python="3.8")
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 def test(session):
     """Run pytests"""
     session.install("-e", ".[testing]")
     session.run("pytest")
 
 
-@nox.session(python="3.8")
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 def build(session):
     """Build source and wheel distribution"""
     session.run("python", "setup.py", "sdist")

@@ -5,6 +5,8 @@ A framework for malware configuration parsers.
 
 from setuptools import setup, find_packages
 
+from noxfile import SUPPORTED_PYTHON_VERSIONS
+
 setup(
     name="mwcp",
     author="DC3",
@@ -19,7 +21,8 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
+    ] + [
+        f'Programming Language :: Python :: {version}' for version in SUPPORTED_PYTHON_VERSIONS
     ],
     entry_points={
         'console_scripts': [
@@ -38,7 +41,7 @@ setup(
         'bitarray',
         'cattrs',
         'click>=8.0.1',
-        'construct==2.9.45',  # pin because parsers are very dependent on this.
+        'construct==2.10.70',  # pin because parsers are very dependent on this.
         'defusedxml',
         'future',
         'isodate',
