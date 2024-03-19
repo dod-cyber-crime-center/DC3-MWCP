@@ -1,6 +1,6 @@
 # Python Style Guide
 
-Use [black](github.com/psf/black) with line lengths of 120.
+Use [black](https://github.com/psf/black) with line lengths of 120.
 
 ```bash
 $ pip install black
