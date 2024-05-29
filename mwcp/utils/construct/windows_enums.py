@@ -3,7 +3,7 @@ A central location to store common windows enumerations.
 This module will be imported along with 'from mwcp.utils import construct'
 """
 
-from .version28 import *
+from .core import *
 
 # Visible interface. Add the classes and functions you would like to be available for users of construct
 # library here.
@@ -26,8 +26,8 @@ def RegHive(subcon):
     Converts an integer to registry hive enum.
 
     >>> RegHive(Int32ul).build("HKCU")
-    '\x01\x00\x00\x80'
-    >>> str(RegHive(Int32ul).parse('\x01\x00\x00\x80'))
+    b'\x01\x00\x00\x80'
+    >>> str(RegHive(Int32ul).parse(b'\x01\x00\x00\x80'))
     'HKCU'
     """
     return Enum(subcon, **REGHIVES)
@@ -46,8 +46,8 @@ def LanguageIdentifier(subcon):
     Converts an integer to language identifer enum
 
     >>> LanguageIdentifier(Int32ul).build("English (United States)")
-    '\t\x04\x00\x00'
-    >>> str(LanguageIdentifier(Int32ul).parse("\x04\x08\x00\x00"))
+    b'\t\x04\x00\x00'
+    >>> str(LanguageIdentifier(Int32ul).parse(b"\x04\x08\x00\x00"))
     'Chinese (PRC)'
     """
     return Enum(subcon, **LANGUAGEIDENTIFIERS)
@@ -107,8 +107,8 @@ def KnownFolderID(subcon):
     Converts an integer to a CSIDL (KNownFolderID) value
 
     >>> KnownFolderID(Int32ul).build("CSIDL_SYSTEM")
-    '%\x00\x00\x00'
-    >>> str(KnownFolderID(Int32ul).parse("\x18\x00\x00\x00"))
+    b'%\x00\x00\x00'
+    >>> str(KnownFolderID(Int32ul).parse(b"\x18\x00\x00\x00"))
     'CSIDL_COMMON_STARTUP'
     """
     return Enum(subcon, **CSIDL)
@@ -169,9 +169,9 @@ def AlgorithmID(subcon):
     r"""
     Converts an integer to an AlgorithmID value
 
-    >>> str(AlgorithmID(Int16ul).parse("\x00\xa4"))
+    >>> str(AlgorithmID(Int16ul).parse(b"\x00\xa4"))
     'CALG_RSA_KEYX'
     >>> AlgorithmID(Int16ul).build("CALG_RC4")
-    '\x01h'
+    b'\x01h'
     """
     return Enum(subcon, **ALGIDS)

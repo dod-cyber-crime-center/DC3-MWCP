@@ -256,8 +256,8 @@ class AhnLab(Parser):
         self.dispatcher.add(FileObject(decrypted_data))
 
 
-class Avast(Parser):
-    DESCRIPTION = "Avast"
+class Avast_AVG(Parser):
+    DESCRIPTION = "Avast or AVG"
     KEY = bytearray(
         (0x33, 0xB6, 0x59, 0x83, 0x8B, 0x43, 0x75, 0xFB, 0x35, 0xB6, 0x8A, 0x37, 0xAE, 0x29, 0x16, 0x47, 0xA2, 0x51,
          0x41, 0x4F, 0x69, 0x9A, 0x07, 0xF5, 0xF1, 0x69, 0x80, 0x89, 0x60, 0x15, 0x8E, 0xF6, 0xB2, 0x3B, 0x89, 0xC4,
@@ -549,15 +549,15 @@ class Avast(Parser):
     @classmethod
     def identify(cls, file_object):
         """
-        Identify an Avast Quarantined.
+        Identify an Avast or AVG Quarantined File.
         :param file_object: FileObject object
-        :return: Boolean value indicating if file is an Avast Quarantine File.
+        :return: Boolean value indicating if file is an Avast or AVG Quarantine File.
         """
         return file_object.data.startswith(b"-chest- ")
 
     def run(self):
         data = self.file_object.data[8:]
-        block_size = 0x1000
+        block_size = 0x10000
         decrypted_data = bytearray()
         for i in range(0, len(data), block_size):
             decrypted_data += bytearray(d ^ k for (d, k) in zip(data[i:i + block_size], cycle(self.KEY)))

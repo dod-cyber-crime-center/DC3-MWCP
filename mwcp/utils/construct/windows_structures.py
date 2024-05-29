@@ -7,8 +7,8 @@ from __future__ import absolute_import, division
 
 import datetime
 
-from . import version28 as construct
-from .version28 import this, len_
+from . import core as construct
+from .core import this, len_
 
 from . import network, datetime_, windows_enums
 from .windows_constants import *
@@ -310,14 +310,14 @@ class SystemTimeAdapter(construct.Adapter):
     >>> SystemTimeAdapter(SYSTEMTIME).parse(b'\xdd\x07\t\x00\x03\x00\x12\x00\t\x00.\x00\x15\x00\xf2\x02')
     '2013-09-18T09:46:21.754000'
     >>> SystemTimeAdapter(SYSTEMTIME, tzinfo=datetime.timezone.utc).parse(b'\xdd\x07\t\x00\x03\x00\x12\x00\t\x00.\x00\x15\x00\xf2\x02')
-    '2013-09-18T09:46:21.754000+00:00
+    '2013-09-18T09:46:21.754000+00:00'
     """
     def __init__(self, subcon, tzinfo=None):
         """
         :param tzinfo: Optional timezone object, default is localtime
         :param subcon: subcon to parse SystemTime
         """
-        super(SystemTimeAdapter, self).__init__(subcon)
+        super().__init__(subcon)
         self._tzinfo = tzinfo
 
     def _decode(self, obj, context, path):
@@ -346,7 +346,7 @@ class FileTimeAdapter(construct.Adapter):
     Technically FILETIME is two 32-bit integers as dwLowDateTime and dwHighDateTime, but there is no need to do that
 
     >>> FileTimeAdapter(construct.Int64ul).parse(b'\x00\x93\xcc\x11\xa7\x88\xd0\x01')
-    '2015-05-07T05:20:33'
+    '2015-05-07T05:20:33.328000'
     >>> FileTimeAdapter(construct.Int64ul, tz=datetime.timezone.utc).parse(b'\x00\x93\xcc\x11\xa7\x88\xd0\x01')
     '2015-05-07T09:20:33.328000+00:00'
     """
@@ -355,7 +355,7 @@ class FileTimeAdapter(construct.Adapter):
         :param tz: Optional timezone object, default is localtime
         :param subcon: subcon to parse FileTime
         """
-        super(FileTimeAdapter, self).__init__(subcon)
+        super().__init__(subcon)
         self._tz = tz
 
     def _decode(self, obj, context, path):

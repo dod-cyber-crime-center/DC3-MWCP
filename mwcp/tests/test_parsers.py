@@ -32,6 +32,8 @@ def _setup(config):
         mwcp.config["MALWARE_REPO"] = malware_repo
     if yara_repo:
         mwcp.config["YARA_REPO"] = yara_repo
+    if config.option.keep_tmp:
+        mwcp.config["KEEP_TMP"] = True
 
     mwcp.config.validate()
 
@@ -293,6 +295,16 @@ def _fixup_test_cases(expected_results, actual_results):
             if item["type"] == "command":
                 item["cwd"] = None
 
+    # Version 3.14 adds secret and key_derivation to EncryptionKey
+    if expected_results_version < version.parse("3.14.0"):
+        for item in expected_results["metadata"]:
+            if item["type"] == "encryption_key":
+                item["secret"] = None
+                item["key_derivation"] = None
+            elif item["type"] == "decoded_string" and item["encryption_key"]:
+                item["encryption_key"]["secret"] = None
+                item["encryption_key"]["key_derivation"] = None
+                
     # The order the metadata comes in doesn't matter and shouldn't fail the test.
     # (Using custom repr to ensure dictionary keys are sorted before repr is applied.)
     custom_repr = lambda d: repr(dict(sorted(d.items())) if isinstance(d, dict) else d)

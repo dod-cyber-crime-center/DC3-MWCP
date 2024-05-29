@@ -654,7 +654,9 @@
             "key": "aGVsbG8=",
             "algorithm": "rc4",
             "mode": null,
-            "iv": null
+            "iv": null,
+            "secret": null,
+            "key_derivation": null
         },
         {
             "type": "encryption_key",
@@ -662,7 +664,19 @@
             "key": "/////w==",
             "algorithm": "aes",
             "mode": "ecb",
-            "iv": "AAAAAA=="
+            "iv": "AAAAAA==",
+            "secret": null,
+            "key_derivation": null
+        },
+        {
+            "type": "encryption_key",
+            "tags": [],
+            "key": "/////w==",
+            "algorithm": "aes",
+            "mode": "cbc",
+            "iv": null,
+            "secret": "cEBzc3cwcmQ=",
+            "key_derivation": "sha256"
         },
         {
             "type": "decoded_string",
@@ -680,7 +694,9 @@
                 "key": "//8=",
                 "algorithm": "xor",
                 "mode": null,
-                "iv": null
+                "iv": null,
+                "secret": null,
+                "key_derivation": null
             }
         },
         {
@@ -689,7 +705,9 @@
             "key": "//8=",
             "algorithm": "xor",
             "mode": null,
-            "iv": null
+            "iv": null,
+            "secret": null,
+            "key_derivation": null
         },
         {
             "type": "mission_id",

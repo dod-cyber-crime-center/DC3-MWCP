@@ -32,7 +32,9 @@
                 "key": "3q2+7w==",
                 "algorithm": null,
                 "mode": null,
-                "iv": null
+                "iv": null,
+                "secret": null,
+                "key_derivation": null
             }
         }
     ]

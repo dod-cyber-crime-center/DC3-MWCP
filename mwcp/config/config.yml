@@ -26,3 +26,6 @@ LOG_CONFIG_PATH: ./log_config.yml
 
 # Directory containing yara signatures.
 #YARA_REPO: ~/yara_repo
+
+# Keep temporary directory created by FileObject.temp_path()
+# KEEP_TMP: false

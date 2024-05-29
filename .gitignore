@@ -1,6 +1,7 @@
 *~
 .DS_Store
 .project
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -64,3 +65,6 @@ target/
 
 # PyCharm
 /.idea
+
+/scratch
+TODO.txt

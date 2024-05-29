@@ -19,7 +19,7 @@ from typing import List, Optional, Iterable, Union, TYPE_CHECKING, ContextManage
 
 import pefile
 
-from mwcp import metadata
+from mwcp import metadata, config
 from mwcp.utils import elffileutils, pefileutils
 from mwcp.utils.stringutils import convert_to_unicode, sanitize_filename
 
@@ -369,7 +369,7 @@ class FileObject(object):
             return datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc)
 
     @contextlib.contextmanager
-    def temp_path(self):
+    def temp_path(self, keep=False):
         """
         Context manager for creating a temporary full file path to the file object.
         This is useful for when you want to use this file on libraries which require
@@ -382,9 +382,29 @@ class FileObject(object):
             with file_object.temp_path() as file_path:
                 _some_library_that_needs_a_path(file_path)
         """
-        # TODO: Provide and option to change location of temporary files through the use
-        #   of the configuration file.
-        with tempfile.TemporaryDirectory(prefix="mwcp_") as tmpdir:
+        keep = (
+            keep
+            or config.get("KEEP_TMP", False)
+            or os.environ.get("MWCP_KEEP_TMP", "false").lower() in ("true", "t", "yes", "y", "1")
+        )
+        if keep:
+            tmpdir = tempfile.mkdtemp(prefix="mwcp_")
+            context = contextlib.nullcontext(tmpdir)
+            # Warn user since this should not be left on in production code.
+            logger.warning(f"Temporary directory '{tmpdir}' not set for deletion.")
+            # Set link to current temporary directory.
+            try:
+                mwcp_current = os.path.join(tempfile.gettempdir(), "mwcp_current")
+                if os.path.lexists(mwcp_current):
+                    os.unlink(mwcp_current)
+                os.symlink(tmpdir, mwcp_current, target_is_directory=True)
+            except OSError:
+                # We can fail to create a symlink in Windows if "Developer Mode" is not enabled.
+                pass
+        else:
+            context = tempfile.TemporaryDirectory(prefix="mwcp_")
+
+        with context as tmpdir:
             temp_file = os.path.join(tmpdir, sanitize_filename(self.name) if self.name else self.md5)
             with open(temp_file, "wb") as fo:
                 fo.write(self.data)
@@ -486,7 +506,7 @@ class FileObject(object):
             self.reporter.add(metadata.File.from_file_object(self))
 
     @contextlib.contextmanager
-    def disassembly(self, disassembler: str = None, report: Report = None, **config) -> ContextManager["dragodis.Disassembler"]:
+    def disassembly(self, disassembler: str = None, report: Report = None, keep=False, **config) -> ContextManager["dragodis.Disassembler"]:
         """
         Produces a Dragodis Disassembler object for the file.
         Dragodis must be installed for this work.
@@ -504,11 +524,12 @@ class FileObject(object):
         :param report: Provide the Report object if you want the annotated disassembler project file to
             be added after processing.
             This is usually only recommended if the parser plans to annotate the disassembly. e.g. API resolution
+        :param keep: Whether to prevent the temporary directory from being deleted.
         """
         if not dragodis:
             raise RuntimeError("Please install Dragodis to use this function.")
 
-        with self.temp_path() as file_path:
+        with self.temp_path(keep=keep) as file_path:
             with dragodis.open_program(file_path, disassembler, **config) as dis:
                 bit_size = dis.bit_size
                 yield dis

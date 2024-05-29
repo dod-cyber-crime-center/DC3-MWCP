@@ -1282,7 +1282,7 @@ class URL2(Metadata):
             elif self.query:
                 result.add_linked(stix_extensions.ObservedString(purpose="url-query", value=self.query))
             else:
-                warnings.warn("Skipped creation of STIX string since the parser provided no URL data")
+                logger.warning("Skipped creation of STIX string since the parser provided no URL data")
                 return result
         else:
             result.add_linked(stix.URL(value=self.url))
@@ -1726,11 +1726,20 @@ class EncryptionKey(Metadata):
             mode="ecb",
             iv=b"\x00\x00\x00\x00\x00\x00\x00\x01",
         )
+        EncryptionKey(
+            b"\xa0u\xd1\x7f=E0s\x85?\x8188\xc1[\x80#\xb8\xc4\x87\x03\x8465O\xe5\x99\xc3\x94.\x1f\x95",
+            algorithm="aes",
+            mode="cbc",
+            secret=b"p@ssw0rd",
+            key_derivation="sha256"
+        )
     """
     key: bytes
     algorithm: str = None
     mode: str = None
     iv: bytes = None
+    secret: bytes = None
+    key_derivation: str = None
 
     # Tests encodings in order by preference.
     TEST_ENCODINGS = [
@@ -1789,18 +1798,22 @@ class EncryptionKey(Metadata):
             count += char.startswith(b"\\x") + char.startswith(b"\\u") * 2
         return count
 
-    def _detect_encoding(self) -> Optional[str]:
+    def _detect_encoding(self, data: bytes = None) -> Optional[str]:
         """
-        Attempts to determine if the key can be encoded as a string.
+        Attempts to determine if the key (or another value) can be encoded as a string.
 
         :returns: Best guess encoding if successful.
         """
+        if not data:
+            data = self.key
+        if not data:
+            return
+
         # If user gave us the encoding, use that.
         if self._encoding_set:
             return self._encoding
 
         # NOTE: Much of this is taken from rugosa.detect_encoding()
-        data = self.key
         best_score = len(data)  # lowest score is best
         best_code_page = None
         for code_page in self.TEST_ENCODINGS:
@@ -1818,24 +1831,30 @@ class EncryptionKey(Metadata):
 
         return best_code_page
 
-    def as_formatted_dict(self, flat=False) -> dict:
-        # Convert key into hex number
-        key = f"0x{self.key.hex()}"
-
+    def formatted_bytes(self, data: bytes) -> str:
+        # Convert into hex number
+        value = f"0x{data.hex()}"
         # Add context if encoding can be detected from key.
-        if encoding := self._detect_encoding():
-            key += f' ("{self.key.decode(encoding)}")'
+        if encoding := self._detect_encoding(data):
+            value += f' ("{data.decode(encoding)}")'
+        return value
 
+    def as_formatted_dict(self, flat=False) -> dict:
         return {
             "tags": self.tags,
-            "key": key,
+            "key": self.formatted_bytes(self.key),
             "algorithm": self.algorithm,
             "mode": self.mode,
             "iv": f"0x{self.iv.hex()}" if self.iv else None,
+            "secret": self.formatted_bytes(self.secret) if self.secret else None,
+            "key_derivation": self.key_derivation,
         }
 
     def as_stix(self, base_object, fixed_timestamp=None) -> STIXResult:
-        params = {"key_hex": self.key.hex()}
+        params = {}
+
+        if self.key:
+            params["key_hex"] = self.key.hex()
 
         if self.algorithm:
             params["algorithm"] = self.algorithm
@@ -1845,6 +1864,12 @@ class EncryptionKey(Metadata):
 
         if self.iv:
             params["iv_hex"] = self.iv.hex()
+
+        if self.secret:
+            params["secret_hex"] = self.secret.hex()
+
+        if self.key_derivation:
+            params["key_derivation"] = self.key_derivation
 
         result = STIXResult(fixed_timestamp=fixed_timestamp)
         result.add_linked(stix_extensions.SymmetricEncryption(**params))

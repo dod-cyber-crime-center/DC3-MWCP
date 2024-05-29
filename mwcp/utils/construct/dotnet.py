@@ -1,6 +1,6 @@
 """Construct helpers for .NET"""
 
-from .version28 import *
+from .core import *
 
 
 class _DotNetUInt(Construct):

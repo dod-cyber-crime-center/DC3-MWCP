@@ -12,9 +12,8 @@ def pytest_configure(config):
     """
     Registers custom markers.
     """
-    config.addinivalue_line(
-        "markers", "parsers: mark to only test parsers"
-    )
+    config.addinivalue_line("markers", "parsers: mark to only test parsers")
+    config.addinivalue_line("markers", "framework: mark to only test framework")
 
 
 def pytest_addoption(parser):
@@ -36,6 +35,10 @@ def pytest_addoption(parser):
     parser.addoption(
         "--full-diff", action="store_true",
         help="Whether to disable the custom unified diff view and instead use pytest's default full diff."
+    )
+    parser.addoption(
+        "--keep-tmp", action="store_true",
+        help="Whether to keep temporary files in temporary directory made by FileObject.",
     )
 
 
@@ -236,6 +239,7 @@ def metadata_items() -> List[Metadata]:
         metadata.Interval(3),
         metadata.EncryptionKey(b"hello", algorithm="rc4"),
         metadata.EncryptionKey(b"\xff\xff\xff\xff", algorithm="aes", mode="ecb", iv=b"\x00\x00\x00\x00"),
+        metadata.EncryptionKey(b"\xff\xff\xff\xff", algorithm="aes", mode="cbc", secret=b"p@ssw0rd", key_derivation="sha256"),
         metadata.DecodedString("GetProcess"),
         # Github issue #31
         metadata.DecodedString(

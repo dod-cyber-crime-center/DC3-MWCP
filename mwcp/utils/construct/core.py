@@ -1,17 +1,18 @@
 """
-Collection of patches done to bring back some of the removed features of 2.8 back into 2.9
+Collection of patches done to bring back some of the removed features of 2.8 and 2.9
 as well as generally fix lingering issues with construct.
 
 To activate, replace your standard import with this:
-    from mwcp.utils.construct import version28 as construct
+    from mwcp.utils import construct
 
 Patches:
     - slicing mechanism ([:], [min:], [:max], etc)
     - allows default value for pop() in Containers
     - allow any encoding for string constructs.
-    - patch Embedded to remove hardcoded limitation of supported classes.
+    - (<2.10) patch Embedded to remove hardcoded limitation of supported classes.
     - fixes issue with sizeof used with dynamic Structs (issue #771)
     - patch StringEncoded to make UnicodeDecodeErrors as StringError (issue #743)
+    - (<2.9.51) backport stream_*() functions to optionally accept a 'path' argument.
 
 Also contains fixes for few constructs. (Use these versions to get the benefits.)
     - Range() - was removed in 2.9
@@ -38,12 +39,12 @@ Wishlist: (the following are things we would like to fix in version 2.9 but are 
           null characters should be stripped.
     - Add the path to ConstructError exceptions. This will greatly help with debugging.
     - Add deepcopy functionality for Container classes.
-    - Embedding should also embed the context.
-        - Also, Embedded should just be a function that toggles flagembedded instead of being it's own class.
     - remove _io from resulting Container objects after a parse. Doesn't look to be used for anything.
 """
 
 from __future__ import absolute_import
+
+import uuid
 
 from future.builtins import bytes, str
 
@@ -56,6 +57,46 @@ import construct.core
 import construct.debug
 from construct import *
 from construct.core import *
+
+
+# Version 2.9.51 added 'path' to stream_*() functions.
+# Backport older versions to optionally accept a path.
+# Forwardport ability to default path to None, (since it is not required for errors)
+def stream_read(stream, length, path=None):
+    if version < (2, 9, 51):
+        return construct.core.stream_read(stream, length)
+    else:
+        return construct.core.stream_read(stream, length, path)
+
+
+def stream_read_entire(stream, path=None):
+    if version < (2, 9, 51):
+        return construct.core.stream_read_entire(stream)
+    else:
+        return construct.core.stream_read_entire(stream, path)
+
+
+def stream_write(stream, data, length=None, path=None):
+    if length is None:
+        length = len(data)
+    if version < (2, 9, 51):
+        return construct.core.stream_write(stream, data, length)
+    else:
+        return construct.core.stream_write(stream, data, length, path)
+
+
+def stream_seek(stream, offset, whence=0, path=None):
+    if version < (2, 9, 51):
+        return construct.core.stream_seek(stream, offset, whence)
+    else:
+        return construct.core.stream_seek(stream, offset, whence, path)
+
+
+def stream_tell(stream, path=None):
+    if version < (2, 9, 51):
+        return construct.core.stream_tell(stream)
+    else:
+        return construct.core.stream_tell(stream, path)
 
 
 class Range(Subconstruct):
@@ -89,7 +130,7 @@ class Range(Subconstruct):
     __slots__ = ["min", "max"]
 
     def __init__(self, min, max, subcon):
-        super(Range, self).__init__(subcon)
+        super().__init__(subcon)
         self.min = min
         self.max = max
 
@@ -97,7 +138,7 @@ class Range(Subconstruct):
         min_ = evaluate(self.min, context)
         max_ = evaluate(self.max, context)
         if not 0 <= min_ <= max_ <= sys.maxsize:
-            raise RangeError("[{}] unsane min {} and max {}".format(path, min_, max_))
+            raise RangeError(f"[{path}] unsane min {min_} and max {max_}")
         obj = ListContainer()
         try:
             i = 0
@@ -106,7 +147,7 @@ class Range(Subconstruct):
                 fallback = stream.tell()
                 obj.append(self.subcon._parsereport(stream, context, path))
                 if stream.tell() == fallback:
-                    raise ExplicitError("[{}] Infinite loop detected.".format(path))
+                    raise ExplicitError(f"[{path}] Infinite loop detected.")
                 i += 1
         except StopIteration:
             pass
@@ -114,7 +155,7 @@ class Range(Subconstruct):
             raise
         except Exception:  # TODO: catch ConstructError instead?
             if len(obj) < min_:
-                raise RangeError("[{}] expected {} to {}, found {}".format(path, min_, max_, len(obj)))
+                raise RangeError(f"[{path}] expected {min_} to {max_}, found {len(obj)}")
             stream.seek(fallback)
         return obj
 
@@ -122,11 +163,11 @@ class Range(Subconstruct):
         min_ = evaluate(self.min, context)
         max_ = evaluate(self.max, context)
         if not 0 <= min_ <= max_ <= sys.maxsize:
-            raise RangeError("[{}] unsane min {} and max {}".format(path, min_, max_))
+            raise RangeError(f"[{path}] unsane min {min_} and max {max_}")
         if not isinstance(obj, collections.abc.Sequence):
-            raise RangeError("[{}] expected sequence type, found {}".format(path, type(obj)))
+            raise RangeError(f"[{path}] expected sequence type, found {type(obj)}")
         if not min_ <= len(obj) <= max_:
-            raise RangeError("[{}] expected from {} to {} elements, found {}".format(path, min_, max_, len(obj)))
+            raise RangeError(f"[{path}] expected from {min_} to {max_} elements, found {len(obj)}")
         retlist = ListContainer()
         try:
             for i, subobj in enumerate(obj):
@@ -139,7 +180,7 @@ class Range(Subconstruct):
             raise
         except Exception:
             if len(obj) < min_:
-                raise RangeError("[{}] expected {} to {}, found {}".format(path, min_, max_, len(obj)))
+                raise RangeError(f"[{path}] expected {min_} to {max_}, found {len(obj)}")
             else:
                 raise
         return retlist
@@ -152,7 +193,11 @@ class Range(Subconstruct):
         except (KeyError, AttributeError):
             raise SizeofError("cannot calculate size, key not found in context")
         if min_ == max_:
-            return min_ * self.subcon._sizeof(context, path)
+            size = 0
+            for i in range(min_):
+                context._index = i
+                size += self.subcon._sizeof(context, path)
+            return size
         else:
             raise SizeofError("cannot calculate size")
 
@@ -238,7 +283,7 @@ String = PaddedString
 
 
 def GreedyString(encoding='utf-8'):
-    """Adds default encoding option to PaddedString()."""
+    """Adds default encoding option to GreedyString()."""
     return construct.GreedyString(encoding)
 
 
@@ -279,7 +324,7 @@ class Compressed(Adapter):
     __slots__ = ["lib", "wrap_exception"]
 
     def __init__(self, subcon, lib, wrap_exception=True):
-        super(Compressed, self).__init__(subcon)
+        super().__init__(subcon)
         self.wrap_exception = wrap_exception
         if hasattr(lib, "compress") and hasattr(lib, "decompress"):
             self.lib = lib
@@ -293,14 +338,14 @@ class Compressed(Adapter):
             import bz2
             self.lib = bz2
         else:
-            raise ValueError('Invalid lib parameter: {}'.format(lib))
+            raise ValueError(f'Invalid lib parameter: {lib}')
 
     def _decode(self, data, context, path):
         try:
             return self.lib.decompress(data)
         except Exception as e:
             if self.wrap_exception:
-                raise ConstructError('Decompression failed with error: {}'.format(e))
+                raise ConstructError(f'Decompression failed with error: {e}')
             else:
                 raise
 
@@ -309,7 +354,7 @@ class Compressed(Adapter):
             return self.lib.compress(data)
         except Exception as e:
             if self.wrap_exception:
-                raise ConstructError('Compression failed with error: {}'.format(e))
+                raise ConstructError(f'Compression failed with error: {e}')
             else:
                 raise
 
@@ -325,11 +370,11 @@ class Union(construct.Union):
             subcons = (parsefrom_or_subcon,) + subcons
         else:
             parsefrom = parsefrom_or_subcon
-        super(Union, self).__init__(parsefrom, *subcons, **subconskw)
+        super().__init__(parsefrom, *subcons, **subconskw)
 
 
 # Map an integer in the inclusive range 0-255 to its string byte representation
-PRINTABLE = [bytes2str(int2byte(i)) if 32 <= i < 128 else '.' for i in range(256)]
+PRINTABLE = [chr(i) if 32 <= i < 128 else '.' for i in range(256)]
 HEXPRINT = [format(i, '02X') for i in range(256)]
 
 # Copy of construct.lib.hex.hexdump but removes the "hexundump(" string.
@@ -360,8 +405,8 @@ def hexdump(data, linesize):
     prettylines = []
     for i in range(0, len(data), linesize):
         line = data[i:i+linesize]
-        hextext = " ".join(HEXPRINT[b] for b in iterateints(line))
-        rawtext = "".join(PRINTABLE[b] for b in iterateints(line))
+        hextext = " ".join(HEXPRINT[b] for b in line)
+        rawtext = "".join(PRINTABLE[b] for b in line)
         prettylines.append(fmt % (i, str(hextext), str(rawtext)))
     return "\n".join(prettylines)
 
@@ -376,14 +421,14 @@ class Probe(construct.Probe):
     """
     def __init__(self, into=None, lookahead=128, name=None):
         self.print_name = name
-        super(Probe, self).__init__(into=into, lookahead=lookahead)
+        super().__init__(into=into, lookahead=lookahead)
 
     def printout(self, stream, context, path):
         print("--------------------------------------------------")
-        print("Probe {}".format(self.print_name or ''))
-        print("Path: {}".format(path))
+        print(f"Probe {self.print_name or ''}")
+        print(f"Path: {path}")
         if self.into:
-            print("Into: {!r}".format(self.into))
+            print(f"Into: {self.into!r}")
 
         if self.lookahead and stream is not None:
             fallback = stream.tell()
@@ -485,28 +530,30 @@ class Mapping(construct.Mapping):
     """
 
     def __init__(self, subcon, dec_mapping, enc_mapping=None):
-        super(Mapping, self).__init__(subcon, {})
+        super().__init__(subcon, {})
         self.decmapping = dec_mapping
         self.encmapping = enc_mapping or {v: k for k, v in sorted(dec_mapping.items(), reverse=True)}
-
 
 
 def _patch_pop():
     """
     Patches the pop() function in Container to allow for a default value.
     """
-    def pop(self, key, *default):
-        try:
-            val = dict.pop(self, key, *default)
-            self.__keys_order__.remove(key)
-            return val
-        except ValueError:
-            if default:
-                return default[0]
-            else:
-                raise KeyError
+    # Only need to patch the older version of Container that implemented its own version of pop.
+    # (Updated in version 2.10.58)
+    if "__keys_order__" in Container.__slots__:
+        def pop(self, key, *default):
+            try:
+                val = dict.pop(self, key, *default)
+                self.__keys_order__.remove(key)
+                return val
+            except ValueError:
+                if default:
+                    return default[0]
+                else:
+                    raise KeyError
 
-    Container.pop = pop
+        Container.pop = pop
 
 
 def _patch_slice():
@@ -538,7 +585,7 @@ def _patch_StringEncoded():
         try:
             return orig_decode(self, obj, context, path)
         except UnicodeDecodeError as e:
-            raise StringError("[{}] string decoding failed: {}".format(path, e))
+            raise StringError(f"[{path}] string decoding failed: {e}")
 
     construct.StringEncoded._decode = _decode
 
@@ -556,7 +603,8 @@ def _patch_sizeof():
             def isStruct(sc):
                 return isStruct(sc.subcon) if isinstance(sc, Renamed) else isinstance(sc, Struct)
             def nest(context, sc):
-                if isStruct(sc) and not sc.flagembedded and sc.name in context:
+                # flagembedded was removed in 2.10
+                if isStruct(sc) and not getattr(sc, "flagembedded", False) and sc.name in context:
                     context2 = context[sc.name]
                     context2["_"] = context
                     return context2
@@ -621,8 +669,6 @@ def _patch_mergefields():
     Patches the mergefields() function to remove the hardcoded list of embeddable classes.
 
     This fixes the issue of trying to wrap Embedded around a Bitwise component.
-
-    Fixes: github.com/construct/construct/issues/TODO
     """
     def mergefields(*subcons):
         def select(sc):
@@ -645,14 +691,69 @@ def _patch_mergefields():
     construct.core.mergefields = mergefields
 
 
+def _patch_embed():
+    r"""
+    Patches in a way to embed a struct within another struct through the use of * unpacking.
+
+    NOTE: This is just a fancy wrapper for allowing the automatic creation of 'Computed' constructs.
+    Therefore, it only is for report purposes, and will not be helpful for building.
+
+    NOTE: This only works for structs built with positional arguments. The keyword argument method won't work.
+
+    e.g.:
+        nested = construct.BitStruct(
+            "bit1" / construct.Bit,
+            "nibble" / construct.Nibble,
+            "bit3" / construct.BitsInteger(3),
+        )
+
+        construct.Struct(
+            'a' / construct.Int32ul,
+            *nested,
+            'b' / construct.Int32ul,
+        )
+    """
+    def _obtain_subcons(subcon):
+        while isinstance(subcon, Subconstruct):
+            subcon = subcon.subcon
+        return getattr(subcon, "subcons", [])
+
+    def _embed(subcon):
+        # Peel back any layers to reveal the nested subcons.
+        subcons = _obtain_subcons(subcon)
+
+        # Ignore and just yield the original subcon if we don't find any nested subcons.
+        if not subcons:
+            yield subcon
+            return
+
+        # Discover name.
+        if subcon.name:
+            name = subcon.name
+        else:
+            name = f"_embed_{uuid.uuid4().hex}"
+            subcon = name / subcon
+
+        yield subcon
+        for nested in subcons:
+            if nested.name:
+                yield nested.name / Computed(lambda ctx, root_name=name, nested_name=nested.name: ctx[root_name][nested_name])
+
+    def __iter__(self):
+        yield from _embed(self)
+    construct.core.Construct.__iter__ = __iter__
+
+
 def _patch():
-    """Patches 2.9 with 2.8 features and other general fixes."""
+    """Patches construct with old features and other general fixes."""
     _patch_pop()
     _patch_slice()
     _patch_StringEncoded()
     _patch_sizeof()
     _patch_encodingunit()
-    _patch_mergefields()
+    _patch_embed()
+    if version < (2, 10, 0):
+        _patch_mergefields()
 
 
 _patch()

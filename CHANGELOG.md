@@ -1,6 +1,24 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [3.14.0] - 2024-05-29
+
+### Added
+- Added `secret` and `key_derivation` fields to `EncryptionKey` metadata for storing KDF information.
+- `construct` utility:
+  - Added `RegexSearch` and `RegexMatch` helpers.
+  - Added ability to embed constructs using `*` unpacking.
+
+### Changed
+- All pefileutils functions that are meant to return lists now return empty lists when empty instead of `None`.
+- The temporary directory created by `FileObject.temp_path()` will not be deleted if `keep` is set to True 
+  or the `--keep-tmp` command line flag is used. The last directory created will be symbolically
+  linked to `mwcp_current`.
+- Relaxed `construct` version requirement to support 2.9 or 2.10
+
+### Removed
+- Dropped support for Python 3.8
+
 
 ## [3.13.1] - 2023-11-29
 
@@ -641,7 +659,8 @@ It is assumed if you are not updating/adding tests.
 - Fixed broken markdown headings from @bryant1410
 
 
-[Unreleased]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.13.1...HEAD
+[Unreleased]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.14.0...HEAD
+[3.14.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.13.1...3.14.0
 [3.13.1]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.13.0...3.13.1
 [3.13.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.12.0...3.13.0
 [3.12.0]: https://github.com/dod-cyber-crime-center/DC3-MWCP/compare/3.11.0...3.12.0

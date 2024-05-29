@@ -2,7 +2,7 @@
 Network constructs
 """
 
-from .version28 import *
+from .core import *
 
 
 class _MACAddressAdapter(Adapter):

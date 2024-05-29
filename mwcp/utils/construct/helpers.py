@@ -6,13 +6,14 @@ import re
 import string
 import uuid
 import zlib
+from typing import Iterable
 
 from mwcp.utils import custombase64, elffileutils, pefileutils
 
 
 # Patch with version 2.8 changes.
-from mwcp.utils.construct import version28 as construct
-from .version28 import *
+from mwcp.utils.construct import core as construct
+from .core import *
 
 
 BYTE = Byte
@@ -67,12 +68,11 @@ class ErrorMessage(Construct):
         >>> d.parse(b"\xff\x05")
         Traceback (most recent call last):
             ...
-        ExplicitError: Failed if statement
+        construct.core.ExplicitError: Failed if statement
     """
-    __slots__ = ['message']
 
     def __init__(self, message="Error field was activated."):
-        super(self.__class__, self).__init__()
+        super().__init__()
         self.message = message
 
     def _parse(self, stream, context, path):
@@ -89,11 +89,11 @@ def String16(length):
     Creates UTF-16 (little endian) encoded string.
 
     >>> String16(10).build(u'hello')
-    'h\x00e\x00l\x00l\x00o\x00'
+    b'h\x00e\x00l\x00l\x00o\x00'
     >>> String16(10).parse(b'h\x00e\x00l\x00l\x00o\x00')
-    u'hello'
+    'hello'
     >>> String16(16).parse(b'h\x00e\x00l\x00l\x00o\x00\x00\x00\x00\x00\x00\x00')
-    u'hello'
+    'hello'
     """
     return String(length, encoding='utf-16-le')
 
@@ -103,9 +103,9 @@ def String32(length):
     Creates UTF-32 (little endian) encoded string.
 
     >>> String32(20).build(u'hello')
-    'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00'
+    b'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00'
     >>> String32(20).parse(b'h\x00\x00\x00e\x00\x00\x00l\x00\x00\x00l\x00\x00\x00o\x00\x00\x00')
-    u'hello'
+    'hello'
     """
     return String(length, encoding='utf-32-le')
 
@@ -117,23 +117,25 @@ class Printable(Validator):
     NOTE: A ValidationError is a type of ConstructError and will be cause if catching ConstructError.
 
     >>> Printable(String(5)).parse(b'hello')
-    u'hello'
+    'hello'
     >>> Printable(String(5)).parse(b'he\x11o!')
     Traceback (most recent call last):
         ...
-    ValidationError: object failed validation: heo!
+    construct.core.ValidationError: Error in path (parsing)
+    object failed validation: heo!
     >>> Printable(Bytes(3)).parse(b'\x01NO')
     Traceback (most recent call last):
         ...
-    ValidationError: object failed validation: NO
+    construct.core.ValidationError: Error in path (parsing)
+    object failed validation: b'\x01NO'
     >>> Printable(Bytes(3)).parse(b'YES')
-    'YES'
+    b'YES'
     """
 
     def _validate(self, obj, context, path):
         if isinstance(obj, bytes):
             return all(chr(byte) in string.printable for byte in obj)
-        return isinstance(obj, stringtypes) and all(char in string.printable for char in obj)
+        return isinstance(obj, str) and all(char in string.printable for char in obj)
 
 
 # Continuously parses until it hits the first non-zero byte.
@@ -151,7 +153,7 @@ class BytesTerminated(NullTerminated):
     See the NullTerminated documentation for the remainder of the functionality and options.
 
     >>> BytesTerminated(GreedyBytes, term=b'TERM').parse(b'helloTERM')
-    'hello'
+    b'hello'
     """
 
     # The only method we need to override is _parse. Everything else from NullTerminated works as-is.
@@ -162,15 +164,15 @@ class BytesTerminated(NullTerminated):
             raise PaddingError("BytesTerminated term must be at least 1 byte")
         data = b''
         while True:
-            pos = stream_tell(stream)
+            pos = stream_tell(stream, path)
             try:
                 b = stream_read(stream, term_len)
-                stream_seek(stream, pos, 0)
+                stream_seek(stream, pos, 0, path)
             except StreamError:
                 if self.require:
                     raise
                 else:
-                    stream_seek(stream, pos, 0)
+                    stream_seek(stream, pos, 0, path)
                     data += stream_read_entire(stream)
                     break
 
@@ -178,10 +180,10 @@ class BytesTerminated(NullTerminated):
                 if self.include:
                     data += b
                 if self.consume:
-                    stream_read(stream, term_len)
+                    stream_read(stream, term_len, path)
                 break
             else:
-                data += stream_read(stream, 1)
+                data += stream_read(stream, 1, path)
         if self.subcon is GreedyBytes:
             return data
         if type(self.subcon) is GreedyString:
@@ -201,33 +203,34 @@ class Stripped(Adapter):
     :param pad: The character/bytes to use for stripping. Defaults to null character.
 
     >>> Stripped(GreedyBytes).parse(b'hello\x00\x00\x00')
-    'hello'
+    b'hello'
     >>> Stripped(Bytes(10)).parse(b'hello\x00\x00\x00\x00\x00')
-    'hello'
+    b'hello'
     >>> Stripped(Bytes(14), pad=b'PAD').parse(b'helloPADPADPAD')
-    'hello'
+    b'hello'
     >>> Stripped(Bytes(14), pad=b'PAD').build(b'hello')
-    'helloPADPADPAD'
+    b'helloPADPADPAD'
     >>> Stripped(CString(), pad=u'PAD').parse(b'helloPADPAD\x00')
-    u'hello'
+    'hello'
     >>> Stripped(String(14), pad=u'PAD').parse(b'helloPADPAD\x00\x00\x00')
-    u'hello'
+    'hello'
 
     # WARNING: If padding doesn't fit in the perscribed data it will not strip it!
     >>> Stripped(Bytes(13), pad=b'PAD').parse(b'helloPADPADPA')
-    'helloPADPADPA'
+    b'helloPADPADPA'
     >>> Stripped(Bytes(13), pad=b'PAD').build(b'hello')
     Traceback (most recent call last):
         ...
-    StreamError: bytes object of wrong length, expected 13, found 5
+    construct.core.StreamError: Error in path (building)
+    bytes object of wrong length, expected 13, found 5
 
-    # If the wrapped subconstruct's size can't be determine, if defaults to not providing a pad.
+    # If the wrapped subconstruct's size can't be determined, if defaults to not providing a pad.
     >>> Stripped(CString(), pad=u'PAD').build(u'hello')
-    'hello\x00'
+    b'hello\x00'
     """
 
     def __init__(self, subcon, pad=None):
-        super(Stripped, self).__init__(subcon)
+        super().__init__(subcon)
         self.pad = pad
 
     def _decode(self, obj, context, path):
@@ -237,7 +240,7 @@ class Stripped(Adapter):
             pad = u'\0' if isinstance(obj, unicodestringtype) else b'\x00'
 
         if not isinstance(pad, type(obj)):
-            raise PaddingError("NullStripped pad must be of the same type: {} vs {}".format(type(pad), type(obj)))
+            raise PaddingError(f"NullStripped pad must be of the same type: {type(pad)} vs {type(obj)}")
 
         unit = len(pad)
         if unit < 1:
@@ -284,7 +287,7 @@ class HexString(Adapter):
 
     e.g.
     >>> HexString(Int32ul).build('0x123')
-    '#\x01\x00\x00'
+    b'#\x01\x00\x00'
     >>> HexString(Int32ul).parse(b'\x20\x01\x00\x00')
     '0x120'
     >>> HexString(Int16ub).parse(b'\x12\x34')
@@ -314,31 +317,30 @@ class Base64(Adapter):
 
     e.g.
     >>> Base64(GreedyString()).build(b'hello')
-    'aGVsbG8='
+    b'aGVsbG8='
     >>> Base64(GreedyString()).parse(b'aGVsbG8=')
-    'hello'
+    b'hello'
     >>> Base64(GreedyBytes).build(b'\x01\x02\x03\x04')
-    'AQIDBA=='
+    b'AQIDBA=='
     >>> Base64(GreedyBytes).parse(b'AQIDBA==')
-    '\x01\x02\x03\x04'
+    b'\x01\x02\x03\x04'
 
     NOTE: String size is based on the encoded version.
-    >>> Base64(String(16)).build(u'hello world')
-    'aGVsbG8gd29ybGQ='
+    >>> Base64(String(16)).build('hello world')
+    b'aGVsbG8gd29ybGQ='
     >>> Base64(String(16)).parse(b'aGVsbG8gd29ybGQ=')
-    'hello world'
+    b'hello world'
 
     Supplying a custom alphabet is also supported.
-    >>> spec = Base64(String(16), custom_alpha='EFGHQRSTUVWefghijklmnopIJKLMNOPABCDqrstuvwxyXYZabcdz0123456789+/=')
-    >>> spec.build(u'hello world')
-    'LSoXMS8BO29dMSj='
+    >>> spec = Base64(String(16), custom_alpha=b'EFGHQRSTUVWefghijklmnopIJKLMNOPABCDqrstuvwxyXYZabcdz0123456789+/=')
+    >>> spec.build('hello world')
+    b'LSoXMS8BO29dMSj='
     >>> spec.parse(b'LSoXMS8BO29dMSj=')
-    'hello world'
+    b'hello world'
     """
-    __slots__ = ['subcon', 'custom_alpha']
 
     def __init__(self, subcon, custom_alpha=None):
-        super(Base64, self).__init__(subcon)
+        super().__init__(subcon)
         self.custom_alpha = custom_alpha
 
     def _encode(self, obj, context, path):
@@ -351,7 +353,10 @@ class Base64(Adapter):
     def _decode(self, obj, context, path):
         if isinstance(obj, str):
             obj = obj.encode('utf-8')
-        return custombase64.b64decode(obj, alphabet=self.custom_alpha)
+        try:
+            return custombase64.b64decode(obj, alphabet=self.custom_alpha)
+        except binascii.Error as e:
+            raise ConstructError(f"[{path}] {e}")
 
 
 class ZLIB(Adapter):
@@ -364,16 +369,15 @@ class ZLIB(Adapter):
     :param int bufsize: The initial output buffer size
 
     >>> ZLIB(Bytes(12)).build(b'data')
-    'x\x9cKI,I\x04\x00\x04\x00\x01\x9b'
+    b'x\x9cKI,I\x04\x00\x04\x00\x01\x9b'
     >>> ZLIB(GreedyBytes, level=0).build(b'data')
-    'x\x01\x01\x04\x00\xfb\xffdata\x04\x00\x01\x9b'
+    b'x\x01\x01\x04\x00\xfb\xffdata\x04\x00\x01\x9b'
     >>> ZLIB(GreedyBytes).parse(b'x^KI,I\x04\x00\x04\x00\x01\x9b')
-    'data'
+    b'data'
     """
-    __slots__ = ["subcon", "wbits", "bufsize", "level"]
 
     def __init__(self, subcon, wbits=None, bufsize=None, level=None):
-        super(ZLIB, self).__init__(subcon)
+        super().__init__(subcon)
         self.wbits = wbits
         self.bufsize = bufsize
         self.level = level
@@ -409,16 +413,15 @@ class UUIDAdapter(Adapter):
 
     e.g.
     >>> UUIDAdapter(Bytes(16)).build('{12345678-1234-5678-1234-567812345678}')
-    'xV4\x124\x12xV\x124Vx\x124Vx'
+    b'xV4\x124\x12xV\x124Vx\x124Vx'
     >>> UUIDAdapter(Bytes(16), le=False).build('{12345678-1234-5678-1234-567812345678}')
-    '\x124Vx\x124Vx\x124Vx\x124Vx'
+    b'\x124Vx\x124Vx\x124Vx\x124Vx'
     >>> UUIDAdapter(Bytes(16)).parse(b'xV4\x124\x12xV\x124Vx\x124Vx')
     '{12345678-1234-5678-1234-567812345678}'
     """
-    __slots__ = ['subcon', 'le']
 
     def __init__(self, subcon, le=True):
-        super(UUIDAdapter, self).__init__(subcon)
+        super().__init__(subcon)
         self.le = le
 
     def _encode(self, obj, context, path):
@@ -443,9 +446,9 @@ def UUID(le=True):
 
     e.g.
     >>> UUID().build('{12345678-1234-5678-1234-567812345678}')
-    'xV4\x124\x12xV\x124Vx\x124Vx'
+    b'xV4\x124\x12xV\x124Vx\x124Vx'
     >>> UUID(le=False).build('{12345678-1234-5678-1234-567812345678}')
-    '\x124Vx\x124Vx\x124Vx\x124Vx'
+    b'\x124Vx\x124Vx\x124Vx\x124Vx'
     >>> UUID().parse(b'xV4\x124\x12xV\x124Vx\x124Vx')
     '{12345678-1234-5678-1234-567812345678}'
     >>> UUID(le=False).parse(b'\x124Vx\x124Vx\x124Vx\x124Vx')
@@ -511,7 +514,7 @@ class PEPhysicalAddress(Adapter):
         :param pe: Optional PE file object. (if not supplied here, this must be supplied during parse()/build()
         :param subcon: subcon to parse memory offset.
         """
-        super(PEPhysicalAddress, self).__init__(subcon)
+        super().__init__(subcon)
         self._pe = pe
 
     def _encode(self, obj, context, path):
@@ -617,7 +620,7 @@ class Delimited(Construct):
     >>> spec.parse(b'Hello\x00\x00|\x01\x00\x00\x00|world!!\x01\x02|\xff')
     Container(first=u'Hello', second=1, third=b'world!!\x01\x02', fourth=255)
     >>> spec.build(dict(first=u'Hello', second=1, third=b'world!!\x01\x02', fourth=255))
-    'Hello\x00|\x01\x00\x00\x00|world!!\x01\x02|\xff'
+    b'Hello\x00|\x01\x00\x00\x00|world!!\x01\x02|\xff'
 
     If you don't care about a particular element, you can leave it nameless just like in Structs.
     # NOTE: You can't build unless you have supplied every attribute.
@@ -652,7 +655,7 @@ class Delimited(Construct):
     >>> spec.parse(b'Hello\x00\x00YOYO\x01\x00\x00\x00YOYOworld!!YO!!\x01\x02YOYO\xff')
     Container(first=u'Hello', second=1, third=b'world!!YO!!\x01\x02', fourth=255)
     >>> spec.build(dict(first=u'Hello', second=1, third=b'world!!YO!!\x01\x02', fourth=255))
-    'Hello\x00YOYO\x01\x00\x00\x00YOYOworld!!YO!!\x01\x02YOYO\xff'
+    b'Hello\x00YOYO\x01\x00\x00\x00YOYOworld!!YO!!\x01\x02YOYO\xff'
 
     # TODO: Add support for using a single construct for parsing an unknown number of times
     # (or within a min, max, or exact)
@@ -667,18 +670,16 @@ class Delimited(Construct):
     # ['hello']
     """
 
-    __slots__ = ['delimiter', 'subcons']
-
     def __init__(self, delimiter, *subcons):
         """
-        :param delimiter: single charactor or a function that takes context and returns the delimiter
+        :param delimiter: single character or a function that takes context and returns the delimiter
         :param subcons: constructs to use to parse each element.
                     NOTE: The number of constructs will be the number of elements delimited.
                     (ie. len(subcons) == number of delimiters + 1)
 
         :raises ValueError: If no subcons are defined.
         """
-        super(Delimited, self).__init__()
+        super().__init__()
         self.delimiter = delimiter
         self.subcons = subcons
         if len(subcons) < 2:
@@ -700,14 +701,14 @@ class Delimited(Construct):
                         return delimiter_offset
                     else:
                         stream.seek(delimiter_offset + 1)
-            raise ConstructError('Unable to find delimiter: {}'.format(delimiter))
+            raise ConstructError(f'Unable to find delimiter: {delimiter}')
         finally:
             stream.seek(fallback)
 
     def _parse_subcon(self, subcon, stream, obj, context, path):
         """Parses and fills obj and context."""
         subobj = subcon._parsereport(stream, context, path)
-        if subcon.flagembedded:
+        if getattr(subcon, "flagembedded", False):
             if subobj is not None:
                 obj.update(subobj.items())
                 context.update(subobj.items())
@@ -733,7 +734,7 @@ class Delimited(Construct):
 
             delimiter_offset = self._find_delimiter(stream, delimiter)
 
-            # Temporaily fake the read() so that we can force EOF before delimiter.
+            # Temporarily fake the read() so that we can force EOF before delimiter.
             orig_read = stream.read
             def new_read(size=None):
                 max_size = delimiter_offset - stream.tell()
@@ -764,7 +765,7 @@ class Delimited(Construct):
         context = Container(_=context)
         context.update(obj)
         for i, sc in enumerate(self.subcons):
-            if sc.flagembedded:
+            if getattr(sc, "flagembedded", False):
                 subobj = obj
             elif sc.flagbuildnone:
                 subobj = obj.get(sc.name, None)
@@ -772,7 +773,7 @@ class Delimited(Construct):
                 subobj = obj[sc.name]
             buildret = sc._build(subobj, stream, context, path)
             if buildret is not None:
-                if sc.flagembedded:
+                if getattr(sc, "flagembedded", False):
                     context.update(buildret)
                 if sc.name is not None:
                     context[sc.name] = buildret
@@ -798,10 +799,10 @@ class Regex(Construct):
 
     The seek position is left at the end of the successful match (match.end()).
 
-    >>> regex = re.compile('\x01\x02(?P<size>.{4})\x03\x04(?P<path>[A-Za-z].*\x00)', re.DOTALL)
-    >>> data = 'GARBAGE!\x01\x02\x0A\x00\x00\x00\x03\x04C:\Windows\x00MORE GARBAGE!'
+    >>> regex = re.compile(b'\x01\x02(?P<size>.{4})\x03\x04(?P<path>[A-Za-z].*\x00)', re.DOTALL)
+    >>> data = b'GARBAGE!\x01\x02\x0A\x00\x00\x00\x03\x04C:\Windows\x00MORE GARBAGE!'
     >>> r = Regex(regex, size=Int32ul, path=CString()).parse(data)
-    >>> r == Container(path=u'C:\\Windows', size=10)
+    >>> r == Container(path='C:\\Windows', size=10)
     True
     >>> r = Regex(regex).parse(data)
     >>> r == Container(path=b'C:\\Windows\x00', size=b'\n\x00\x00\x00')
@@ -811,50 +812,49 @@ class Regex(Construct):
     ...     'after_re' / Tell,
     ...     'garbage' / GreedyBytes
     ... ).parse(data)
-    >>> r == Container(re=Container(path=u'C:\\Windows', size=10), after_re=27L, garbage=b'MORE GARBAGE!')
+    >>> r == Container(re=Container(path='C:\\Windows', size=10), after_re=27, garbage=b'MORE GARBAGE!')
     True
 
-    # TODO: Unfortunately Embedded() no longer works with the update to 2.9
-    # >>> Struct(
-    # ...     Embedded(Regex(regex, size=Int32ul, path=CString())),
-    # ...     'after_re' / Tell,
-    # ...     'garbage' / GreedyBytes
-    # ... ).parse(data)
-    # Container(path=u'C:\\Windows', size=10, after_re=27L, garbage=b'MORE GARBAGE!')
+    >>> Struct(
+    ...     *Regex(regex, size=Int32ul, path=CString()),
+    ...     'after_re' / Tell,
+    ...     'garbage' / GreedyBytes
+    ... ).parse(data)
+    Container(size=10, path=u'C:\\Windows', after_re=27, garbage=b'MORE GARBAGE!')
 
     You can use Regex as a trigger to find a particular piece of data before you start parsing.
     >>> Struct(
-    ...     Regex('TRIGGER'),
+    ...     Regex(b'TRIGGER'),
     ...     'greeting' / CString()
-    ... ).parse('\x01\x02\x04GARBAGE\x05TRIGGERhello world\x00')
+    ... ).parse(b'\x01\x02\x04GARBAGE\x05TRIGGERhello world\x00')
     Container(greeting=u'hello world')
 
     If no data is captured, the associated subcon will received a stream with the position set at the location
     of that captured group. Thus, allowing you to use it as an anchor point.
-    >>> r = Regex('hello (?P<anchor>)world(?P<extra_data>.*)', anchor=Tell).parse('hello world!!!!')
-    >>> r == Container(extra_data=b'!!!!', anchor=6L)
+    >>> r = Regex(b'hello (?P<anchor>)world(?P<extra_data>.*)', anchor=Tell).parse(b'hello world!!!!')
+    >>> r == Container(extra_data=b'!!!!', anchor=6)
     True
 
     If no named capture groups are used, you can instead parse the entire matched string by supplying
     a subconstruct as a positional argument. (If no subcon is provided, the raw bytes are returned instead.
-    >>> Regex('hello world\x00', CString()).parse('GARBAGE\x01\x03hello world\x00\x04')
-    u'hello world'
-    >>> Regex('hello world\x00').parse('GARBAGE\x01\x03hello world\x00\x04')
-    'hello world\x00'
+    >>> Regex(b'hello world\x00', CString()).parse(b'GARBAGE\x01\x03hello world\x00\x04')
+    'hello world'
+    >>> Regex(b'hello world\x00').parse(b'GARBAGE\x01\x03hello world\x00\x04')
+    b'hello world\x00'
 
     You can also set the regular expression to match in-place (instead of searching the data)
     by setting the keyword argument _match to True.
     >>> Regex('hello', _match=True).parse(b'hello world!')
-    'hello'
+    b'hello'
     >>> Regex('hello').parse(b'bogus hello world')
-    'hello'
+    b'hello'
     >>> Regex('hello', _match=True).parse(b'bogus hello world')
     Traceback (most recent call last):
         ...
-    ConstructError: [(parsing)] regex did not match
+    construct.core.ConstructError: [(parsing)] regex did not match
     """
 
-    __slots__ = ['regex', 'subcon', 'group_subcons', 'match']
+    __slots__ = ['regex', 'subcon', 'subcons', 'match']
 
     def __init__(self, regex, *subcon, **group_subcons):
         """
@@ -872,21 +872,25 @@ class Regex(Construct):
 
         :raises ValueError: If arguments are invalid.
         """
-        super(Regex, self).__init__()
+        super().__init__()
         if isinstance(regex, str):
             regex = regex.encode()  # force byte strings
         if isinstance(regex, bytestringtype):
             regex = re.compile(regex, re.DOTALL)
         self.regex = regex
-        # TODO: This feature seems backwards, perhaps make a _search keyword instead and default to match functionality.
-        # Alternatively, we could have RegexSearch and RegexMatch constructs instead.
         self.match = group_subcons.pop('_match', False)
-        self.group_subcons = group_subcons
+        self.subcons = [Renamed(sc, name) for name, sc in group_subcons.items()]
+        self._subcons = Container((sc.name, sc) for sc in self.subcons)
         if subcon and len(subcon) > 1:
             raise ValueError('Only one subcon can be supplied for the entire match.')
         if subcon and group_subcons:
             raise ValueError('subcon and group_subcons arguments cannot be used at the same time.')
         self.subcon = subcon[0] if subcon else None
+
+    def __getattr__(self, name):
+        if name in self._subcons:
+            return self._subcons[name]
+        raise AttributeError
 
     def _parse(self, stream, context, path):
         start = stream.tell()
@@ -897,7 +901,7 @@ class Regex(Construct):
         else:
             match = self.regex.search(stream.read())
         if not match:
-            raise ConstructError('[{}] regex did not match'.format(path))
+            raise ConstructError(f'[{path}] regex did not match')
 
         try:
             group_dict = match.groupdict()
@@ -915,7 +919,7 @@ class Regex(Construct):
             obj._io = stream
 
             context = Container(_=context, _params=context._params, _root=None, _parsing=context._parsing,
-                                _building=context._building, _sizing=context._sizing, _subcons=self.group_subcons,
+                                _building=context._building, _sizing=context._sizing, _subcons=self.subcons,
                                 _io=stream, _index=context.get("_index", None))
             context._root = context._.get("_root", context)
 
@@ -924,7 +928,8 @@ class Regex(Construct):
             context.update(group_dict)
 
             # Parse groups using supplied constructs.
-            for name, subcon in self.group_subcons.items():
+            for subcon in self.subcons:
+                name = subcon.name
                 try:
                     data = match.group(name)
                 except IndexError:
@@ -970,6 +975,16 @@ class Regex(Construct):
         raise NotImplementedError
 
 
+def RegexSearch(regex, *subcon, **group_subcons) -> Regex:
+    """Performs search of given regex pattern starting at current stream position and then parses match groups."""
+    return Regex(regex, *subcon, _match=False, **group_subcons)
+
+
+def RegexMatch(regex, *subcon, **group_subcons) -> Regex:
+    """Peforms match of given regex pattern at current stream position and then parses match groups."""
+    return Regex(regex, *subcon, _match=True, **group_subcons)
+
+
 class IterError(ConstructError):
     pass
 
@@ -989,11 +1004,11 @@ class Iter(Construct):
     ...     default=construct.Pass
     ...     )
     ... )
-    >>> spec.parse('\x01\x02\x09\x03\x03\x03\x03\x06\x06')
+    >>> spec.parse(b'\x01\x02\x09\x03\x03\x03\x03\x06\x06')
     Container(types=ListContainer([1, 2, 9]), entries=ListContainer([50529027, 1542, None]))
     >>> C = _
     >>> spec.build(C)
-    '\x01\x02\t\x03\x03\x03\x03\x06\x06'
+    b'\x01\x02\t\x03\x03\x03\x03\x06\x06'
     >>> spec.sizeof(**C)
     9
 
@@ -1001,30 +1016,30 @@ class Iter(Construct):
     ...     'sizes' / Int16ul[4],
     ...     'entries' / Iter(this.sizes, Bytes)  # equivalent to Iter(this.sizes, lambda size: Bytes(size))
     ... )
-    >>> spec.parse('\x01\x00\x03\x00\x00\x00\x05\x00abbbddddd')
-    Container(sizes=ListContainer([1, 3, 0, 5]), entries=ListContainer(['a', 'bbb', '', 'ddddd']))
+    >>> spec.parse(b'\x01\x00\x03\x00\x00\x00\x05\x00abbbddddd')
+    Container(sizes=ListContainer([1, 3, 0, 5]), entries=ListContainer([b'a', b'bbb', b'', b'ddddd']))
     >>> C = _
     >>> spec.build(C)
-    '\x01\x00\x03\x00\x00\x00\x05\x00abbbddddd'
+    b'\x01\x00\x03\x00\x00\x00\x05\x00abbbddddd'
     >>> Iter(this.sizes, Bytes).sizeof(sizes=[1,2,3,0])
     6
     >>> spec.sizeof(**C)
     17
 
     :param iterable: iterable items to act upon
-    :param cases: A dictionary of cases or a function that takes takes a key and returns a construct spec.
+    :param cases: A dictionary of cases or a function that takes a key and returns a construct spec.
     :param default: The default case (only if cases is a dict)
     """
-    __slots__ = ['iterable', 'cases', 'default']
-    
+
     def __init__(self, iterable, cases, default=None):
-        super(Iter, self).__init__()
+        super().__init__()
         self.iterable = iterable
         self.cases = cases
         self.default = default or Pass
         if not callable(cases):
             self.flagbuildnone = all(sc.flagbuildnone for sc in cases.values())
-            self.flagembedded = all(sc.flagembedded for sc in cases.values())
+            if hasattr(self, "flagembedded"):
+                self.flagembedded = all(sc.flagembedded for sc in cases.values())
         
     def _parse(self, stream, context, path):
         iterator = iter(self.iterable(context)) if callable(self.iterable) else iter(self.iterable)
@@ -1071,7 +1086,7 @@ def find_constructs(struct, data):
     ...     'int' / Int16ul,
     ...     'string' / CString())
     >>> list(find_constructs(struct, b'\x01\x02\x03MZ\x0A\x00hello\x00\x03\x04MZ\x0B\x00world\x00\x00'))
-    [(3L, Container(int=10, string=u'hello')), (15L, Container(int=11, string=u'world'))]
+    [(3, Container(int=10, string=u'hello')), (15, Container(int=11, string=u'world'))]
     >>> list(find_constructs(struct, b'nope'))
     []
 
@@ -1111,7 +1126,7 @@ class Backwards(Subconstruct):
 
     e.g.
     >>> (Bytes(14) >> Backwards(Int32ul) >> Tell).parse(b'junk stuff\x01\x02\x00\x00')
-    ListContainer(['junk stuff\x01\x02\x00\x00', 513, 10L])
+    ListContainer([b'junk stuff\x01\x02\x00\x00', 513, 10])
     >>> spec = Struct(Seek(0, os.SEEK_END), 'name' / Backwards(String(9)), 'number' / Backwards(Int32ul))
     >>> spec.parse(b'A BUNCH OF JUNK DATA\x01\x00\x00\x00joe shmoe')
     Container(name=u'joe shmoe', number=1)
@@ -1121,7 +1136,8 @@ class Backwards(Subconstruct):
     >>> spec.parse(b'A BUNCH OF JUNK DATA\x01\x00\x00\x00joe shmoe\x00')
     Traceback (most recent call last):
       ...
-    SizeofError
+    construct.core.SizeofError: Error in path (parsing) -> name
+    <BLANKLINE>
 
     However, GreedyBytes and GreedyString are allowed.
     >>> spec = Struct(Seek(0, os.SEEK_END), 'name' / Backwards(String(9)), 'rest' / Backwards(GreedyBytes))
@@ -1132,15 +1148,14 @@ class Backwards(Subconstruct):
     Container(name=u'joe shmoe', rest=u'hello')
 
     WARNING: This will also break if you read more data that is behind the current position.
-    >>> (Seek(0, os.SEEK_END) >> Backwards(String(10))).parse('yo')
+    >>> (Seek(0, os.SEEK_END) >> Backwards(String(10))).parse(b'yo')
     Traceback (most recent call last):
       ...
-    FormatFieldError: could not read enough bytes, expected 10, found 2
+    construct.core.FormatFieldError: could not read enough bytes, expected 10, found 2
     """
-    __slots__ = ['greedy']
 
     def __init__(self, subcon):
-        super(Backwards, self).__init__(subcon)
+        super().__init__(subcon)
         # GreedyBytes and GreedyString are allowed special cases.
         self.greedy = self.subcon is GreedyBytes or (
                 isinstance(self.subcon, construct.StringEncoded) and self.subcon.subcon is GreedyBytes)
@@ -1181,8 +1196,8 @@ def _parse(self, stream, context, path):
     if offset1 > offset2:
         offset1, offset2 = offset2, offset1
     fallback = stream.tell()
-    stream_seek(stream, offset1)
-    data = stream_read(stream, offset2-offset1)
+    stream_seek(stream, offset1, 0, path)
+    data = stream_read(stream, offset2-offset1, path)
     stream.seek(fallback)
     return Container(data=data, value=obj, offset1=offset1, offset2=offset2, length=(offset2-offset1))
 
@@ -1196,7 +1211,7 @@ def FocusLast(*subcons, **kw):
     parse a bunch of subconstructs and then grab the last element.
 
     >>> FocusLast(Byte, Byte, String(2)).parse(b'\x01\x02hi')
-    u'hi'
+    'hi'
 
     >>> spec = FocusLast(
     ...     'a' / Byte,
@@ -1204,9 +1219,9 @@ def FocusLast(*subcons, **kw):
     ...     String(this.a + this.b),
     ... )
     >>> spec.parse(b'\x01\x02hi!')
-    u'hi!'
+    'hi!'
     >>> spec.build(u'hi!', a=1, b=2)
-    '\x01\x02hi!'
+    b'\x01\x02hi!'
 
 
     e.g.:

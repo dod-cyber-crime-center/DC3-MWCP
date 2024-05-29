@@ -3,15 +3,15 @@
 A framework for malware configuration parsers.
 """
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 
 setup(
     name="mwcp",
     author="DC3",
-    author_email="dcci@dc3.mil",
+    author_email="dc3.tsd@us.af.mil",
     keywords="malware",
-    url="http://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/",
-    packages=find_packages(),
+    url="https://github.com/dod-cyber-crime-center/DC3-MWCP/",
+    packages=find_namespace_packages(),
     include_package_data=True,
     license='MIT',
     classifiers=[
@@ -19,8 +19,12 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
     ],
+    python_requires=">=3.9",
     entry_points={
         'console_scripts': [
             'mwcp = mwcp.cli:main',
@@ -38,7 +42,7 @@ setup(
         'bitarray',
         'cattrs',
         'click>=8.0.1',
-        'construct==2.9.45',  # pin because parsers are very dependent on this.
+        'construct >=2.9.45, <2.11',
         'defusedxml',
         'future',
         'isodate',

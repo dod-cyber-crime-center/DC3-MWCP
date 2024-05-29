@@ -3,7 +3,7 @@
 # from __future__ import absolute_import
 
 # Import interface
-from .version28 import *
+from .core import *
 
 from .construct_html import html_hex
 from .helpers import *

@@ -6,7 +6,7 @@ from __future__ import absolute_import
 
 import datetime
 
-from .version28 import *
+from .core import *
 
 
 # TODO: Implement _encode.
@@ -16,7 +16,7 @@ class _DateTimeDateDataAdapter(Adapter):
     property to format datetime.
 
 
-    >>> _DateTimeDateDataAdapter(Int64sl).parse('\x80\xb4N3\xd1\xd4\xd1H')
+    >>> _DateTimeDateDataAdapter(Int64sl).parse(b'\x80\xb4N3\xd1\xd4\xd1H')
     '2014-11-23 01:09:01 UTC'
     """
     def _decode(self, obj, context, path):
@@ -49,7 +49,7 @@ class EpochTimeAdapter(Adapter):
         :param tz: Optional timezone object, default is localtime
         :param subcon: subcon to parse EpochTime.
         """
-        super(EpochTimeAdapter, self).__init__(subcon)
+        super().__init__(subcon)
         self._tz = tz
 
     def _decode(self, obj, context, path):

@@ -5,7 +5,7 @@ python version: 2.7.8
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 import pefile
 
@@ -174,7 +174,7 @@ def obtain_exports_list(pe=None, file_data=None) -> List[bytes]:
     :param pe: pefile.PE object
     :param file_data: Input file data
 
-    :return: A list of export names, or None.
+    :return: A list of export names or an empty list.
     """
     if file_data:
         pe = obtain_pe(file_data)
@@ -203,14 +203,14 @@ def check_export(export_name, pe=None, file_data=None):
     return export_name in exports
 
 
-def obtain_imported_dlls(pe=None, file_data=None) -> Optional[List[bytes]]:
+def obtain_imported_dlls(pe=None, file_data=None) -> List[bytes]:
     """
     Obtain a list of imported DLL names for the input PE file.
 
     :param pe: pefile.PE object, or None by default
     :param file_data: file data from which to create a pefile.PE object, or None by default
 
-    :return: List of imported DLLs, or None
+    :return: List of imported DLLs or an empty list
     """
     if file_data:
         pe = obtain_pe(file_data)
@@ -218,9 +218,9 @@ def obtain_imported_dlls(pe=None, file_data=None) -> Optional[List[bytes]]:
         try:
             return [imp.dll for imp in pe.DIRECTORY_ENTRY_IMPORT]
         except AttributeError:
-            return None
+            return []
     else:
-        return None
+        return []
 
 
 def obtain_imports_list(dll_name, pe=None, file_data=None):
@@ -231,7 +231,7 @@ def obtain_imports_list(dll_name, pe=None, file_data=None):
     :param pe: pefile.PE object, or None by default
     :param file_data: file data from which to create a pefile.PE object, or None by default
 
-    :return: List of imports from the specified DLL, or None
+    :return: List of imports from the specified DLL or an empty list
     """
     if file_data:
         pe = obtain_pe(file_data)
@@ -241,9 +241,9 @@ def obtain_imports_list(dll_name, pe=None, file_data=None):
                 if imp.dll.lower() == dll_name.lower():
                     return [imp_func.name for imp_func in imp.imports]
         except AttributeError:
-            return None
+            return []
     else:
-        return None
+        return []
 
 
 def is_imported(dll_name, func_name, pe=None, file_data=None):
@@ -638,6 +638,24 @@ class Resource(object):
             self._offset = self._pe.get_physical_by_rva(rva)
         return self._offset
 
+    @property
+    def strings_dict(self) -> Dict[int, str]:
+        """
+        Dictionary of resource strings, mapped by their ID. Only applicable for RT_STRING resources.
+        """
+        if hasattr(self._entry, "directory"):
+            directory = self._entry.directory
+            if hasattr(directory, "strings"):
+                return directory.strings
+        return {}
+
+    @property
+    def strings(self) -> List[str]:
+        """
+        List of strings found within the resource. Only applicable for RT_STRING resources.
+        """
+        return list(self.strings_dict.values())
+
 
 def iter_rsrc(pe, dirtype=None):
     """
@@ -675,7 +693,7 @@ def extract_all_rsrc(pe=None, file_data=None):
     :param pe: pefile.PE object
     :param file_data: Input file data
 
-    :return: List of pefileutils.Resource objects, or an empty list.
+    :return: List of pefileutils.Resource objects or an empty list.
     """
     if file_data:
         pe = obtain_pe(file_data)
@@ -693,7 +711,7 @@ def extract_rsrc_dir(dirtype, pe=None, file_data=None):
     :param pe: pefile.PE object
     :param file_data: Input file data
 
-    :return: List of pefileutils.Resource objects matching the dirtype, or an empty list.
+    :return: List of pefileutils.Resource objects matching the dirtype or an empty list.
     """
     if file_data:
         pe = obtain_pe(file_data)

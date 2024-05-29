@@ -6,8 +6,8 @@ and accessible from the submodule "MIPS". (e.g. construct.MIPS.lw)
 reference: github.com/MIPT-ILab/mipt-mips/wiki/MIPS-Instruction-Set
 """
 
-from .version28 import *
-from .version28 import this
+from .core import *
+from .core import this
 
 
 _REGISTERS = {
@@ -25,7 +25,7 @@ _Register = Enum(BitsInteger(5), **_REGISTERS)
 
 # I-type instruction
 _I_inst = Struct(
-    Embedded(BitStruct(
+    *BitStruct(
         'opcode' / Enum(
             BitsInteger(6),
             # NOTE: Some opcode values are reserved for other instruction formats
@@ -42,7 +42,7 @@ _I_inst = Struct(
         'src_register' / _Register,
         'target_register' / _Register,
         # 'imm_constant' / construct.BitsInteger(16)
-    )),
+    ),
     # Need to move immediate outside of BitStruct to create signed number.
     # (Luckly, the constant is byte aligned)
     'imm_constant' / Int16sb

@@ -54,11 +54,12 @@
 | email@bad.com |
 
 ## Encryption Key
-| Key                    | Algorithm   | Mode   | Iv         |
-|:-----------------------|:------------|:-------|:-----------|
-| 0x68656c6c6f ("hello") | rc4         |        |            |
-| 0xffffffff             | aes         | ecb    | 0x00000000 |
-| 0xffff                 | xor         |        |            |
+| Key                    | Algorithm   | Mode   | Iv         | Secret                          | Key Derivation   |
+|:-----------------------|:------------|:-------|:-----------|:--------------------------------|:-----------------|
+| 0x68656c6c6f ("hello") | rc4         |        |            |                                 |                  |
+| 0xffffffff             | aes         | ecb    | 0x00000000 |                                 |                  |
+| 0xffffffff             | aes         | cbc    |            | 0x7040737377307264 ("p@ssw0rd") | sha256           |
+| 0xffff                 | xor         |        |            |                                 |                  |
 
 ## Event
 | Value          |

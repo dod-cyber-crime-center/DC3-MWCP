@@ -126,7 +126,9 @@ class SymmetricEncryption(_Observable):
             ("id", IDProperty(_type, spec_version="2.1")),
             ("key_hex", HexProperty()),
             ("iv_hex", HexProperty()),
+            ("secret_hex", HexProperty()),
             ("algorithm", StringProperty()),
+            ("key_derivation", StringProperty()),
             ("mode", StringProperty()),
             (
                 "object_marking_refs",
@@ -141,7 +143,7 @@ class SymmetricEncryption(_Observable):
         ]
     )
 
-    _id_contributing_properties = ["key_hex", "iv_hex", "mode", "algorithm"]
+    _id_contributing_properties = ["key_hex", "iv_hex", "mode", "algorithm", "secret_hex", "key_derivation"]
 
     def __init__(self, *args, **kwargs) -> None:
         # always make sure the property extension details are populated
@@ -155,7 +157,7 @@ class SymmetricEncryption(_Observable):
 
     def _check_object_constraints(self) -> None:
         super()._check_object_constraints()
-        self._check_at_least_one_property(["key_hex", "iv_hex", "mode", "algorithm"])
+        self._check_at_least_one_property(self._id_contributing_properties)
 
 
 class TriggerComponent(_STIXBase21):

@@ -1,6 +1,6 @@
 {
     "type": "bundle",
-    "id": "bundle--00000000-0000-4006-9000-000000000253",
+    "id": "bundle--00000000-0000-4006-9000-000000000255",
     "objects": [
         {
             "type": "file",
@@ -731,6 +731,21 @@
             }
         },
         {
+            "type": "symmetric-encryption",
+            "spec_version": "2.1",
+            "id": "symmetric-encryption--edb619da-9899-5795-babd-2a4335a601d3",
+            "key_hex": "ffffffff",
+            "secret_hex": "7040737377307264",
+            "algorithm": "aes",
+            "key_derivation": "sha256",
+            "mode": "cbc",
+            "extensions": {
+                "extension-definition--fb989191-187f-4c11-81cd-4a699a00835d": {
+                    "extension_type": "new-sco"
+                }
+            }
+        },
+        {
             "type": "observed-string",
             "spec_version": "2.1",
             "id": "observed-string--e9ed8909-9e65-5117-b69e-19bbfd27219f",
@@ -769,7 +784,7 @@
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--00000000-0000-4006-9000-000000000214",
+            "id": "relationship--00000000-0000-4006-9000-000000000216",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "relationship_type": "outputs",
@@ -809,7 +824,7 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000224",
+            "id": "note--00000000-0000-4006-9000-000000000226",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "MWCP Tags: something",
@@ -875,7 +890,7 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000236",
+            "id": "note--00000000-0000-4006-9000-000000000238",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "MWCP Tags: tag2",
@@ -958,7 +973,7 @@
         {
             "type": "note",
             "spec_version": "2.1",
-            "id": "note--00000000-0000-4006-9000-000000000249",
+            "id": "note--00000000-0000-4006-9000-000000000251",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "content": "Description: SuperMalware Implant\nAlphabet: 0123456789ABCDEF\nAlphabet Base: 16\nAlphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567=\nAlphabet Base: 32\nAlphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\nAlphabet Base: 64\nEvent Name: MicrosoftExist\nInjects Into: svchost\nInterval: 3.0\nkeylogger: True\nmisc_integer: 432\n    misc_integer Tags: tag1\nVersion: 3.1\nVersion: 403.10",
@@ -969,11 +984,11 @@
         {
             "type": "malware-analysis",
             "spec_version": "2.1",
-            "id": "malware-analysis--00000000-0000-4006-9000-000000000251",
+            "id": "malware-analysis--00000000-0000-4006-9000-000000000253",
             "created": "2022-01-01T07:32:00.000Z",
             "modified": "2022-01-01T07:32:00.000Z",
             "product": "mwcp",
-            "version": "3.12.0",
+            "version": "3.14.0",
             "analysis_sco_refs": [
                 "crypto-currency-address--e2e281c7-65af-5545-970a-8348106e4e15",
                 "directory--a85fb8f4-0b2b-5c61-9cff-fc777cfd6286",
@@ -1019,6 +1034,7 @@
                 "symmetric-encryption--142febd3-2359-57f8-b864-179af8a65bc0",
                 "symmetric-encryption--89973fff-4119-5075-b47f-90b5de7e98c2",
                 "symmetric-encryption--e221dd6b-1b29-515a-b280-50b4e42f74aa",
+                "symmetric-encryption--edb619da-9899-5795-babd-2a4335a601d3",
                 "url--0bdcaa6f-f4d8-5870-b34c-3499c52f6da8",
                 "url--4ed0914c-e437-57b8-ad1b-cb681b6147f0",
                 "url--967a2810-a1a7-5d17-95fa-9a1d91b21f91",

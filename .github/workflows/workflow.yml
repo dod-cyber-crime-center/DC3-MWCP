@@ -8,7 +8,7 @@ jobs:
     strategy:
       matrix:
         # This workflow can be matrixed against multiple Python versions if desired. eg. [3.7, 3.8, 3.9, "3.10"]
-        python-version: [ 3.8 ]
+        python-version: [ "3.11" ]
 
     steps:
       # Get the code from the repository to be linted, packaged, and pushed

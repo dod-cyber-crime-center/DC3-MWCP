@@ -56,6 +56,10 @@ with self.file_object.open() as fo:
 A temporary file path can be generated in a context manager using `.temp_path()`.
 This can be helpful for external utilities that require a real file path.
 
+This directory will not be deleted after processing if the environment variable `MWCP_KEEP_TMP`
+is set to `true` or `1`.
+The last temporary directory created will be symbolically linked to `mwcp_current`. (In Windows, "Developer Mode" must be enabled.) 
+
 ```python
 with self.file_object.temp_path() as file_path:
     _some_library_that_needs_a_path(file_path)

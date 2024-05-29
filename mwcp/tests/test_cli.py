@@ -78,12 +78,12 @@ def test_list(tmp_path, make_sample_parser):
         print(ret.stderr, file=sys.stderr)
         assert ret.exit_code == 0
 
-        results = json.loads(ret.stdout, encoding="utf8")
+        results = json.loads(ret.stdout)
         assert len(results) > 1
         for name, source_name, author, description in results:
-            if name == u"foo" and source_name == u"dc3":
-                assert author == u"DC3"
-                assert description == u"example parser that works on any file"
+            if name == "foo" and source_name == "dc3":
+                assert author == "DC3"
+                assert description == "example parser that works on any file"
                 break
         else:
             pytest.fail("Sample parser was not listed.")
@@ -101,13 +101,13 @@ def test_list(tmp_path, make_sample_parser):
         assert ret.exit_code == 0
 
         # FIXME: This breaks if user has set up a PARSER_SOURCE in the configuration file.
-        results = json.loads(ret.stdout, encoding="utf8")
+        results = json.loads(ret.stdout)
         assert len(results) > 1
         for name, source_name, author, description in results:
             if source_name == str(parser_dir):
-                assert name == u"Sample"
-                assert author == u"Mr. Tester"
-                assert description == u"A test parser"
+                assert name == "Sample"
+                assert author == "Mr. Tester"
+                assert description == "A test parser"
                 break
         else:
             pytest.fail("Sample parser from parser directory was not listed.")
@@ -122,9 +122,9 @@ def test_list(tmp_path, make_sample_parser):
         print(ret.stderr, file=sys.stderr)
         assert ret.exit_code == 0
 
-        results = json.loads(ret.stdout, encoding="utf8")
+        results = json.loads(ret.stdout)
         assert results == [
-            [u"Sample", str(parser_dir), u"Mr. Tester", u"A test parser"]
+            ["Sample", str(parser_dir), "Mr. Tester", "A test parser"]
         ]
 
         # Now try adding the config_file path to the __init__.py file in order to avoid having
@@ -139,9 +139,9 @@ def test_list(tmp_path, make_sample_parser):
         print(ret.stderr, file=sys.stderr)
         assert ret.exit_code == 0
 
-        results = json.loads(ret.stdout, encoding="utf8")
+        results = json.loads(ret.stdout)
         assert results == [
-            [u"Sample", str(parser_dir), u"Mr. Tester", u"A test parser"]
+            ["Sample", str(parser_dir), "Mr. Tester", "A test parser"]
         ]
 
 
@@ -295,7 +295,7 @@ def test_add_filelist_testcase(tmp_path):
         filelist.append((str(file), hashlib.md5(data).hexdigest()))
 
     filelist_txt = tmp_path / "filelist.txt"
-    filelist_txt.write_text(u"\n".join(file_path for file_path, _ in filelist), "utf8")
+    filelist_txt.write_text("\n".join(file_path for file_path, _ in filelist), "utf8")
 
     # Add a test case for our sample parser.
     ret = runner.invoke(cli.main, [

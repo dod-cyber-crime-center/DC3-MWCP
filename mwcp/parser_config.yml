@@ -51,7 +51,7 @@ Quarantined:
     - .SymantecQB
     - .SymantecSubSDK
     - .AhnLab
-    - .Avast
+    - .Avast_AVG
 
 RSA:
   description: RSA artifacts

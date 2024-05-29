@@ -9,22 +9,21 @@ import pytest
 from mwcp.utils import construct
 
 
-@pytest.mark.xfail(
-    raises=ValueError,
-    reason="Doctest is producing a 'wrapper loop when unwrapping obj_' error"
-)
-def test_helpers():
+# @pytest.mark.xfail(
+#     raises=ValueError,
+#     reason="Doctest is producing a 'wrapper loop when unwrapping obj_' error"
+# )
+@pytest.mark.parametrize("module", [
+    construct.helpers,
+    construct.datetime_,
+    construct.network,
+    construct.windows_enums,
+    construct.windows_structures,
+])
+def test_helpers(module):
     """Tests that the doctests for the helpers work."""
-    helper_modules = [
-        construct.helpers,
-        construct.datetime_,
-        construct.network,
-        construct.windows_enums,
-        construct.windows_structures
-    ]
-    for module in helper_modules:
-        results = doctest.testmod(module)
-        assert not results.failed
+    results = doctest.testmod(module)
+    assert not results.failed
 
 
 def test_html():

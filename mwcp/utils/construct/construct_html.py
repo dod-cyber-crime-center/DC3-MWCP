@@ -3,7 +3,6 @@
 To use, run the html_hex with a construct and data:
     print html_hex(CONSTRUCT, data)
 """
-from __future__ import print_function
 
 import codecs
 import os
@@ -11,17 +10,7 @@ import construct
 import itertools
 import jinja2
 import sys
-
-
-PY3 = sys.version_info.major == 3
-
-
-try:
-    # Python 2
-    from itertools import izip_longest
-except ImportError:
-    # Python 3
-    from itertools import zip_longest as izip_longest
+from itertools import zip_longest
 
 
 COLORPALLETTE = [
@@ -62,7 +51,7 @@ def grouper(n, iterable, fillvalue=None):
     [('A', 'B', 'C'), ('D', 'E', 'F'), ('G', 'x', 'x')]
     """
     args = [iter(iterable)] * n
-    return izip_longest(fillvalue=fillvalue, *args)
+    return zip_longest(fillvalue=fillvalue, *args)
 
 
 def _iter_colors(data, color_map, default=None):
@@ -98,7 +87,7 @@ class Member(construct.RawCopy):
         :param subcon:
         """
         self._member_map = member_map
-        super(Member, self).__init__(subcon)
+        super().__init__(subcon)
         # version 2.9 doesn't perpetuate the name past one level anymore.
         self.name = self.subcon.name
 
@@ -121,7 +110,7 @@ class Member(construct.RawCopy):
             return tabs + '{}'.format(value)
 
     def _parse(self, stream, context, path):
-        obj = super(Member, self)._parse(stream, context, path)
+        obj = super()._parse(stream, context, path)
 
         # Store offset, data, and size information then return original object like nothing happened...
         if self.name and not self.name.startswith('_'):
@@ -160,7 +149,7 @@ class MemberMap(construct.Adapter):
         # member_map is a dictionary mapping the offsets of elements to a list of elements it portrays
         self._member_map = {}
         subcon = self._wrap_subcon(subcon)
-        super(MemberMap, self).__init__(subcon)
+        super().__init__(subcon)
 
     def _wrap_subcon(self, subcon):
         """Recursively wraps all subconstructs with Member."""
@@ -191,7 +180,7 @@ class MemberMap(construct.Adapter):
     def _parse(self, stream, context, path):
         # Clear the member_table from previous use.
         self._member_map.clear()
-        return super(MemberMap, self)._parse(stream, context, path)
+        return super()._parse(stream, context, path)
 
     def _decode(self, obj, context, path):
         """Returns a copy of the member map."""
@@ -305,8 +294,6 @@ def html_hex(struct, data, width=16, depth=None, member_callback=None):
                 current_color = None
 
             if byte is not None:
-                if not PY3:
-                    byte = ord(byte)
                 hex_ = '{:02X}'.format(byte)
                 ascii = chr(byte) if 32 < byte < 127 else '.'
             else:
@@ -336,7 +323,7 @@ def html_hex(struct, data, width=16, depth=None, member_callback=None):
 
 if __name__ == '__main__':
     # Run an example if called directly.
-    from mwcp.utils.construct import version28 as construct
+    from mwcp.utils.construct import core as construct
     from mwcp.utils.construct.network import IP4Address
     from mwcp.utils.construct.helpers import HexString
     from construct import this

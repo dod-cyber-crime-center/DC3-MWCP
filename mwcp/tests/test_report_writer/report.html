@@ -91,12 +91,13 @@
 <h2>Encryption Key</h2>
 <table>
 <thead>
-<tr><th>Key                             </th><th>Algorithm  </th><th>Mode  </th><th>Iv        </th></tr>
+<tr><th>Key                             </th><th>Algorithm  </th><th>Mode  </th><th>Iv        </th><th>Secret                                   </th><th>Key Derivation  </th></tr>
 </thead>
 <tbody>
-<tr><td>0x68656c6c6f (&quot;hello&quot;)</td><td>rc4        </td><td>      </td><td>          </td></tr>
-<tr><td>0xffffffff                      </td><td>aes        </td><td>ecb   </td><td>0x00000000</td></tr>
-<tr><td>0xffff                          </td><td>xor        </td><td>      </td><td>          </td></tr>
+<tr><td>0x68656c6c6f (&quot;hello&quot;)</td><td>rc4        </td><td>      </td><td>          </td><td>                                         </td><td>                </td></tr>
+<tr><td>0xffffffff                      </td><td>aes        </td><td>ecb   </td><td>0x00000000</td><td>                                         </td><td>                </td></tr>
+<tr><td>0xffffffff                      </td><td>aes        </td><td>cbc   </td><td>          </td><td>0x7040737377307264 (&quot;p@ssw0rd&quot;)</td><td>sha256          </td></tr>
+<tr><td>0xffff                          </td><td>xor        </td><td>      </td><td>          </td><td>                                         </td><td>                </td></tr>
 </tbody>
 </table>
 
