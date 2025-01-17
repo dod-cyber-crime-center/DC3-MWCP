@@ -64,12 +64,14 @@
         "description": "tuple of username and password", 
         "examples": [
             [
-                "Hunter", 
-                "Benson"
+                "username", 
+                "password",
+                "system_name"
             ], 
             [
                 "admin", 
-                "123456"
+                "123456",
+                "https://example.gov"
             ]
         ], 
         "type": "listofstringtuples"
