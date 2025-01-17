@@ -23,11 +23,13 @@ foo:
   parsers:
     - .Foo
 
-PasswordFinder:
+CredentialFinder:
   description: A parser to identify potential passwords in a text file
-  author: foxtrothotel
+  author: fh
   parsers:
-    - .PasswordFinder
+    - .AzVOne
+    - .GenericVTwo
+    - .GenericVOne
 
 GenericDropper:
   description: Generic Dropper
