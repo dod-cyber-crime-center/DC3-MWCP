@@ -23,6 +23,12 @@ foo:
   parsers:
     - .Foo
 
+PasswordFinder:
+  description: A parser to identify potential passwords in a text file
+  author: foxtrothotel
+  parsers:
+    - .PasswordFinder
+
 GenericDropper:
   description: Generic Dropper
   author: DC3
