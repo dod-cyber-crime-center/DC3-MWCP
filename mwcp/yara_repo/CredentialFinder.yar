@@ -1,55 +1,42 @@
 rule GenericVTwoRule
 {
 	meta:
-		description = "A yara rule for GenericVTwo parser in CredentialFinder.py"
+		description = "Generic password parser version two"
 		author = "FH"
 		data = "2025-01-17"
 		version = "1.0"
 		mwcp = "GenericVTwo"
 
 	strings:
-		$password = "password" nocase
-		$username = "username" nocase
-		$url = "url" nocase
-		$website = "website"
-
+		$regex = /username:[^\n]*\npassword:[^\n]*\nwebsite:[^\n]*[\n$]/
 	condition:
-		$password and $username and ($url or $website)	
+		any of them
 }
-rule PasswordRule
+rule GenericVOneRule
 {
 	meta:
-		description = ""
+		description = "Generic password parser version one"
 		author = "FH"
 		data = "2025-01-17"
 		version = "1.0"
-		mwcp = "PasswordFinder"
+		mwcp = "GenericVOne"
 
 	strings:
-		$password = "password" nocase
-		$username = "username" nocase
-		$url = "url" nocase
-		$website = "website"
-
+		$regex = /URL:[^\n]*\n\s+Username:[^\n]*\n\s+Password:[^\n]*[\n$]/
 	condition:
-		$password and $username and ($url or $website)	
+		any of them
 }
-rule PasswordRule
+rule AzVOne
 {
 	meta:
-		description = ""
+		description = "Az version one"
 		author = "FH"
 		data = "2025-01-17"
 		version = "1.0"
-		mwcp = "PasswordFinder"
-
+		mwcp = "AzVOne"
 	strings:
-		$password = "password" nocase
-		$username = "username" nocase
-		$url = "url" nocase
-		$website = "website"
-
+		$regex = /SOFT:[^\n]*\nURL:[^\n]*\nUSER:[^\n]*\nPASS:[^\n]*[\n$]/
 	condition:
-		$password and $username and ($url or $website)	
+		any of them
 }
 
