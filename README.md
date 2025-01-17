@@ -1,6 +1,6 @@
 # DC3-MWCP
 
-[Changelog](CHANGELOG.md) | [Releases](https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP/releases)
+[Changelog](CHANGELOG.md) | [Releases](https://github.com/finleyh/DC3-MWCP/releases)
 
 DC3 Malware Configuration Parser (DC3-MWCP) is a framework for parsing configuration information from malware.
 The information extracted from malware includes items such as addresses, passwords, filenames, and
@@ -43,14 +43,14 @@ command line tool. DC3-MWCP is authored by the Defense Cyber Crime Center (DC3).
 Alternatively you can clone this repo and install locally.
 
 ```console
-> git clone https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP.git
+> git clone https://github.com/finleyh/DC3-MWCP.git
 > pip install ./DC3-MWCP
 ```
 
 For a development mode use the `-e` flag to install in editable mode:
 
 ```console
-> git clone https://github.com/Defense-Cyber-Crime-Center/DC3-MWCP.git
+> git clone https://github.com/finleyh/DC3-MWCP.git
 > pip install -e ./DC3-MWCP
 ```
 
@@ -81,7 +81,7 @@ SuperMalware:
 
 ## Dragodis Support
 
-DC3-MWCP optionally supports [Dragodis](https://github.com/Defense-Cyber-Crime-Center/Dragodis)
+DC3-MWCP optionally supports [Dragodis](https://github.com/finleyh/Dragodis)
 if it is installed. This allows you to obtain a disassembler agnostic interface for parsing
 the file's disassembly from the `mwcp.FileObject` object with the `.disassembly()` function.
 
@@ -93,15 +93,15 @@ pip install ./DC3-MWCP[dragodis]
 pip install -e ./DC3-MWCP[dragodis]
 ```
 
-After installation make sure to follow Dragodis's [installation instructions](https://github.com/Defense-Cyber-Crime-Center/Dragodis/blob/master/docs/install.rst) to setup
+After installation make sure to follow Dragodis's [installation instructions](https://github.com/finleyh/Dragodis/blob/master/docs/install.rst) to setup
 a backend disassembler.
 
-*It is recommended to also install [Rugosa](https://github.com/Defense-Cyber-Crime-Center/rugosa) 
+*It is recommended to also install [Rugosa](https://github.com/finleyh/rugosa) 
 for emulation and regex/yara matching capabilities using Dragodis.*
 
 ## DC3-Kordesii Support
 
-DC3-MWCP optionally supports [DC3-Kordesii](https://github.com/Defense-Cyber-Crime-Center/kordesii)
+DC3-MWCP optionally supports [DC3-Kordesii](https://github.com/finleyh/kordesii)
 if it is installed. This will allow you to run any DC3-Kordesii decoder from the
 `mwcp.FileObject` object with the `run_kordesii_decoder` function.
 
