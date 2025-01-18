@@ -28,6 +28,7 @@ CredentialFinder:
   author: fh
   parsers:
     - .AzVOne
+    - .AzVTwo
     - .GenericVTwo
     - .GenericVOne
 

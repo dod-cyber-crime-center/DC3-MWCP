@@ -1,6 +1,7 @@
 import re
 import logging
 from mwcp import Parser, metadata
+import pdb
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -14,10 +15,10 @@ class GenericVOne(Parser):
         return True
 
     def run(self):
-        regex=r'URL:(.*?)\nUsername:(.*?)\nPassword(.*?)[$\n]'
+        regex=r'url\s*[^\s]\s*([^\n]*)\n\s*username\s*[^\s]\s*([^\n]*)\n\s*password\s*[^\s]\s*([^\n]*)[\n$\s]'
         logger.info(f"{self.DESCRIPTION} by {self.AUTHOR}")
         file_content = self.file_object.data.decode(errors="backslashreplace")
-        matches = re.findall(regex, file_content)
+        matches = re.findall(regex, file_content, re.IGNORECASE)
         for m in matches:
             self.report.add(metadata.Credential(m))
 
@@ -31,7 +32,7 @@ class GenericVTwo(Parser):
         return True
 
     def run(self):
-        regex=r'username:(.*?)\npassword:(.*?)\nwebsite:(.*?)[$\n]'
+        regex=r'username:\s*(.*?)\npassword:\s*(.*?)\nwebsite:\s*(.*?)[$\n]'
         logger.info(f"{self.DESCRIPTION} by {self.AUTHOR}")
         file_content = self.file_object.data.decode(errors="backslashreplace")
         matches = re.findall(regex, file_content)
@@ -48,7 +49,24 @@ class AzVOne(Parser):
         return True
 
     def run(self):
-        regex = r'SOFT:(.*?)\nURL:(.*?)\nUSER:(.*?)\nPASS:(.*?)[\n$]'
+        regex = r'SOFT:\s*(.*?)\nURL:\s*(.*?)\nUSER:\s*(.*?)\nPASS:\s*(.*?)[\n$]'
+        logger.info(f"{self.DESCRIPTION} by {self.AUTHOR}")
+        file_content = self.file_object.data.decode(errors="backslashreplace")
+        matches = re.findall(regex, file_content, re.IGNORECASE)
+        for m in matches:
+            self.report.add(metadata.Credential(m))
+
+
+class AzVTwo(Parser):
+    DESCRIPTION="Parser for Azlt v2"
+    AUTHOR = "fh"
+    
+    @classmethod
+    def identify(cls, file_object):
+        return True
+
+    def run(self):
+        regex = r'Browser:\s*(.*?)\nUrl:\s*(.*?)\nLogin:\s*(.*?)\nPass:\s*(.*?)[\n$]'
         logger.info(f"{self.DESCRIPTION} by {self.AUTHOR}")
         file_content = self.file_object.data.decode(errors="backslashreplace")
         matches = re.findall(regex, file_content, re.IGNORECASE)

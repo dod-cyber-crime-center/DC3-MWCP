@@ -3,7 +3,7 @@ rule GenericVTwoRule
 	meta:
 		description = "Generic password parser version two"
 		author = "FH"
-		data = "2025-01-17"
+		date = "2025-01-17"
 		version = "1.0"
 		mwcp = "CredentialFinder.GenericVTwo"
 
@@ -18,12 +18,12 @@ rule GenericVOneRule
 	meta:
 		description = "Generic password parser version one"
 		author = "FH"
-		data = "2025-01-17"
+		date = "2025-01-17"
 		version = "1.0"
 		mwcp = "CredentialFinder.GenericVOne"
 
 	strings:
-		$regex = /URL:[^\n]*\n\s+Username:[^\n]*\n\s+Password:[^\n]*[\n$]/
+		$regex = /[uU][Rr][Ll]\s*[^\s]\s*[^\n]*\n\s*[Uu]sername\s*[^\s]\s*[^\n]*\n\s*[Pp]assword\s*[^\s]\s*[^\n]*[\n$\s]/
 	condition:
 		any of them
 }
@@ -33,7 +33,7 @@ rule AzVOne
 	meta:
 		description = "Az version one"
 		author = "FH"
-		data = "2025-01-17"
+		date = "2025-01-17"
 		version = "1.0"
 		mwcp = "CredentialFinder.AzVOne"
 	strings:
@@ -47,7 +47,7 @@ rule AzVTwo
 	meta:
 		description = "Az version two"
 		author = "FH"
-		data = "2025-01-18"
+		date = "2025-01-18"
 		version = "1.0"
 		mwcp = "CredentialFinder.AzVTwo"
 	strings:
