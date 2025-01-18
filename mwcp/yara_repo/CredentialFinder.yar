@@ -12,6 +12,7 @@ rule GenericVTwoRule
 	condition:
 		any of them
 }
+
 rule GenericVOneRule
 {
 	meta:
@@ -26,6 +27,7 @@ rule GenericVOneRule
 	condition:
 		any of them
 }
+
 rule AzVOne
 {
 	meta:
@@ -40,3 +42,16 @@ rule AzVOne
 		any of them
 }
 
+rule AzVTwo
+{
+	meta:
+		description = "Az version two"
+		author = "FH"
+		data = "2025-01-18"
+		version = "1.0"
+		mwcp = "CredentialFinder.AzVTwo"
+	strings:
+		$regex = /Browser:\s*[^\n]*\nUrl:\s*[^\n]*\nLogin:\s*[^\n]*\nPass:\s*[^\n]*[\n$]/
+	condition:
+		any of them
+}
