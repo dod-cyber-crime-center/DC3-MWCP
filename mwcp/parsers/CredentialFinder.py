@@ -39,6 +39,21 @@ class GenericVTwo(Parser):
         for m in matches:
             self.report.add(metadata.Credential(m))
 
+class GenericVThree(Parser):
+    DESCRIPTION = "Genericv3"
+    AUTHOR = "fh"    
+
+    @classmethod
+    def identify(cls, file_object):
+        return True
+
+    def run(self):
+        regex = r'\s*url\s*:\s*([^\n]*)\n\s*login\s*:\s*([^\n]*)\n\s*password\s*:\s*([^\n]*)[\n$]'
+        logger.info(f"{self.DESCRIPTION} by {self.AUTHOR}")
+        file_content = self.file_object.data.decode(errors="backslashreplace")
+        matches = re.findall(regex, file_content,re.IGNORECASE)
+        for m in matches:
+            self.report.add(metadata.Credential(m))
 
 class AzVOne(Parser):
     DESCRIPTION="Parser for Azlt v1"

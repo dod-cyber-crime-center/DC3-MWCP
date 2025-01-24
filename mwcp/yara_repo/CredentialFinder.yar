@@ -1,3 +1,17 @@
+rule GenericVThreeRule
+{
+	meta:
+		description = "Generic password parser version three"
+		author = "FH"
+		date = "2025-01-24"
+		version = "1.0"
+		mwcp = "CredentialFinder.GenericVThree"
+
+	strings:
+		$regex = /\s*url\s*:[^\n]*\n\s*login\s*:[^\n]*\n\s*password\s*:[^\n]*[\n$]/i
+	condition:
+		any of them
+}
 rule GenericVTwoRule
 {
 	meta:
