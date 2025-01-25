@@ -55,7 +55,6 @@ rule AzVOne
 	condition:
 		any of them
 }
-
 rule AzVTwo
 {
 	meta:
@@ -66,6 +65,19 @@ rule AzVTwo
 		mwcp = "CredentialFinder.AzVTwo"
 	strings:
 		$regex = /Browser:\s*[^\n]*\nUrl:\s*[^\n]*\nLogin:\s*[^\n]*\nPass:\s*[^\n]*[\n$]/
+	condition:
+		any of them
+}
+rule AzVThree
+{
+	meta:
+		description = "Az version three"
+		author = "FH"
+		date = "2025-01-24"
+		version = "1.0"
+		mwcp = "CredentialFinder.AzVThree"
+	strings:
+		$regex = /Soft:\s*[^\n]*\nHost:\s*[^\n]*\nLogin:\s*[^\n]*\nPassword:\s*[^\n]*\n/
 	condition:
 		any of them
 }

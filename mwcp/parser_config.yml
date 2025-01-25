@@ -29,6 +29,7 @@ CredentialFinder:
   parsers:
     - .AzVOne
     - .AzVTwo
+    - .AzVThree
     - .GenericVTwo
     - .GenericVOne
     - .GenericVThree

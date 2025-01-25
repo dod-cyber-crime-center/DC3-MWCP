@@ -88,3 +88,17 @@ class AzVTwo(Parser):
         for m in matches:
             self.report.add(metadata.Credential(m))
 
+class AzVThree(Parser):
+    DESCRIPTION="Parser for Azlt v3"
+    AUTHOR = "fh"
+    @classmethod
+    def identify(cls, file_object):
+        return True
+
+    def run(self):
+        regex = r'Soft:\s*([^\n]*)\nHost:\s*([^\n]*)\nLogin:\s*([^\n]*)\nPassword:\s*([^\n]*)\n'
+        logger.info(f"{self.DESCRIPTION} by {self.AUTHOR}")
+        file_content = self.file_object.data.decode(errors="backslashreplace")
+        matches = re.findall(regex, file_content, re.IGNORECASE)
+        for m in matches:
+            self.report.add(metdata.Credential(m))
