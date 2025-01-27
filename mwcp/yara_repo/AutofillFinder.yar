@@ -13,7 +13,7 @@ rule GenericVOneRule
 		$applica="applica" ascii wide nocase
 		$email = "email" ascii wide nocase
 		$address = "address" ascii wide nocase
-		$special /:\s*[^\n]+[$\n]/
+		$special = /email\]?:\s*[^\n]+[$\n]/
 
 	condition:
 		$firstname and $lastname and ($applica or $email or $address) and #special>10
