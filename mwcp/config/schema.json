@@ -212,7 +212,7 @@
                     },
                     {
                         "title": "Credential",
-                        "description": "Collection of username and password used as credentials.",
+                        "description": "Collection of username and password used as credentials, with their associated systems.",
                         "type": "object",
                         "properties": {
                             "type": {
@@ -223,6 +223,12 @@
                                 "items": {
                                     "type": "string"
                                 }
+                            },
+                            "software": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
                             },
                             "username": {
                                 "type": [
