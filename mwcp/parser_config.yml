@@ -45,6 +45,11 @@ CredentialFinder:
     - .GenericVTwo
     - .GenericVOne
     - .GenericVThree
+HistoryFinder:
+  description: A parser to identify browser view history in a text format
+  author: fh
+  parsers:
+    - .GenericVOne
 
 GenericDropper:
   description: Generic Dropper
