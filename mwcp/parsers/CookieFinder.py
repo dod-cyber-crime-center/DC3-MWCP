@@ -15,7 +15,7 @@ class GenericVOne(Parser):
         return True
 
     def run(self):
-        regex = r'(^\s+)\x09(?:TRUE|FALSE)\x09\x2F\x09(?:TRUE|FALSE)\x09([123]\d{9})\x09([^\n$]+)'
+	regex = r'([a-zA-Z0-9-\._]+)\x09(?:TRUE|FALSE)\x09\x2F\x09(?:TRUE|FALSE)\x09([123]\d{9})\x09([^\n]+)'
         logger.info(f"{self.DESCRIPTION} by {self.AUTHOR}")
         file_content = self.file_object.data.decode(errors="backslashreplace")
         matches = re.findall(regex, file_content, re.IGNORECASE)
