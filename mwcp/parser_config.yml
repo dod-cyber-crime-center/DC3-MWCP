@@ -23,8 +23,14 @@ foo:
   parsers:
     - .Foo
 
+CookieFinder:
+  description: A parser to identify potential cookie files in a text format
+  author: fh
+  parsers:
+    - .GenericVOne
+
 CredentialFinder:
-  description: A parser to identify potential passwords in a text file
+  description: A parser to identify potential passwords in a text format
   author: fh
   parsers:
     - .AzVOne
