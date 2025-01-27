@@ -454,6 +454,14 @@
         ], 
         "type": "listofstrings"
     }, 
+    "software": {
+        "description": "software/system name associated to credentials", 
+        "examples": [
+            "www.bing.com", 
+            "crowdstrike"
+        ], 
+        "type": "listofstrings"
+    }, 
     "version": {
         "description": "the version of the malware. To the degree possible this should be based directly on artifacts from the malware", 
         "examples": [
