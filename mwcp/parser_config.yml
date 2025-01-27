@@ -23,6 +23,12 @@ foo:
   parsers:
     - .Foo
 
+AutofillFinder:
+  description: finds autofill files
+  author: fh
+  parsers:
+    - .GenericVOne
+
 CookieFinder:
   description: A parser to identify potential cookie files in a text format
   author: fh
