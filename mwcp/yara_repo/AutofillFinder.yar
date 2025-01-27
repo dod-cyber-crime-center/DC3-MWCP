@@ -16,5 +16,5 @@ rule GenericVOneRule
 		$special = /email\]?:\s*[^\n]+[$\n]/
 
 	condition:
-		$firstname and $lastname and ($applica or $email or $address) and #special>10
+		$firstname and $lastname and ($applica or $email or $address) and #special>3
 }
