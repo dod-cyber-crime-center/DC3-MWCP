@@ -51,6 +51,12 @@ HistoryFinder:
   parsers:
     - .GenericVOne
 
+LinuxFinder:
+  description: A parser to identify interesting files found on linux
+  author: fh
+  parsers:
+    - .SSHPrivateKey
+
 GenericDropper:
   description: Generic Dropper
   author: DC3
