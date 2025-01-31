@@ -17,12 +17,14 @@ class SSHPublicKey(Parser):
         return True
 
     def run(self):
-        regex=r'url\s*[^\s]\s*([^\n]*)\n\s*username\s*[^\s]\s*([^\n]*)\n\s*password\s*[^\s]\s*([^\n]*)[\n$\s]'
+        regex=r'((?:ssh|ecdsa)[^\s]+)\s+([^\s]+)(?:\s+([^\n]+))?\n'
         logger.info(f"{self.DESCRIPTION} by {self.AUTHOR}")
         file_content = self.file_object.data.decode(errors="backslashreplace")
         matches = re.findall(regex, file_content, re.IGNORECASE)
         for m in matches:
-            self.report.add(metadata.Credential(m))
+            self.report.add(metadata.Other('ssh_public_key',m[1]))
+            self.report.add(metadata.Other('ssh_public_key_type',m[0]))
+            self.report.add(metadata.Other('ssh_public_key_user',m[2]))
 
 
 class SSHPrivateKey(Parser):
