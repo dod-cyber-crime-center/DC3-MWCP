@@ -48,6 +48,7 @@ setup(
         'isodate',
         'jinja2',  # For construct.html_hex()
         'jsonschema_extractor>=1.0',
+        'lief>=0.16.0;python_version>="3.9"',
         'packaging',
         'pandas',
         'pefile>=2019.4.18',
