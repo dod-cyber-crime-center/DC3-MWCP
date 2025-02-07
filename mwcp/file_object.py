@@ -20,7 +20,7 @@ from typing import List, Optional, Iterable, Union, TYPE_CHECKING, ContextManage
 import pefile
 
 from mwcp import metadata, config
-from mwcp.utils import elffileutils, pefileutils
+from mwcp.utils import elffileutils, pefileutils, machoutils
 from mwcp.utils.stringutils import convert_to_unicode, sanitize_filename
 
 try:
@@ -113,6 +113,8 @@ class FileObject(object):
         self._resources = None
         self._elf = None
         self._elf_attempt = False
+        self._macho = None
+        self._macho_attempt = False
         self.output_file = output_file
         self._outputted_file = False
         self._kordesii_cache = {}
@@ -273,6 +275,14 @@ class FileObject(object):
             self._elf_attempt = True
             self._elf = elffileutils.obtain_elf(self.data)
         return self._elf
+
+    @property
+    def macho(self):
+        """Returns lief.MachO.FatBinary object or None if not a Mach-O file."""
+        if not self._macho and not self._macho_attempt:
+            self._macho_attempt = True
+            self._macho = machoutils.obtain_macho(self.data)
+        return self._macho
 
     # TODO: Deprecate "file_name" name in exhange for "name"?
     @property

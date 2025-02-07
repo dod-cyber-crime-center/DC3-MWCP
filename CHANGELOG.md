@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- `machoutils` helper utility that works similar to `pefileutils`, but for Mach-O files. (@ddash-ct)
+- Add `macho` property to `FileObject`. (@ddash-ct)
+- `lief>=0.16.0;python_version>="3.9"` dependency for `macho`
+
+
 ## [3.14.0] - 2024-05-29
 
 ### Added
