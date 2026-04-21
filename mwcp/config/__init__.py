@@ -3,7 +3,7 @@
 import logging
 import os
 import pathlib
-import pkg_resources
+from importlib import resources
 
 import appdirs
 from ruamel.yaml import YAML
@@ -29,7 +29,7 @@ class Config(dict):
         super().__init__(**kwargs)
         # We are going to manually add the fields.json path because
         # the fields.json file is not currently designed to be modified.
-        self["FIELDS_PATH"] = os.path.abspath(pkg_resources.resource_filename("mwcp.config", "fields.json"))
+        self["FIELDS_PATH"] = str(resources.files("mwcp.config").joinpath("fields.json"))
 
     def __repr__(self):
         return f"Config({super().__repr__()})"
@@ -54,16 +54,16 @@ class Config(dict):
         # Create a user copy if it doesn't exist.
         cfg_file_path = cfg_dir / self.CONFIG_FILE_NAME
         if not cfg_file_path.exists():
-            with pkg_resources.resource_stream("mwcp.config", self.CONFIG_FILE_NAME) as default_cfg:
-                with open(cfg_file_path, "wb") as fp:
-                    fp.write(default_cfg.read())
+            default_cfg_data = resources.files("mwcp.config").joinpath(self.CONFIG_FILE_NAME).read_bytes()
+            with open(cfg_file_path, "wb") as fp:
+                    fp.write(default_cfg_data)
 
         # Also copy over log_config.yml
         log_config_path = cfg_dir / "log_config.yml"
         if not log_config_path.exists():
-            with pkg_resources.resource_stream("mwcp.config", "log_config.yml") as default_log_cfg:
-                with open(log_config_path, "wb") as fp:
-                    fp.write(default_log_cfg.read())
+            default_log_data = resources.files("mwcp.config").joinpath("log_config.yml").read_bytes()
+            with open(log_config_path, "wb") as fp:
+                    fp.write(default_log_data)
 
         return cfg_file_path
 

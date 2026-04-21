@@ -12,7 +12,7 @@ import os
 import pkgutil
 from typing import Optional, Dict, List, Type, Iterable
 
-import pkg_resources
+from importlib.metadata import entry_points
 
 from ruamel.yaml import YAML
 
@@ -136,7 +136,7 @@ def register_entry_points():
     Registers parsers found in entry_point: "mwcp.parsers"
     :return:
     """
-    for entry in pkg_resources.iter_entry_points("mwcp.parsers"):
+    for entry in entry_points(group="mwcp.parsers"):
         package = entry.load()
         register_parser_package(package, source_name=entry.name)
 

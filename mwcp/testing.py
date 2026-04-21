@@ -11,7 +11,7 @@ import shutil
 from dataclasses import dataclass
 from typing import Iterable, Union, List
 
-import pkg_resources
+from importlib import resources
 
 import mwcp
 from mwcp import registry, config
@@ -147,7 +147,7 @@ def _get_testcase_dir_from_source(source: registry.Source) -> pathlib.Path:
     """
     if source.is_pkg:
         # Dynamically pull based on top level module.
-        return pathlib.Path(pkg_resources.resource_filename(source.path, "tests"))
+        return pathlib.Path(str(resources.files(source.path).joinpath("tests")))
 
     # If source is a directory, assume there is a "tests" folder within it.
     return pathlib.Path(source.path, "tests")

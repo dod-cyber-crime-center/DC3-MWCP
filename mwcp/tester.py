@@ -12,10 +12,7 @@ import sys
 import traceback
 from timeit import default_timer
 
-try:
-    import pkg_resources
-except ImportError:
-    pkg_resources = None
+from importlib import resources
 
 import mwcp
 from mwcp import config
@@ -159,7 +156,7 @@ class Tester(object):
 
             if source.is_pkg:
                 # Dynamically pull based on parser's top level module.
-                test_dir = pkg_resources.resource_filename(source.path, "tests")
+                test_dir = str(resources.files(source.path).joinpath("tests"))
             else:
                 # If source is a directory, assume there is a "tests" folder within it.
                 test_dir = os.path.join(source.path, "tests")
