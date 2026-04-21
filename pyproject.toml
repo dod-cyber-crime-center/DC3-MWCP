@@ -29,7 +29,7 @@ dependencies = [
     "attrs>=20.3.0",
     "bitarray",
     "cattrs",
-    "click>=8.0.1",
+    "click>=8.0.1,<8.2.0",
     "construct>=2.9.45,<2.11",
     "defusedxml",
     "future",
