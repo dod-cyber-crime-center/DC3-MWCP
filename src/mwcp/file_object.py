@@ -523,7 +523,12 @@ class FileObject:
             context = tempfile.TemporaryDirectory(prefix="mwcp_")
 
         with context as tmpdir:
-            temp_file = os.path.join(tmpdir, sanitize_filename(self.name) if self.name else self.md5)
+            # Fall back to the md5 when the name is missing or sanitizes to a
+            # blank/whitespace-only string. Such a name produces an invalid path
+            # that cannot be written (for example a name of all spaces on
+            # Windows). See #51.
+            filename = sanitize_filename(self.name).strip() if self.name else ""
+            temp_file = os.path.join(tmpdir, filename or self.md5)
             if extension and not temp_file.endswith(extension):
                 temp_file += extension
             with open(temp_file, "wb") as fo:
