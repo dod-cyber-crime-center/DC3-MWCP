@@ -89,3 +89,18 @@ SubParser:
     assert residual_files[1].name == "implant.txt"
     assert residual_files[1].description == "Unidentified file"
     assert (output_directory / "3e245_implant.txt").exists()
+
+
+def test_temp_path_with_blank_filename():
+    """
+    Tests bug #51 where a file name that is all whitespace (or otherwise
+    sanitizes to an empty string) produced an invalid temp path that could not
+    be written (for example a name of all spaces on Windows). The md5 should be
+    used as a fallback instead.
+    """
+    import os
+
+    file_object = mwcp.FileObject(b"some data", file_name="     ")
+    with file_object.temp_path() as path:
+        assert os.path.basename(path) == file_object.md5
+        assert os.path.exists(path)
