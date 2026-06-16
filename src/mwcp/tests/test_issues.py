@@ -2,6 +2,7 @@
 
 import csv
 import io
+import os
 import sys
 
 from click.testing import CliRunner
@@ -98,8 +99,6 @@ def test_temp_path_with_blank_filename():
     be written (for example a name of all spaces on Windows). The md5 should be
     used as a fallback instead.
     """
-    import os
-
     file_object = mwcp.FileObject(b"some data", file_name="     ")
     with file_object.temp_path() as path:
         assert os.path.basename(path) == file_object.md5
