@@ -159,8 +159,9 @@ class YaraRunner(Runner):
             raise RuntimeError(f"Unable to locate: {yara_repo}")
 
         compiler = yara_x.Compiler()
-        for file_path in yara_repo.rglob("*.yara?"):
-            print(file_path)
+        for file_path in yara_repo.rglob("*"):
+            if file_path.suffix not in (".yara", ".yar"):
+                continue
             content = file_path.read_text()
             # Ignore rules files without any "mwcp" meta elements.
             if not re.search(r"mwcp\s*=", content):
@@ -252,7 +253,6 @@ class YaraRunner(Runner):
 
         :returns: Report object containing parse results.
         """
-        print("here")
         input_file = self._generate_input_file(file_path, data)
 
         parser_name = parser
