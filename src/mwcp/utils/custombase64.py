@@ -62,7 +62,7 @@ def _code(data, custom_alpha, size, decode, code_func):
         data = data.encode()
     _validate_alphabet(custom_alpha, size)
     if size != 16 and len(custom_alpha) == size:
-        _adjust_pad(custom_alpha, data, decode)
+        custom_alpha = _adjust_pad(custom_alpha, data, decode)
     std_alpha = _STD_ALPHA[size]
 
     if decode:
