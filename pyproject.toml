@@ -52,7 +52,7 @@ dependencies = [
     "ruamel.yaml",
     "tabulate[widechars]<1.0.0",
     "stix2",
-    "yara-python",
+    "yara-x>=1.16.0",
 ]
 
 [project.optional-dependencies]

@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Replace `yara-python` with `yara-x`
+
 ## [3.16.1] - 2026-05-04
 
 ### Added

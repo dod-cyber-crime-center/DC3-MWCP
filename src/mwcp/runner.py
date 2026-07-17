@@ -10,7 +10,7 @@ import weakref
 from collections import deque
 from typing import TYPE_CHECKING, Union, Type, Iterable
 
-import yara
+import yara_x
 
 from mwcp import metadata
 from mwcp.file_object import FileObject
@@ -154,25 +154,26 @@ class YaraRunner(Runner):
         self._queue = deque()
         self._seen = set()
 
-    def compile_rules(self, yara_repo: pathlib.Path) -> yara.Rules:
+    def compile_rules(self, yara_repo: pathlib.Path) -> yara_x.Rules:
         if not yara_repo.exists():
             raise RuntimeError(f"Unable to locate: {yara_repo}")
-        # Collect and validate rule files.
-        rule_paths = []
+
+        compiler = yara_x.Compiler()
         for file_path in yara_repo.rglob("*"):
-            if file_path.suffix in (".yara", ".yar"):
-                # Ignore rules files without any "mwcp" meta elements.
-                if not re.search(r"mwcp\s*=", file_path.read_text()):
-                    logger.debug(f"Ignoring rule file without 'mwcp' metadata: {file_path}")
-                    continue
+            if file_path.suffix not in (".yara", ".yar"):
+                continue
+            content = file_path.read_text()
+            # Ignore rules files without any "mwcp" meta elements.
+            if not re.search(r"mwcp\s*=", content):
+                logger.debug(f"Ignoring rule file without 'mwcp' metadata: {file_path}")
+                continue
 
-                try:
-                    yara.compile(filepath=str(file_path))
-                    rule_paths.append(file_path)
-                except yara.Error as e:
-                    logger.warning(f"[Skipping Rules] Failed to compile: {e}")
+            try:
+                compiler.add_source(content)
+            except yara_x.CompileError as e:
+                logger.warning(f"[Skipping Rules] Failed to compile: {e}")
 
-        return yara.compile(filepaths={path.name: str(path) for path in rule_paths})
+        return compiler.build()
 
     def iter_parsers(self, file_object: FileObject, parser: Union[str, Parser] = None) -> Iterable[Parser]:
         """
@@ -191,12 +192,13 @@ class YaraRunner(Runner):
         seen = set()
         logger.info(f"Attempting to YARA match {file_object.name}")
         matched = False
-        for match in self._rules.match(data=file_object.data):
-            logger.debug(f"Matched {file_object.name} with YARA rule: {match.rule}")
-            if "mwcp" in match.meta:
-                mwcp_meta = match.meta["mwcp"]
-                logger.debug(f"Mapped {file_object.name}: {mwcp_meta}")
-                parser_names = [name.strip() for name in mwcp_meta.split(",")]
+        for match in self._rules.scan(file_object.data).matching_rules:
+            logger.debug(f"Matched {file_object.name} with YARA rule: {match.identifier}")
+            for identifier, value in match.metadata:
+                if identifier != "mwcp":
+                    continue
+                logger.debug(f"Mapped {file_object.name}: {value}")
+                parser_names = [name.strip() for name in value.split(",")]
                 for name in parser_names:
                     for source, parser in iter_parsers(name):
                         if (source.name, parser.name) not in seen:
